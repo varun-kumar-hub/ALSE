@@ -60,6 +60,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ onClose }) => {
   const [isPulling, setIsPulling] = useState(false);
   const [pullStatus, setPullStatus] = useState('');
   const [savedSuccess, setSavedSuccess] = useState(false);
+  const [savedProviderId, setSavedProviderId] = useState<string | null>(null);
 
   useEffect(() => {
     if (!workspaceLocation) {
@@ -81,6 +82,12 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ onClose }) => {
 
     setSavedSuccess(true);
     setTimeout(() => setSavedSuccess(false), 2000);
+  };
+
+  const handleSaveProvider = async (id: string) => {
+    await updateSetting('providerConfigs', JSON.stringify(providerConfigs));
+    setSavedProviderId(id);
+    setTimeout(() => setSavedProviderId(null), 2000);
   };
 
   const handlePullModel = async () => {
@@ -257,12 +264,28 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ onClose }) => {
 
                         <div className="space-y-1">
                           <label className="text-[10px] font-medium text-zinc-600">Default Model</label>
-                          <input
-                            type="text"
-                            value={cfg.defaultModel}
-                            onChange={(e) => updateProviderConfig(cfg.id, { defaultModel: e.target.value })}
-                            className="w-full bg-white border border-zinc-200 rounded-lg px-2.5 py-1.5 text-xs text-zinc-950 font-mono focus:outline-none focus:border-blue-500"
-                          />
+                          <div className="flex gap-2">
+                            <input
+                              type="text"
+                              value={cfg.defaultModel}
+                              onChange={(e) => updateProviderConfig(cfg.id, { defaultModel: e.target.value })}
+                              className="flex-1 bg-white border border-zinc-200 rounded-lg px-2.5 py-1.5 text-xs text-zinc-950 font-mono focus:outline-none focus:border-blue-500"
+                            />
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant="secondary"
+                              onClick={() => handleSaveProvider(cfg.id)}
+                              leftIcon={
+                                savedProviderId === cfg.id ? (
+                                  <Check className="w-3.5 h-3.5 text-emerald-600" />
+                                ) : undefined
+                              }
+                              className="shrink-0"
+                            >
+                              {savedProviderId === cfg.id ? 'Saved!' : 'Save'}
+                            </Button>
+                          </div>
                         </div>
                       </div>
                     )}
