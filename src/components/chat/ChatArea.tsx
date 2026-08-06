@@ -46,7 +46,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
     duration: step.status === 'running' ? '...' : undefined,
     defaultExpanded: step.status === 'running',
     content: step.detail ? (
-      <div className="rounded-lg border border-zinc-200 bg-zinc-50 p-3 text-xs leading-relaxed text-zinc-600">
+      <div className="rounded-lg border border-zinc-200 bg-zinc-50 p-3 text-xs leading-relaxed text-zinc-600 select-text">
         {step.detail}
       </div>
     ) : undefined,

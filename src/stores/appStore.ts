@@ -15,7 +15,7 @@ import {
 } from '../lib/thinkingTimeline';
 
 interface AppState {
-  sidebarOpen: boolean;
+  sidebarOpen: boolean; 
   activeView: 'welcome' | 'setup' | 'chat' | 'settings';
   currentChatId: string | null;
   selectedModel: string;

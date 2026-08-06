@@ -22,6 +22,11 @@ import { filterResponseForIntent } from './lib/responseFilter';
 import { buildThinkingTimeline } from './lib/thinkingTimeline';
 import { Chat, ChatMessage as ChatMessageType } from './services/types';
 
+function hasActiveTextSelection(): boolean {
+  const selection = window.getSelection?.();
+  return Boolean(selection && !selection.isCollapsed && selection.toString().length > 0);
+}
+
 export function App() {
   const {
     activeView,
@@ -155,7 +160,9 @@ export function App() {
       await streamChat(selectedModel, historyPayload, (chunk) => {
         if (chunk.message?.content) {
           fullAccumulatedResponse += chunk.message.content;
-          setStreamingContent(filterResponseForIntent(fullAccumulatedResponse, intent));
+          if (!hasActiveTextSelection()) {
+            setStreamingContent(filterResponseForIntent(fullAccumulatedResponse, intent));
+          }
         }
       });
     } catch (err) {
