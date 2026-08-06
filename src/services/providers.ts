@@ -128,7 +128,7 @@ export function resolveModelForCapability(
     if (coderModel) return coderModel;
   }
 
-  if (intent === 'embeddings') {
+  if ((intent as string) === 'embeddings') {
     const embedModel = installedModels.find((m) => m.toLowerCase().includes('embed'));
     if (embedModel) return embedModel;
   }
