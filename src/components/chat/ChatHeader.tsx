@@ -2,6 +2,7 @@ import React from 'react';
 import { Cpu, Download } from 'lucide-react';
 import { Button } from '../ui/Button';
 import { useAppStore } from '../../stores/appStore';
+import { getModelAgentRoleLabel } from '../../services/providers';
 
 interface ChatHeaderProps {
   chatTitle: string;
@@ -12,7 +13,7 @@ export const ChatHeader: React.FC<ChatHeaderProps> = ({ chatTitle, onExport }) =
   const { models, selectedModel, setSelectedModel } = useAppStore();
 
   return (
-    <header className="h-14 w-full flex items-center justify-between px-6 border-b border-zinc-200 bg-white/85 backdrop-blur-md shrink-0 z-10">
+    <header className="h-14 w-full flex items-center justify-between px-6 border-b border-zinc-200 bg-white/85 backdrop-blur-md shrink-0 z-10 select-none">
       {/* Chat Title */}
       <div className="flex items-center gap-3 min-w-0">
         <h2 className="text-sm font-bold text-zinc-950 truncate">
@@ -33,13 +34,24 @@ export const ChatHeader: React.FC<ChatHeaderProps> = ({ chatTitle, onExport }) =
             {models.length > 0 ? (
               models.map((m) => (
                 <option key={m.name} value={m.name} className="bg-white text-zinc-800">
-                  {m.name}
+                  {getModelAgentRoleLabel(m.name)}
                 </option>
               ))
             ) : (
-              <option value="llama3.2" className="bg-white text-zinc-800">
-                llama3.2 (3B)
-              </option>
+              <>
+                <option value="qwen3:8b" className="bg-white text-zinc-800">
+                  Qwen3:8B (General Agent)
+                </option>
+                <option value="qwen2.5-coder:7b" className="bg-white text-zinc-800">
+                  Qwen2.5-Coder:7B (Coding Agent)
+                </option>
+                <option value="llama3.2:latest" className="bg-white text-zinc-800">
+                  Llama 3.2 (General Agent - Alt)
+                </option>
+                <option value="nomic-embed-text:latest" className="bg-white text-zinc-800">
+                  nomic-embed-text (Embeddings / RAG)
+                </option>
+              </>
             )}
           </select>
         </div>

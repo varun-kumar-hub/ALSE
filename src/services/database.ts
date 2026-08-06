@@ -1,5 +1,6 @@
 import Database from '@tauri-apps/plugin-sql';
 import { Chat, ChatMessage, AppSettings } from './types';
+import { DEFAULT_PROVIDER_CONFIGS, mergeProviderConfigs } from './providers';
 
 let dbInstance: Database | null = null;
 let isFallbackMode = false;
@@ -290,6 +291,16 @@ export async function getAllSettings(): Promise<AppSettings> {
 
   const theme = (await getSetting('theme', 'dark')) as AppSettings['theme'];
   const defaultModel = await getSetting('defaultModel', 'llama3.2:latest');
+  const aiMode = (await getSetting('aiMode', 'hybrid')) as AppSettings['aiMode'];
+  const defaultProvider = await getSetting('defaultProvider', 'ollama');
+  const rawProviderConfigs = await getSetting('providerConfigs', JSON.stringify(DEFAULT_PROVIDER_CONFIGS));
+  let providerConfigs = DEFAULT_PROVIDER_CONFIGS;
+  try {
+    providerConfigs = mergeProviderConfigs(JSON.parse(rawProviderConfigs));
+  } catch (err) {
+    console.warn('Invalid provider configuration; restoring defaults:', err);
+    providerConfigs = DEFAULT_PROVIDER_CONFIGS;
+  }
   const workspaceLocation = await getSetting('workspaceLocation', '');
   const responseStyle = (await getSetting('responseStyle', 'adaptive')) as AppSettings['responseStyle'];
   const autoStartOllama = (await getSetting('autoStartOllama', 'true')) === 'true';
@@ -300,6 +311,9 @@ export async function getAllSettings(): Promise<AppSettings> {
     assistantName,
     theme,
     defaultModel,
+    aiMode,
+    defaultProvider,
+    providerConfigs,
     workspaceLocation,
     responseStyle,
     autoStartOllama,

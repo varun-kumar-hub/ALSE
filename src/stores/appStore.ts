@@ -21,6 +21,9 @@ interface AppState {
   selectedModel: string;
   models: OllamaModel[];
   assistantName: string;
+  aiMode: AppSettings['aiMode'];
+  defaultProvider: string;
+  providerConfigs: AppSettings['providerConfigs'];
   theme: 'dark' | 'light' | 'system';
   isBackendReady: boolean;
   backendStatus: StartupResult | null;
@@ -42,6 +45,9 @@ interface AppState {
   setCurrentChatId: (id: string | null) => void;
   setSelectedModel: (model: string) => void;
   setAssistantName: (name: string) => void;
+  setAiMode: (mode: AppSettings['aiMode']) => void;
+  setDefaultProvider: (provider: string) => void;
+  setProviderConfigs: (configs: AppSettings['providerConfigs']) => void;
   setTheme: (theme: 'dark' | 'light' | 'system') => void;
   setIsStreaming: (streaming: boolean) => void;
   setStreamingContent: (content: string | ((prev: string) => string)) => void;
@@ -68,6 +74,9 @@ export const useAppStore = create<AppState>((set) => ({
   selectedModel: 'llama3.2:latest',
   models: [],
   assistantName: 'Nexus Agent',
+  aiMode: 'hybrid',
+  defaultProvider: 'ollama',
+  providerConfigs: [],
   theme: 'dark',
   isBackendReady: false,
   backendStatus: null,
@@ -88,6 +97,9 @@ export const useAppStore = create<AppState>((set) => ({
   setCurrentChatId: (id) => set({ currentChatId: id }),
   setSelectedModel: (model) => set({ selectedModel: model }),
   setAssistantName: (name) => set({ assistantName: name }),
+  setAiMode: (mode) => set({ aiMode: mode }),
+  setDefaultProvider: (provider) => set({ defaultProvider: provider }),
+  setProviderConfigs: (configs) => set({ providerConfigs: configs }),
   setTheme: (theme) => set({ theme }),
   setIsStreaming: (streaming) => set({ isStreaming: streaming }),
   setStreamingContent: (content) =>
@@ -115,6 +127,9 @@ export const useAppStore = create<AppState>((set) => ({
       assistantName: settings.assistantName,
       theme: settings.theme,
       selectedModel: settings.defaultModel,
+      aiMode: settings.aiMode,
+      defaultProvider: settings.defaultProvider,
+      providerConfigs: settings.providerConfigs,
       workspaceLocation: settings.workspaceLocation,
       responseStyle: settings.responseStyle,
       autoStartOllama: settings.autoStartOllama,
@@ -134,6 +149,11 @@ export const useAppStore = create<AppState>((set) => ({
     if (key === 'assistantName') set({ assistantName: value });
     if (key === 'theme') set({ theme: value as 'dark' | 'light' | 'system' });
     if (key === 'defaultModel') set({ selectedModel: value });
+    if (key === 'aiMode') set({ aiMode: value as AppSettings['aiMode'] });
+    if (key === 'defaultProvider') set({ defaultProvider: value });
+    if (key === 'providerConfigs') {
+      set({ providerConfigs: JSON.parse(value) as AppSettings['providerConfigs'] });
+    }
     if (key === 'workspaceLocation') set({ workspaceLocation: value });
     if (key === 'responseStyle') set({ responseStyle: value as AppSettings['responseStyle'] });
     if (key === 'autoStartOllama') set({ autoStartOllama: value === 'true' });

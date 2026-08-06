@@ -14,7 +14,7 @@ import {
   getMessages,
   addMessage,
 } from './services/database';
-import { streamChat, generateChatTitle } from './services/ollama';
+import { createProviderManager, getCapabilitiesForIntent } from './services/providers';
 import { saveWorkspaceFile } from './services/workspace';
 import { detectQueryIntent } from './lib/intentDetector';
 import { optimizePrompt } from './lib/promptOptimizer';
@@ -34,7 +34,11 @@ export function App() {
     currentChatId,
     setCurrentChatId,
     selectedModel,
+    models,
     assistantName,
+    aiMode,
+    defaultProvider,
+    providerConfigs,
     setIsStreaming,
     setStreamingContent,
     setGenerationStage,
@@ -117,6 +121,9 @@ export function App() {
 
     // 1. Add User Message
     const intent = detectQueryIntent(userPrompt);
+    const providerManager = createProviderManager(providerConfigs, aiMode, defaultProvider);
+    const capabilities = getCapabilitiesForIntent(intent);
+
     setThinkingTimeline(buildThinkingTimeline(intent, userPrompt, selectedModel));
     updateThinkingTimelinePhase('analyze');
     const userMsg = await addMessage(targetChatId, 'user', userPrompt, intent);
@@ -125,7 +132,7 @@ export function App() {
     // 2. Generate title if it's the first message
     const currentMsgs = await getMessages(targetChatId);
     if (currentMsgs.length <= 1) {
-      generateChatTitle(selectedModel, userPrompt).then((title) => {
+      providerManager.generateTitle(userPrompt, selectedModel).then((title) => {
         if (targetChatId) handleRenameChat(targetChatId, title);
       });
     }
@@ -157,20 +164,26 @@ export function App() {
     }, 400);
 
     try {
-      await streamChat(selectedModel, historyPayload, (chunk) => {
-        if (chunk.message?.content) {
-          fullAccumulatedResponse += chunk.message.content;
-          if (!hasActiveTextSelection()) {
-            setStreamingContent(filterResponseForIntent(fullAccumulatedResponse, intent));
+      await providerManager.streamChat(
+        { intent, capabilities },
+        selectedModel,
+        historyPayload,
+        (chunk) => {
+          if (chunk.message?.content) {
+            fullAccumulatedResponse += chunk.message.content;
+            if (!hasActiveTextSelection()) {
+              setStreamingContent(filterResponseForIntent(fullAccumulatedResponse, intent));
+            }
           }
-        }
-      });
+        },
+        models.map((m) => m.name)
+      );
     } catch (err) {
       console.warn('Streaming response fallback:', err);
       failThinkingTimelinePhase('generate');
       fullAccumulatedResponse =
         fullAccumulatedResponse ||
-        `I could not complete this response because the local model service is unavailable.\n\nRequest: "${userPrompt}"`;
+        `I could not complete this response because the AI provider service is unavailable.\n\nRequest: "${userPrompt}"`;
       setStreamingContent(fullAccumulatedResponse);
     } finally {
       setGenerationStage('finalizing');

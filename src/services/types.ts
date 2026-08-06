@@ -74,6 +74,9 @@ export interface AppSettings {
   assistantName: string;
   theme: 'dark' | 'light' | 'system';
   defaultModel: string;
+  aiMode: AiExecutionMode;
+  defaultProvider: string;
+  providerConfigs: ProviderConfig[];
   workspaceLocation: string;
   responseStyle: 'adaptive' | 'detailed' | 'concise';
   autoStartOllama: boolean;
@@ -116,4 +119,53 @@ export interface ThinkingTimelineStep {
   detail?: string;
   phase: TimelinePhase;
   status: TimelineStepStatus;
+}
+
+export type AiExecutionMode = 'local' | 'cloud' | 'hybrid';
+
+export type ProviderCapability =
+  | 'chat'
+  | 'streaming'
+  | 'embeddings'
+  | 'vision'
+  | 'speech-to-text'
+  | 'text-to-speech'
+  | 'title-generation'
+  | 'json'
+  | 'tools'
+  | 'reasoning'
+  | 'coding'
+  | 'research';
+
+export interface ProviderConfig {
+  id: string;
+  name: string;
+  kind: 'local' | 'cloud';
+  enabled: boolean;
+  defaultModel: string;
+  apiKeySet?: boolean;
+  apiKey?: string;
+  capabilities: ProviderCapability[];
+}
+
+export interface ProviderRouteRequest {
+  intent?: QueryIntent;
+  capabilities: ProviderCapability[];
+  containsPrivateData?: boolean;
+  needsCurrentInfo?: boolean;
+}
+
+export interface NormalizedProviderResponse {
+  content: string;
+  reasoning?: string;
+  usage?: {
+    inputTokens?: number;
+    outputTokens?: number;
+    totalTokens?: number;
+    estimatedCostUsd?: number;
+  };
+  finishReason?: string;
+  toolCalls?: unknown[];
+  images?: string[];
+  metadata?: Record<string, unknown>;
 }

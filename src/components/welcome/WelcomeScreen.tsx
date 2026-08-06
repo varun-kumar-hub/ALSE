@@ -1,22 +1,25 @@
 import React, { useState } from 'react';
-import { Bot, ArrowRight, ShieldCheck, Cpu, HardDrive } from 'lucide-react';
+import { Bot, ArrowRight, ShieldCheck, Cloud, Sparkles } from 'lucide-react';
 import { Button } from '../ui/Button';
 import { Input } from '../ui/Input';
 import { useAppStore } from '../../stores/appStore';
+import { AiExecutionMode } from '../../services/types';
 
 interface WelcomeScreenProps {
   onContinue: () => void;
 }
 
 export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onContinue }) => {
-  const { assistantName, updateSetting } = useAppStore();
+  const { assistantName, aiMode: currentAiMode, updateSetting } = useAppStore();
   const [name, setName] = useState(assistantName);
+  const [selectedMode, setSelectedMode] = useState<AiExecutionMode>(currentAiMode || 'hybrid');
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (name.trim()) {
       await updateSetting('assistantName', name.trim());
     }
+    await updateSetting('aiMode', selectedMode);
     await updateSetting('onboardingComplete', 'true');
     onContinue();
   };
@@ -30,14 +33,14 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onContinue }) => {
             <Bot className="w-8 h-8" />
           </div>
           <h1 className="text-3xl font-extrabold tracking-tight gradient-text">
-            Nexus Agent
+            Welcome to Nexus Agent
           </h1>
           <p className="text-sm text-zinc-500 max-w-xs mx-auto">
-            Your local-first, privacy-focused intelligent AI platform.
+            Choose how you'd like to use AI.
           </p>
         </div>
 
-        {/* Custom Assistant Name Form */}
+        {/* Form */}
         <form onSubmit={handleSubmit} className="space-y-6">
           <div className="space-y-2">
             <Input
@@ -48,27 +51,105 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onContinue }) => {
               className="text-base py-3"
               autoFocus
             />
-            <p className="text-xs text-zinc-500">
-              Stored locally on your device. You can change this anytime in Settings.
-            </p>
           </div>
 
-          {/* Feature Highlights */}
-          <div className="grid grid-cols-3 gap-3 pt-2">
-            <div className="flex flex-col items-center text-center p-3 rounded-xl bg-zinc-50 border border-zinc-200">
-              <ShieldCheck className="w-5 h-5 text-emerald-600 mb-1.5" />
-              <span className="text-xs font-semibold text-zinc-900">100% Local</span>
-              <span className="text-[10px] text-zinc-500">No cloud upload</span>
-            </div>
-            <div className="flex flex-col items-center text-center p-3 rounded-xl bg-zinc-50 border border-zinc-200">
-              <Cpu className="w-5 h-5 text-blue-600 mb-1.5" />
-              <span className="text-xs font-semibold text-zinc-900">AI Runtime</span>
-              <span className="text-[10px] text-zinc-500">Prepared for you</span>
-            </div>
-            <div className="flex flex-col items-center text-center p-3 rounded-xl bg-zinc-50 border border-zinc-200">
-              <HardDrive className="w-5 h-5 text-teal-600 mb-1.5" />
-              <span className="text-xs font-semibold text-zinc-900">SQLite Storage</span>
-              <span className="text-[10px] text-zinc-500">Local-first data</span>
+          {/* AI Execution Mode Selection */}
+          <div className="space-y-3">
+            <label className="text-xs font-semibold text-zinc-700 uppercase tracking-wider block">
+              AI Execution Mode
+            </label>
+            <div className="grid grid-cols-1 gap-3">
+              {/* Local Mode */}
+              <div
+                onClick={() => setSelectedMode('local')}
+                className={`flex items-start gap-3 p-3.5 rounded-xl border cursor-pointer transition-all ${
+                  selectedMode === 'local'
+                    ? 'border-blue-600 bg-blue-50/50 shadow-sm'
+                    : 'border-zinc-200 hover:border-zinc-300 bg-white'
+                }`}
+              >
+                <div className="p-2 rounded-lg bg-emerald-50 text-emerald-600 mt-0.5">
+                  <ShieldCheck className="w-4 h-4" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold text-zinc-900">Local AI</span>
+                    <input
+                      type="radio"
+                      name="aiMode"
+                      checked={selectedMode === 'local'}
+                      onChange={() => setSelectedMode('local')}
+                      className="text-blue-600 focus:ring-blue-500"
+                    />
+                  </div>
+                  <p className="text-[11px] text-zinc-500 mt-0.5">
+                    Runs offline with local Ollama models. Complete privacy, 0 API cost.
+                  </p>
+                </div>
+              </div>
+
+              {/* Cloud Mode */}
+              <div
+                onClick={() => setSelectedMode('cloud')}
+                className={`flex items-start gap-3 p-3.5 rounded-xl border cursor-pointer transition-all ${
+                  selectedMode === 'cloud'
+                    ? 'border-blue-600 bg-blue-50/50 shadow-sm'
+                    : 'border-zinc-200 hover:border-zinc-300 bg-white'
+                }`}
+              >
+                <div className="p-2 rounded-lg bg-blue-50 text-blue-600 mt-0.5">
+                  <Cloud className="w-4 h-4" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold text-zinc-900">Cloud AI</span>
+                    <input
+                      type="radio"
+                      name="aiMode"
+                      checked={selectedMode === 'cloud'}
+                      onChange={() => setSelectedMode('cloud')}
+                      className="text-blue-600 focus:ring-blue-500"
+                    />
+                  </div>
+                  <p className="text-[11px] text-zinc-500 mt-0.5">
+                    Use API keys for OpenAI, Claude, Gemini, Groq. Lightweight, no model downloads.
+                  </p>
+                </div>
+              </div>
+
+              {/* Hybrid Mode (Recommended) */}
+              <div
+                onClick={() => setSelectedMode('hybrid')}
+                className={`flex items-start gap-3 p-3.5 rounded-xl border cursor-pointer transition-all ${
+                  selectedMode === 'hybrid'
+                    ? 'border-blue-600 bg-blue-50/50 shadow-sm ring-1 ring-blue-500'
+                    : 'border-zinc-200 hover:border-zinc-300 bg-white'
+                }`}
+              >
+                <div className="p-2 rounded-lg bg-purple-50 text-purple-600 mt-0.5">
+                  <Sparkles className="w-4 h-4" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs font-bold text-zinc-900">Hybrid AI</span>
+                      <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-blue-100 text-blue-700">
+                        Recommended
+                      </span>
+                    </div>
+                    <input
+                      type="radio"
+                      name="aiMode"
+                      checked={selectedMode === 'hybrid'}
+                      onChange={() => setSelectedMode('hybrid')}
+                      className="text-blue-600 focus:ring-blue-500"
+                    />
+                  </div>
+                  <p className="text-[11px] text-zinc-500 mt-0.5">
+                    Smart routing: use local AI for private/routine work, cloud AI for advanced tasks.
+                  </p>
+                </div>
+              </div>
             </div>
           </div>
 
@@ -78,7 +159,7 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onContinue }) => {
             className="w-full text-base py-3 font-semibold"
             rightIcon={<ArrowRight className="w-5 h-5" />}
           >
-            Get Started
+            Continue
           </Button>
         </form>
       </div>
