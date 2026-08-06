@@ -100,12 +100,9 @@ export const ChatInput: React.FC<ChatInputProps> = ({ onSend, onStop }) => {
                 setIsExpanded(true);
                 requestAnimationFrame(() => textareaRef.current?.focus());
               }}
-              className="absolute inset-0 flex items-center justify-between px-4 text-left text-sm font-medium text-zinc-500"
+              className="absolute inset-0 flex items-center px-4 pr-14 text-left text-sm font-medium text-zinc-500"
             >
               <span>Message {assistantName}...</span>
-              <span className="flex h-8 w-8 items-center justify-center rounded-full bg-zinc-100 text-zinc-500">
-                <Mic className="h-4 w-4" />
-              </span>
             </button>
           )}
 
