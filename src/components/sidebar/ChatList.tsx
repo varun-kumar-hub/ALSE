@@ -51,7 +51,7 @@ export const ChatList: React.FC<ChatListProps> = ({
 
   if (filtered.length === 0) {
     return (
-      <div className="flex flex-col items-center justify-center p-6 text-center text-slate-500 text-xs">
+      <div className="flex flex-col items-center justify-center p-6 text-center text-zinc-500 text-xs">
         {searchQuery ? 'No matching conversations' : 'No chats yet. Start a new chat above!'}
       </div>
     );
@@ -61,7 +61,7 @@ export const ChatList: React.FC<ChatListProps> = ({
     if (items.length === 0) return null;
     return (
       <div className="space-y-1 my-3">
-        <div className="flex items-center gap-1.5 px-3 py-1 text-[11px] font-semibold text-slate-500 uppercase tracking-wider select-none">
+        <div className="flex items-center gap-1.5 px-3 py-1 text-[11px] font-semibold text-zinc-500 uppercase tracking-wider select-none">
           {icon}
           <span>{title}</span>
         </div>
@@ -84,7 +84,7 @@ export const ChatList: React.FC<ChatListProps> = ({
 
   return (
     <div className="flex-1 overflow-y-auto px-2 space-y-1">
-      {renderSection('Pinned', pinnedChats, <Pin className="w-3 h-3 text-indigo-400" />)}
+      {renderSection('Pinned', pinnedChats, <Pin className="w-3 h-3 text-blue-600" />)}
       {renderSection('Today', todayChats)}
       {renderSection('Yesterday', yesterdayChats)}
       {renderSection('This Week', thisWeekChats)}
@@ -92,3 +92,4 @@ export const ChatList: React.FC<ChatListProps> = ({
     </div>
   );
 };
+

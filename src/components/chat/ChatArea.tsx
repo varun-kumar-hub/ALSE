@@ -1,9 +1,10 @@
-import React, { useRef, useEffect } from 'react';
-import { Bot, BookOpen, GitCompare, Code2, Calendar } from 'lucide-react';
+import React, { useRef, useEffect, useState, useCallback } from 'react';
+import { ArrowDown, Bot } from 'lucide-react';
 import { ChatHeader } from './ChatHeader';
 import { ChatMessage } from './ChatMessage';
 import { ChatInput } from './ChatInput';
 import { StreamingIndicator } from './StreamingIndicator';
+import { AgentPlanning, PlanStep } from '../ui/AgentPlanning';
 import { ChatMessage as ChatMessageType } from '../../services/types';
 import { useAppStore } from '../../stores/appStore';
 
@@ -24,89 +25,129 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
   onRegenerate,
   onExport,
 }) => {
-  const { isStreaming, streamingContent, generationStage, assistantName } = useAppStore();
+  const {
+    isStreaming,
+    streamingContent,
+    generationStage,
+    thinkingTimeline,
+    assistantName,
+  } = useAppStore();
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const autoScrollRef = useRef(true);
+  const scrollFrameRef = useRef<number | null>(null);
+  const scrollListenerFrameRef = useRef<number | null>(null);
+  const [showJumpToLatest, setShowJumpToLatest] = useState(false);
 
-  // Auto-scroll to bottom as messages arrive or tokens stream
-  const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  };
+  const thinkingSteps: PlanStep[] = thinkingTimeline.map((step) => ({
+    id: step.id,
+    title: step.title,
+    status: step.status,
+    duration: step.status === 'running' ? '...' : undefined,
+    defaultExpanded: step.status === 'running',
+    content: step.detail ? (
+      <div className="rounded-lg border border-zinc-200 bg-zinc-50 p-3 text-xs leading-relaxed text-zinc-600">
+        {step.detail}
+      </div>
+    ) : undefined,
+  }));
+
+  const isNearBottom = useCallback(() => {
+    const container = scrollContainerRef.current;
+    if (!container) return true;
+    const distanceFromBottom =
+      container.scrollHeight - container.scrollTop - container.clientHeight;
+    return distanceFromBottom <= 100;
+  }, []);
 
   useEffect(() => {
-    scrollToBottom();
-  }, [messages, streamingContent, generationStage]);
+    return () => {
+      if (scrollFrameRef.current !== null) {
+        cancelAnimationFrame(scrollFrameRef.current);
+      }
+      if (scrollListenerFrameRef.current !== null) {
+        cancelAnimationFrame(scrollListenerFrameRef.current);
+      }
+    };
+  }, []);
+
+  const scrollToBottom = useCallback((behavior: ScrollBehavior = 'auto') => {
+    if (scrollFrameRef.current !== null) return;
+
+    scrollFrameRef.current = requestAnimationFrame(() => {
+      scrollFrameRef.current = null;
+      const container = scrollContainerRef.current;
+      if (!container) return;
+
+      container.scrollTo({
+        top: container.scrollHeight,
+        behavior,
+      });
+    });
+  }, []);
+
+  const handleScroll = useCallback(() => {
+    if (scrollListenerFrameRef.current !== null) return;
+
+    scrollListenerFrameRef.current = requestAnimationFrame(() => {
+      scrollListenerFrameRef.current = null;
+      const nearBottom = isNearBottom();
+      autoScrollRef.current = nearBottom;
+      setShowJumpToLatest(!nearBottom && isStreaming);
+    });
+  }, [isNearBottom, isStreaming]);
+
+  useEffect(() => {
+    if (!isStreaming) {
+      setShowJumpToLatest(false);
+      return;
+    }
+
+    const shouldFollow = isNearBottom();
+    autoScrollRef.current = shouldFollow;
+    setShowJumpToLatest(!shouldFollow);
+
+    if (shouldFollow) {
+      scrollToBottom('auto');
+    }
+  }, [isStreaming, isNearBottom, scrollToBottom]);
+
+  useEffect(() => {
+    if (autoScrollRef.current) {
+      scrollToBottom('auto');
+    }
+  }, [messages.length, streamingContent, thinkingTimeline, scrollToBottom]);
+
+  const handleJumpToLatest = () => {
+    autoScrollRef.current = true;
+    setShowJumpToLatest(false);
+    scrollToBottom('smooth');
+  };
 
   return (
-    <div className="flex-1 h-screen flex flex-col bg-slate-950/40 relative overflow-hidden">
+    <div className="flex-1 h-screen flex flex-col bg-[#f6f5f2] relative overflow-hidden">
       {/* Header */}
       <ChatHeader chatTitle={chatTitle} onExport={onExport} />
 
       {/* Main Messages Scroll Container */}
-      <div className="flex-1 overflow-y-auto">
+      <div
+        ref={scrollContainerRef}
+        onScroll={handleScroll}
+        className="flex-1 overflow-y-auto"
+      >
         {messages.length === 0 ? (
           /* Empty Chat Welcome Screen */
           <div className="h-full flex flex-col items-center justify-center p-6 text-center max-w-xl mx-auto space-y-6 select-none animate-in fade-in duration-300">
-            <div className="w-16 h-16 rounded-2xl bg-indigo-600/20 border border-indigo-500/30 flex items-center justify-center text-indigo-400 shadow-xl shadow-indigo-500/10 pulse-glow">
+            <div className="w-16 h-16 rounded-2xl bg-blue-50 border border-blue-100 flex items-center justify-center text-blue-600 shadow-sm">
               <Bot className="w-8 h-8" />
             </div>
             <div className="space-y-2">
-              <h2 className="text-2xl font-bold gradient-text">
+              <h2 className="text-3xl font-extrabold tracking-tight text-zinc-950">
                 How can {assistantName} help you today?
               </h2>
-              <p className="text-xs text-slate-400">
+              <p className="text-sm text-zinc-500">
                 Ask research questions, compare technologies, write code, or plan projects.
               </p>
-            </div>
-
-            {/* Quick Prompt Suggestions */}
-            <div className="grid grid-cols-2 gap-3 w-full text-left pt-2">
-              <button
-                onClick={() => onSendMessage('Explain quantum computing principles with key takeaways')}
-                className="glass-card p-3 rounded-2xl text-xs space-y-1 hover:border-indigo-500/40 text-slate-300 cursor-pointer"
-              >
-                <div className="flex items-center gap-1.5 font-semibold text-sky-400">
-                  <BookOpen className="w-3.5 h-3.5" /> Technical Research
-                </div>
-                <p className="text-[11px] text-slate-500 truncate">
-                  Explain quantum computing principles
-                </p>
-              </button>
-
-              <button
-                onClick={() => onSendMessage('Compare PostgreSQL vs SQLite vs MongoDB for local desktop apps')}
-                className="glass-card p-3 rounded-2xl text-xs space-y-1 hover:border-purple-500/40 text-slate-300 cursor-pointer"
-              >
-                <div className="flex items-center gap-1.5 font-semibold text-purple-400">
-                  <GitCompare className="w-3.5 h-3.5" /> Architecture Compare
-                </div>
-                <p className="text-[11px] text-slate-500 truncate">
-                  PostgreSQL vs SQLite vs MongoDB
-                </p>
-              </button>
-
-              <button
-                onClick={() => onSendMessage('Write a Rust async function to stream HTTP NDJSON chunks')}
-                className="glass-card p-3 rounded-2xl text-xs space-y-1 hover:border-emerald-500/40 text-slate-300 cursor-pointer"
-              >
-                <div className="flex items-center gap-1.5 font-semibold text-emerald-400">
-                  <Code2 className="w-3.5 h-3.5" /> Code Solution
-                </div>
-                <p className="text-[11px] text-slate-500 truncate">
-                  Write a Rust async stream handler
-                </p>
-              </button>
-
-              <button
-                onClick={() => onSendMessage('Create a 4-week roadmap for launching an MVP AI Desktop app')}
-                className="glass-card p-3 rounded-2xl text-xs space-y-1 hover:border-amber-500/40 text-slate-300 cursor-pointer"
-              >
-                <div className="flex items-center gap-1.5 font-semibold text-amber-400">
-                  <Calendar className="w-3.5 h-3.5" /> Project Roadmap
-                </div>
-                <p className="text-[11px] text-slate-500 truncate">
-                  Create a 4-week AI MVP roadmap
-                </p>
-              </button>
             </div>
           </div>
         ) : (
@@ -123,8 +164,16 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
 
             {/* In-flight streaming message */}
             {isStreaming && (
-              <div className="py-4 px-4 md:px-8 bg-slate-900/30 border-t border-slate-900">
+              <div className="py-4 px-4 md:px-8 bg-transparent">
                 <div className="max-w-4xl mx-auto flex flex-col gap-3">
+                  {thinkingSteps.length > 0 && (
+                    <AgentPlanning
+                      title="Execution plan"
+                      steps={thinkingSteps}
+                      defaultExpanded
+                      className="max-w-2xl"
+                    />
+                  )}
                   <StreamingIndicator stage={generationStage} />
                   {streamingContent && (
                     <ChatMessage
@@ -141,6 +190,18 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
           </div>
         )}
       </div>
+
+      {showJumpToLatest && (
+        <button
+          type="button"
+          onClick={handleJumpToLatest}
+          className="absolute bottom-24 right-6 z-20 inline-flex items-center gap-2 rounded-full border border-zinc-200 bg-white px-3 py-2 text-xs font-semibold text-zinc-700 shadow-lg transition-colors hover:bg-zinc-50 hover:text-zinc-950"
+          title="Jump to latest message"
+        >
+          <ArrowDown className="h-4 w-4" />
+          <span>Jump to Latest</span>
+        </button>
+      )}
 
       {/* Input Box */}
       <ChatInput onSend={onSendMessage} onStop={onStopStreaming} />

@@ -112,25 +112,25 @@ export const SetupWizard: React.FC<{ onComplete: () => void }> = ({ onComplete }
             : step.status,
     defaultExpanded: step.status === 'running' || step.status === 'error',
     content: step.detail ? (
-      <p className="rounded-md border border-slate-800 bg-slate-950/70 p-3 font-mono text-[11px] leading-relaxed text-slate-400">
+      <p className="rounded-md border border-zinc-200 bg-[#f6f5f2]/70 p-3 font-mono text-[11px] leading-relaxed text-zinc-500">
         {step.detail}
       </p>
     ) : undefined,
   }));
 
   return (
-    <div className="h-screen w-full overflow-hidden bg-slate-950 p-3 select-none">
-      <div className="mx-auto flex h-full w-full max-w-xl flex-col overflow-hidden rounded-2xl border border-slate-800 bg-slate-900/80 shadow-2xl">
-        <div className="shrink-0 px-7 py-5 border-b border-slate-800 bg-slate-950/70">
+    <div className="h-screen w-full overflow-hidden bg-[#f6f5f2] p-3 select-none">
+      <div className="mx-auto flex h-full w-full max-w-xl flex-col overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-sm">
+        <div className="shrink-0 px-7 py-5 border-b border-zinc-200 bg-[#f6f5f2]/70">
           <div className="flex items-center justify-between gap-4">
             <div className="flex min-w-0 items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-cyan-500/10 border border-cyan-400/30 text-cyan-300 flex items-center justify-center">
-              <Sparkles className="w-5 h-5" />
-            </div>
-            <div className="min-w-0">
-              <h1 className="text-lg font-semibold text-slate-100">Welcome to AI OS</h1>
-              <p className="text-sm text-slate-400">{headline}</p>
-            </div>
+              <div className="w-10 h-10 rounded-xl bg-blue-50 border border-blue-100 text-blue-600 flex items-center justify-center">
+                <Sparkles className="w-5 h-5" />
+              </div>
+              <div className="min-w-0">
+                <h1 className="text-lg font-semibold text-zinc-950">Welcome to Nexus Agent</h1>
+                <p className="text-sm text-zinc-500">{headline}</p>
+              </div>
             </div>
             {isReady && (
               <Button
@@ -147,14 +147,14 @@ export const SetupWizard: React.FC<{ onComplete: () => void }> = ({ onComplete }
 
         <div className="flex-1 overflow-y-auto p-6 space-y-5">
           {error ? (
-            <div className="rounded-xl border border-rose-500/30 bg-rose-950/30 p-4 space-y-3">
+            <div className="rounded-xl border border-rose-200 bg-rose-50 p-4 space-y-3">
               <div className="flex gap-3">
                 <XCircle className="w-5 h-5 text-rose-300 shrink-0 mt-0.5" />
                 <div>
-                  <h2 className="text-sm font-semibold text-rose-100">
+                  <h2 className="text-sm font-semibold text-rose-900">
                     Unable to prepare AI Runtime
                   </h2>
-                  <p className="text-xs text-rose-200/80 mt-1">
+                  <p className="text-xs text-rose-700 mt-1">
                     Reason: {error}
                   </p>
                 </div>
@@ -197,16 +197,16 @@ export const SetupWizard: React.FC<{ onComplete: () => void }> = ({ onComplete }
           />
 
           {showDetails && diagnostics.length > 0 && (
-            <div className="rounded-xl border border-slate-800 bg-slate-950 p-3 max-h-40 overflow-y-auto">
+            <div className="rounded-xl border border-zinc-200 bg-[#f6f5f2] p-3 max-h-40 overflow-y-auto">
               {diagnostics.map((line, index) => (
-                <p key={`${line}-${index}`} className="font-mono text-[11px] text-slate-400">
+                <p key={`${line}-${index}`} className="font-mono text-[11px] text-zinc-500">
                   {line}
                 </p>
               ))}
             </div>
           )}
         </div>
-        <div className="shrink-0 border-t border-slate-800 bg-slate-950/70 p-5">
+        <div className="shrink-0 border-t border-zinc-200 bg-[#f6f5f2]/70 p-5">
           <Button
             size="lg"
             disabled={!isReady}
@@ -214,10 +214,11 @@ export const SetupWizard: React.FC<{ onComplete: () => void }> = ({ onComplete }
             rightIcon={<ArrowRight className="w-5 h-5" />}
             className="w-full"
           >
-            {isReady ? 'Open AI OS' : `${completedCount} / ${steps.length} Complete`}
+            {isReady ? 'Open Nexus Agent' : `${completedCount} / ${steps.length} Complete`}
           </Button>
         </div>
       </div>
     </div>
   );
 };
+

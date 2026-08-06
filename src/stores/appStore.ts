@@ -1,7 +1,18 @@
 import { create } from 'zustand';
-import { OllamaModel, StartupResult, AppSettings } from '../services/types';
+import {
+  OllamaModel,
+  StartupResult,
+  AppSettings,
+  ThinkingTimelineStep,
+  TimelinePhase,
+} from '../services/types';
 import { listModels } from '../services/ollama';
 import { getAllSettings, setSetting } from '../services/database';
+import {
+  completeTimeline,
+  failTimelinePhase,
+  updateTimelinePhase,
+} from '../lib/thinkingTimeline';
 
 interface AppState {
   sidebarOpen: boolean;
@@ -16,6 +27,7 @@ interface AppState {
   isStreaming: boolean;
   streamingContent: string;
   generationStage: 'idle' | 'initializing' | 'understanding' | 'generating' | 'finalizing';
+  thinkingTimeline: ThinkingTimelineStep[];
   searchQuery: string;
   workspaceLocation: string;
   responseStyle: AppSettings['responseStyle'];
@@ -34,6 +46,11 @@ interface AppState {
   setIsStreaming: (streaming: boolean) => void;
   setStreamingContent: (content: string | ((prev: string) => string)) => void;
   setGenerationStage: (stage: AppState['generationStage']) => void;
+  setThinkingTimeline: (steps: ThinkingTimelineStep[]) => void;
+  updateThinkingTimelinePhase: (phase: TimelinePhase) => void;
+  completeThinkingTimeline: () => void;
+  failThinkingTimelinePhase: (phase: TimelinePhase) => void;
+  resetThinkingTimeline: () => void;
   setSearchQuery: (query: string) => void;
   setOnboardingComplete: (complete: boolean) => void;
   setRuntimeReady: (ready: boolean) => void;
@@ -48,15 +65,16 @@ export const useAppStore = create<AppState>((set) => ({
   sidebarOpen: true,
   activeView: 'chat',
   currentChatId: null,
-  selectedModel: 'llama3.2',
+  selectedModel: 'llama3.2:latest',
   models: [],
-  assistantName: 'AI OS',
+  assistantName: 'Nexus Agent',
   theme: 'dark',
   isBackendReady: false,
   backendStatus: null,
   isStreaming: false,
   streamingContent: '',
   generationStage: 'idle',
+  thinkingTimeline: [],
   searchQuery: '',
   workspaceLocation: '',
   responseStyle: 'adaptive',
@@ -78,6 +96,14 @@ export const useAppStore = create<AppState>((set) => ({
         typeof content === 'function' ? content(state.streamingContent) : content,
     })),
   setGenerationStage: (stage) => set({ generationStage: stage }),
+  setThinkingTimeline: (steps) => set({ thinkingTimeline: steps }),
+  updateThinkingTimelinePhase: (phase) =>
+    set((state) => ({ thinkingTimeline: updateTimelinePhase(state.thinkingTimeline, phase) })),
+  completeThinkingTimeline: () =>
+    set((state) => ({ thinkingTimeline: completeTimeline(state.thinkingTimeline) })),
+  failThinkingTimelinePhase: (phase) =>
+    set((state) => ({ thinkingTimeline: failTimelinePhase(state.thinkingTimeline, phase) })),
+  resetThinkingTimeline: () => set({ thinkingTimeline: [] }),
   setSearchQuery: (query) => set({ searchQuery: query }),
   setOnboardingComplete: (complete) => set({ onboardingComplete: complete }),
   setRuntimeReady: (ready) => set({ isBackendReady: ready }),

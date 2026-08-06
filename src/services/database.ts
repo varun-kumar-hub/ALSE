@@ -282,9 +282,14 @@ export async function setSetting(key: string, value: string): Promise<void> {
 }
 
 export async function getAllSettings(): Promise<AppSettings> {
-  const assistantName = await getSetting('assistantName', 'AI OS');
+  let assistantName = await getSetting('assistantName', 'Nexus Agent');
+  if (assistantName === 'AI OS' || assistantName === 'AI Operating System') {
+    assistantName = 'Nexus Agent';
+    await setSetting('assistantName', assistantName);
+  }
+
   const theme = (await getSetting('theme', 'dark')) as AppSettings['theme'];
-  const defaultModel = await getSetting('defaultModel', 'llama3.2');
+  const defaultModel = await getSetting('defaultModel', 'llama3.2:latest');
   const workspaceLocation = await getSetting('workspaceLocation', '');
   const responseStyle = (await getSetting('responseStyle', 'adaptive')) as AppSettings['responseStyle'];
   const autoStartOllama = (await getSetting('autoStartOllama', 'true')) === 'true';

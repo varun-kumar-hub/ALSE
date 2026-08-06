@@ -1,23 +1,23 @@
 @import "tailwindcss";
 
 @theme {
-  --color-bg-main: #0b0b10;
-  --color-bg-sidebar: #07070a;
-  --color-bg-card: #12121c;
-  --color-bg-card-hover: #181826;
-  --color-bg-input: #151522;
+  --color-bg-main: #f6f5f2;
+  --color-bg-sidebar: #ffffff;
+  --color-bg-card: #ffffff;
+  --color-bg-card-hover: #f2f6ff;
+  --color-bg-input: #fbfaf8;
 
-  --color-border: #222234;
-  --color-border-hover: #33334e;
+  --color-border: #e5e1d8;
+  --color-border-hover: #cfc8ba;
 
-  --color-accent: #6366f1;
-  --color-accent-hover: #4f46e5;
-  --color-accent-light: #818cf8;
-  --color-accent-glow: rgba(99, 102, 241, 0.2);
+  --color-accent: #2563eb;
+  --color-accent-hover: #1d4ed8;
+  --color-accent-light: #60a5fa;
+  --color-accent-glow: rgba(37, 99, 235, 0.12);
 
-  --color-text-primary: #f3f4f6;
-  --color-text-secondary: #9ca3af;
-  --color-text-muted: #6b7280;
+  --color-text-primary: #18181b;
+  --color-text-secondary: #52525b;
+  --color-text-muted: #71717a;
 
   --color-success: #10b981;
   --color-warning: #f59e0b;
@@ -34,10 +34,14 @@
   body {
     background-color: var(--color-bg-main);
     color: var(--color-text-primary);
-    font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    font-family: 'Instrument Sans', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
     overflow: hidden;
-    user-select: none;
     -webkit-font-smoothing: antialiased;
+  }
+
+  button,
+  [role='button'] {
+    user-select: none;
   }
 
   /* Custom Scrollbar */
@@ -51,38 +55,38 @@
   }
 
   ::-webkit-scrollbar-thumb {
-    background: #252538;
+    background: #d8d3ca;
     border-radius: 9999px;
   }
 
   ::-webkit-scrollbar-thumb:hover {
-    background: #3b3b57;
+    background: #bbb2a4;
   }
 }
 
 /* Glassmorphism & Micro-animations */
 .glass-panel {
-  background: rgba(18, 18, 28, 0.75);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  border: 1px solid rgba(255, 255, 255, 0.07);
+  background: rgba(255, 255, 255, 0.86);
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+  border: 1px solid rgba(212, 208, 198, 0.9);
 }
 
 .glass-card {
-  background: rgba(21, 21, 34, 0.6);
-  backdrop-filter: blur(8px);
-  border: 1px solid rgba(255, 255, 255, 0.05);
+  background: rgba(255, 255, 255, 0.84);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(228, 224, 216, 0.95);
   transition: all 0.2s ease;
 }
 
 .glass-card:hover {
-  background: rgba(28, 28, 44, 0.8);
-  border-color: rgba(99, 102, 241, 0.3);
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4), 0 0 15px rgba(99, 102, 241, 0.15);
+  background: rgba(248, 250, 252, 0.95);
+  border-color: rgba(37, 99, 235, 0.2);
+  box-shadow: 0 12px 28px rgba(24, 24, 27, 0.08);
 }
 
 .gradient-text {
-  background: linear-gradient(135deg, #a5b4fc 0%, #6366f1 50%, #c084fc 100%);
+  background: linear-gradient(135deg, #111827 0%, #2563eb 58%, #0f766e 100%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
 }
@@ -102,8 +106,8 @@
 
 /* Prose/Markdown Customization */
 .markdown-body {
-  color: #e5e7eb;
-  line-height: 1.7;
+  color: #27272a;
+  line-height: 1.75;
 }
 
 .markdown-body p {
@@ -111,24 +115,24 @@
 }
 
 .markdown-body h1, .markdown-body h2, .markdown-body h3, .markdown-body h4 {
-  color: #f9fafb;
+  color: #18181b;
   font-weight: 600;
   margin-top: 1.5rem;
   margin-bottom: 0.75rem;
 }
 
 .markdown-body code {
-  background-color: #1a1a29;
-  color: #a5b4fc;
+  background-color: #eef2ff;
+  color: #1d4ed8;
   padding: 0.2rem 0.4rem;
   border-radius: 0.375rem;
-  font-family: 'JetBrains Mono', 'Fira Code', monospace;
+  font-family: 'IBM Plex Mono', 'JetBrains Mono', monospace;
   font-size: 0.875em;
 }
 
 .markdown-body pre {
-  background-color: #0f0f18 !important;
-  border: 1px solid #242436;
+  background-color: #111827 !important;
+  border: 1px solid #1f2937;
   border-radius: 0.75rem;
   padding: 1rem;
   margin: 1rem 0;
@@ -149,14 +153,14 @@
 }
 
 .markdown-body th, .markdown-body td {
-  border: 1px solid #26263a;
+  border: 1px solid #e4e4e7;
   padding: 0.75rem 1rem;
   text-align: left;
 }
 
 .markdown-body th {
-  background-color: #161624;
-  color: #818cf8;
+  background-color: #f4f4f5;
+  color: #1d4ed8;
   font-weight: 600;
 }
 
@@ -170,9 +174,9 @@
 }
 
 .markdown-body blockquote {
-  border-left: 3px solid #6366f1;
+  border-left: 3px solid #2563eb;
   padding-left: 1rem;
-  color: #9ca3af;
+  color: #52525b;
   font-style: italic;
   margin: 1rem 0;
 }

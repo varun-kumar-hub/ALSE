@@ -69,14 +69,38 @@ export function parseResponseSections(content: string, intent: QueryIntent): For
 
 function getDefaultSectionTitle(intent: QueryIntent): string {
   switch (intent) {
+    case 'biography':
+      return 'Biography';
+    case 'definition':
+      return 'Definition';
+    case 'explanation':
+      return 'Explanation';
     case 'research':
       return 'Research Response';
+    case 'summarization':
+      return 'Summary';
+    case 'translation':
+      return 'Translation';
+    case 'mathematics':
+      return 'Answer';
+    case 'creative-writing':
+      return 'Draft';
+    case 'email-document':
+      return 'Document';
+    case 'data-analysis':
+      return 'Analysis';
+    case 'file-analysis':
+      return 'File Analysis';
     case 'comparison':
       return 'Comparison Analysis';
     case 'coding':
       return 'Solution & Code';
+    case 'debugging':
+      return 'Debugging';
     case 'planning':
       return 'Project Plan';
+    case 'brainstorming':
+      return 'Ideas';
     default:
       return 'Answer';
   }

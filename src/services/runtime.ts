@@ -88,7 +88,7 @@ export async function prepareRuntime(
 
     return {
       ready: true,
-      workspace_path: '~/ai-os-workspace',
+      workspace_path: '~/nexus-agent-workspace',
       models: [],
       diagnostics: [
         'Running in browser preview mode.',

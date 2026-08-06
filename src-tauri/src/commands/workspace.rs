@@ -1,14 +1,14 @@
 use std::fs;
 use std::path::{Component, Path, PathBuf};
 
-/// Get default workspace directory (%USERPROFILE%/ai-os-workspace)
+/// Get default workspace directory (%USERPROFILE%/nexus-agent-workspace)
 #[tauri::command]
 pub fn get_default_workspace_path() -> Result<String, String> {
     let home = std::env::var("USERPROFILE")
         .or_else(|_| std::env::var("HOME"))
         .map_err(|_| "Could not determine user home directory".to_string())?;
 
-    let path = Path::new(&home).join("ai-os-workspace");
+    let path = Path::new(&home).join("nexus-agent-workspace");
     Ok(path.to_string_lossy().to_string())
 }
 
@@ -21,7 +21,7 @@ pub fn init_workspace(custom_path: Option<String>) -> Result<String, String> {
             let home = std::env::var("USERPROFILE")
                 .or_else(|_| std::env::var("HOME"))
                 .map_err(|_| "Could not determine home directory".to_string())?;
-            Path::new(&home).join("ai-os-workspace")
+            Path::new(&home).join("nexus-agent-workspace")
         }
     };
 
@@ -48,7 +48,7 @@ pub fn init_workspace(custom_path: Option<String>) -> Result<String, String> {
     let metadata = workspace_path.join("settings").join("workspace.json");
     if !metadata.exists() {
         let content = format!(
-            "{{\n  \"version\": 1,\n  \"created_by\": \"AI Operating System\",\n  \"workspace_path\": \"{}\"\n}}\n",
+            "{{\n  \"version\": 1,\n  \"created_by\": \"Nexus Agent\",\n  \"workspace_path\": \"{}\"\n}}\n",
             workspace_path.to_string_lossy().replace('\\', "\\\\")
         );
         fs::write(&metadata, content)
@@ -72,7 +72,7 @@ pub fn save_workspace_file(
             let home = std::env::var("USERPROFILE")
                 .or_else(|_| std::env::var("HOME"))
                 .map_err(|_| "Could not find home directory".to_string())?;
-            Path::new(&home).join("ai-os-workspace")
+            Path::new(&home).join("nexus-agent-workspace")
         }
     };
 

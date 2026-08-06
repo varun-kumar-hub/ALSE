@@ -9,21 +9,21 @@ export const StreamingIndicator: React.FC<StreamingIndicatorProps> = ({ stage })
   if (stage === 'idle') return null;
 
   const stageLabels = {
-    initializing: 'Initializing local AI engine...',
-    understanding: 'Understanding request & intent...',
-    generating: 'Generating response...',
-    finalizing: 'Finalizing formatting...',
+    initializing: 'Starting request...',
+    understanding: 'Understanding request...',
+    generating: 'Building answer...',
+    finalizing: 'Reviewing response...',
   };
 
   const stageIcons = {
-    initializing: <Loader2 className="w-4 h-4 text-indigo-400 animate-spin" />,
-    understanding: <Brain className="w-4 h-4 text-purple-400 animate-pulse" />,
-    generating: <Sparkles className="w-4 h-4 text-indigo-400 animate-spin" />,
-    finalizing: <CheckCircle2 className="w-4 h-4 text-emerald-400" />,
+    initializing: <Loader2 className="w-4 h-4 text-blue-600 animate-spin" />,
+    understanding: <Brain className="w-4 h-4 text-blue-600 animate-pulse" />,
+    generating: <Sparkles className="w-4 h-4 text-blue-600 animate-spin" />,
+    finalizing: <CheckCircle2 className="w-4 h-4 text-emerald-600" />,
   };
 
   return (
-    <div className="flex items-center gap-2.5 px-4 py-2 rounded-2xl bg-indigo-950/40 border border-indigo-500/20 text-xs font-medium text-indigo-300 w-fit backdrop-blur-md animate-in fade-in duration-200">
+    <div className="flex items-center gap-2.5 px-4 py-2 rounded-xl bg-white border border-zinc-200 text-xs font-semibold text-zinc-700 w-fit shadow-sm animate-in fade-in duration-200">
       {stageIcons[stage]}
       <span>{stageLabels[stage]}</span>
     </div>

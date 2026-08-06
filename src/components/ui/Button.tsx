@@ -21,18 +21,18 @@ export const Button: React.FC<ButtonProps> = ({
   ...props
 }) => {
   const baseStyles =
-    'inline-flex items-center justify-center font-medium rounded-xl transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer';
+    'inline-flex items-center justify-center font-semibold rounded-lg transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500/30 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer';
 
   const variantStyles = {
     primary:
-      'bg-indigo-600 hover:bg-indigo-500 text-white shadow-lg shadow-indigo-600/25 hover:shadow-indigo-500/40 border border-indigo-500/30',
+      'bg-blue-600 hover:bg-blue-700 text-white shadow-sm border border-blue-700/20',
     secondary:
-      'bg-slate-800/80 hover:bg-slate-700/80 text-slate-200 border border-slate-700/50 backdrop-blur-md',
-    ghost: 'hover:bg-slate-800/50 text-slate-300 hover:text-white',
+      'bg-white hover:bg-zinc-50 text-zinc-800 border border-zinc-200 shadow-sm',
+    ghost: 'hover:bg-zinc-100 text-zinc-600 hover:text-zinc-950',
     danger:
-      'bg-rose-600/90 hover:bg-rose-500 text-white shadow-lg shadow-rose-600/20 border border-rose-500/30',
+      'bg-rose-600 hover:bg-rose-700 text-white shadow-sm border border-rose-700/20',
     outline:
-      'border border-indigo-500/40 text-indigo-400 hover:bg-indigo-500/10 hover:border-indigo-400',
+      'border border-blue-200 text-blue-700 hover:bg-blue-50 hover:border-blue-300',
   };
 
   const sizeStyles = {

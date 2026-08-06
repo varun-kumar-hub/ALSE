@@ -18,6 +18,8 @@ import { streamChat, generateChatTitle } from './services/ollama';
 import { saveWorkspaceFile } from './services/workspace';
 import { detectQueryIntent } from './lib/intentDetector';
 import { optimizePrompt } from './lib/promptOptimizer';
+import { filterResponseForIntent } from './lib/responseFilter';
+import { buildThinkingTimeline } from './lib/thinkingTimeline';
 import { Chat, ChatMessage as ChatMessageType } from './services/types';
 
 export function App() {
@@ -31,6 +33,11 @@ export function App() {
     setIsStreaming,
     setStreamingContent,
     setGenerationStage,
+    setThinkingTimeline,
+    updateThinkingTimelinePhase,
+    completeThinkingTimeline,
+    failThinkingTimelinePhase,
+    resetThinkingTimeline,
     initApp,
   } = useAppStore();
 
@@ -105,6 +112,8 @@ export function App() {
 
     // 1. Add User Message
     const intent = detectQueryIntent(userPrompt);
+    setThinkingTimeline(buildThinkingTimeline(intent, userPrompt, selectedModel));
+    updateThinkingTimelinePhase('analyze');
     const userMsg = await addMessage(targetChatId, 'user', userPrompt, intent);
     setMessages((prev) => [...prev, userMsg]);
 
@@ -117,6 +126,11 @@ export function App() {
     }
 
     // 3. Prepare AI Prompt & Intent
+    updateThinkingTimelinePhase(
+      ['research', 'comparison', 'debugging', 'file-analysis', 'data-analysis'].includes(intent)
+        ? 'gather'
+        : 'plan'
+    );
     const optimizedPrompt = optimizePrompt(userPrompt, intent, assistantName);
 
     setIsStreaming(true);
@@ -132,25 +146,32 @@ export function App() {
     let fullAccumulatedResponse = '';
 
     setGenerationStage('understanding');
-    setTimeout(() => setGenerationStage('generating'), 400);
+    setTimeout(() => {
+      setGenerationStage('generating');
+      updateThinkingTimelinePhase('generate');
+    }, 400);
 
     try {
       await streamChat(selectedModel, historyPayload, (chunk) => {
         if (chunk.message?.content) {
           fullAccumulatedResponse += chunk.message.content;
-          setStreamingContent(fullAccumulatedResponse);
+          setStreamingContent(filterResponseForIntent(fullAccumulatedResponse, intent));
         }
       });
     } catch (err) {
       console.warn('Streaming response fallback:', err);
+      failThinkingTimelinePhase('generate');
       fullAccumulatedResponse =
         fullAccumulatedResponse ||
         `I could not complete this response because the local model service is unavailable.\n\nRequest: "${userPrompt}"`;
       setStreamingContent(fullAccumulatedResponse);
     } finally {
       setGenerationStage('finalizing');
+      updateThinkingTimelinePhase('validate');
 
       // Save final assistant message to SQLite
+      fullAccumulatedResponse = filterResponseForIntent(fullAccumulatedResponse, intent);
+      updateThinkingTimelinePhase('format');
       if (fullAccumulatedResponse.trim() && targetChatId) {
         const assistantMsg = await addMessage(
           targetChatId,
@@ -161,6 +182,7 @@ export function App() {
         setMessages((prev) => [...prev, assistantMsg]);
       }
 
+      completeThinkingTimeline();
       setIsStreaming(false);
       setStreamingContent('');
       setGenerationStage('idle');
@@ -171,6 +193,7 @@ export function App() {
   const handleStopStreaming = () => {
     setIsStreaming(false);
     setGenerationStage('idle');
+    resetThinkingTimeline();
   };
 
   const handleRegenerate = () => {
@@ -205,7 +228,7 @@ export function App() {
   const activeChat = chats.find((c) => c.id === currentChatId);
 
   return (
-    <div className="flex h-screen w-screen overflow-hidden bg-slate-950 text-slate-100 font-sans">
+    <div className="flex h-screen w-screen overflow-hidden bg-[#f6f5f2] text-zinc-950 font-sans">
       <Sidebar
         chats={chats}
         activeChatId={currentChatId}
@@ -218,7 +241,7 @@ export function App() {
       />
 
       <ChatArea
-        chatTitle={activeChat?.title || 'AI Operating System'}
+        chatTitle={activeChat?.title || 'Nexus Agent'}
         messages={messages}
         onSendMessage={handleSendMessage}
         onStopStreaming={handleStopStreaming}
@@ -232,3 +255,4 @@ export function App() {
 }
 
 export default App;
+

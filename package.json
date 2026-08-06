@@ -1,8 +1,8 @@
 {
-  "name": "ai-os",
+  "name": "nexus-agent",
   "private": true,
   "version": "0.1.0",
-  "description": "Local-first AI Operating System foundation",
+  "description": "Local-first Nexus Agent foundation",
   "type": "module",
   "scripts": {
     "setup": "npm install",

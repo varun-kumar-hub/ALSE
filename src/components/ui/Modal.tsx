@@ -39,20 +39,20 @@ export const Modal: React.FC<ModalProps> = ({
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       {/* Backdrop */}
       <div
-        className="fixed inset-0 bg-black/70 backdrop-blur-sm transition-opacity"
+        className="fixed inset-0 bg-zinc-950/25 backdrop-blur-sm transition-opacity"
         onClick={onClose}
       />
 
       {/* Content Card */}
       <div
-        className={`relative w-full ${maxWidthStyles[maxWidth]} bg-slate-900 border border-slate-800 rounded-2xl shadow-2xl z-10 overflow-hidden glass-panel`}
+        className={`relative w-full ${maxWidthStyles[maxWidth]} bg-white border border-zinc-200 rounded-2xl shadow-sm z-10 overflow-hidden`}
       >
         {title && (
-          <div className="flex items-center justify-between px-6 py-4 border-b border-slate-800/80">
-            <h3 className="text-base font-semibold text-slate-100">{title}</h3>
+          <div className="flex items-center justify-between px-6 py-4 border-b border-zinc-200">
+            <h3 className="text-base font-semibold text-zinc-950">{title}</h3>
             <button
               onClick={onClose}
-              className="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-800/60 transition-colors"
+              className="text-zinc-500 hover:text-zinc-950 p-1 rounded-lg hover:bg-zinc-100 transition-colors"
             >
               <X className="w-5 h-5" />
             </button>

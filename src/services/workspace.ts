@@ -5,7 +5,7 @@ export async function getDefaultWorkspacePath(): Promise<string> {
     return await invoke<string>('get_default_workspace_path');
   } catch (err) {
     console.warn('Failed to get default workspace path via Tauri:', err);
-    return '~/ai-os-workspace';
+    return '~/nexus-agent-workspace';
   }
 }
 
@@ -14,7 +14,7 @@ export async function initWorkspace(customPath?: string): Promise<string> {
     return await invoke<string>('init_workspace', { customPath });
   } catch (err) {
     console.warn('Failed to initialize workspace via Tauri:', err);
-    return customPath || '~/ai-os-workspace';
+    return customPath || '~/nexus-agent-workspace';
   }
 }
 

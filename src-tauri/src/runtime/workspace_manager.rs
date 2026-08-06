@@ -49,5 +49,5 @@ fn default_workspace_path() -> Result<PathBuf, String> {
         .or_else(|_| std::env::var("HOME"))
         .map_err(|_| "Unable to determine local workspace location".to_string())?;
 
-    Ok(Path::new(&home).join("ai-os-workspace"))
+    Ok(Path::new(&home).join("nexus-agent-workspace"))
 }

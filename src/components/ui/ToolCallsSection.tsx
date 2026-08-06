@@ -129,7 +129,7 @@ export function ToolCallsSection({
     call.integration_name ?? integrationLookup.get(call.tool_category)?.name;
 
   const defaultRenderIcon = (call: ToolCallEntry, size: number) => (
-    <div className="flex h-8 w-8 min-w-8 items-center justify-center rounded-lg border border-slate-700/70 bg-slate-900 text-slate-300">
+    <div className="flex h-8 w-8 min-w-8 items-center justify-center rounded-lg border border-zinc-200 bg-white text-zinc-700">
       {getIconUrl(call) ? (
         <img src={getIconUrl(call)} alt="" className="h-full w-full rounded-lg object-cover" />
       ) : (
@@ -175,7 +175,7 @@ export function ToolCallsSection({
           </div>
         ))}
         {uniqueIcons.length > maxIconsToShow && (
-          <div className="z-0 flex h-7 min-h-7 w-7 min-w-7 items-center justify-center rounded-lg bg-slate-800 text-xs font-normal text-slate-400">
+          <div className="z-0 flex h-7 min-h-7 w-7 min-w-7 items-center justify-center rounded-lg bg-zinc-100 text-xs font-normal text-zinc-500">
             +{uniqueIcons.length - maxIconsToShow}
           </div>
         )}
@@ -190,7 +190,7 @@ export function ToolCallsSection({
       <button
         type="button"
         onClick={() => setIsExpanded((value) => !value)}
-        className="flex cursor-pointer items-center gap-2 py-2 text-slate-500 hover:text-slate-100"
+        className="flex cursor-pointer items-center gap-2 py-2 text-zinc-500 hover:text-zinc-950"
       >
         {renderStackedIcons()}
         <span className="text-xs font-medium transition-all duration-200">
@@ -220,7 +220,7 @@ export function ToolCallsSection({
                   <div className="flex min-h-8 min-w-8 shrink-0 items-center justify-center">
                     {iconRenderer(call, iconSize)}
                   </div>
-                  {index < toolCalls.length - 1 && <div className="min-h-4 w-px flex-1 bg-slate-800" />}
+                  {index < toolCalls.length - 1 && <div className="min-h-4 w-px flex-1 bg-zinc-200" />}
                 </div>
 
                 <div className="min-w-0 flex-1">
@@ -235,8 +235,8 @@ export function ToolCallsSection({
                   >
                     <p
                       className={cn(
-                        'text-xs font-medium text-slate-400',
-                        hasDetails && 'group-hover:text-slate-100'
+                        'text-xs font-medium text-zinc-600',
+                        hasDetails && 'group-hover:text-zinc-950'
                       )}
                     >
                       {call.message || formatToolName(call.tool_name)}
@@ -244,7 +244,7 @@ export function ToolCallsSection({
                     {hasDetails && (
                       <ChevronDown
                         className={cn(
-                          'h-3.5 w-3.5 text-slate-500 transition-transform',
+                          'h-3.5 w-3.5 text-zinc-500 transition-transform',
                           isCallExpanded && 'rotate-180'
                         )}
                       />
@@ -252,22 +252,22 @@ export function ToolCallsSection({
                   </button>
 
                   {hasCategoryText && (
-                    <p className="text-[11px] capitalize text-slate-600">
+                    <p className="text-[11px] capitalize text-zinc-500">
                       {getIntegrationName(call) || categoryLabel(call.tool_category)}
                     </p>
                   )}
 
                   {isCallExpanded && hasDetails && (
-                    <div className="mb-3 mt-2 w-fit space-y-2 rounded-xl border border-slate-800 bg-slate-950/70 p-3 text-[11px]">
+                    <div className="mb-3 mt-2 w-fit space-y-2 rounded-xl border border-zinc-200 bg-zinc-50 p-3 text-[11px]">
                       {call.inputs && Object.keys(call.inputs).length > 0 && (
                         <div className="flex flex-col">
-                          <span className="mb-1 font-medium text-slate-500">Input</span>
+                          <span className="mb-1 font-medium text-zinc-500">Input</span>
                           {contentRenderer(call.inputs)}
                         </div>
                       )}
                       {call.output && (
                         <div className="flex flex-col">
-                          <span className="mb-1 font-medium text-slate-500">Output</span>
+                          <span className="mb-1 font-medium text-zinc-500">Output</span>
                           {contentRenderer(call.output)}
                         </div>
                       )}
@@ -282,3 +282,4 @@ export function ToolCallsSection({
     </div>
   );
 }
+

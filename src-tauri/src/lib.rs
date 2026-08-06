@@ -32,5 +32,5 @@ pub fn run() {
             prepare_runtime,
         ])
         .run(tauri::generate_context!())
-        .expect("error while running AI OS application");
+        .expect("error while running Nexus Agent application");
 }

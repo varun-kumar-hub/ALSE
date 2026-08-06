@@ -47,7 +47,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
       <div className="fixed top-3 left-3 z-30">
         <button
           onClick={toggleSidebar}
-          className="p-2 rounded-xl bg-slate-900/80 hover:bg-slate-800 text-slate-400 hover:text-slate-200 border border-slate-800 backdrop-blur-md shadow-lg transition-all cursor-pointer"
+          className="p-2 rounded-xl bg-white hover:bg-zinc-100 text-zinc-600 hover:text-zinc-800 border border-zinc-200 backdrop-blur-md shadow-lg transition-all cursor-pointer"
           title="Open Sidebar"
         >
           <PanelLeft className="w-5 h-5" />
@@ -57,23 +57,23 @@ export const Sidebar: React.FC<SidebarProps> = ({
   }
 
   return (
-    <aside className="w-72 h-screen flex flex-col bg-slate-950/90 border-r border-slate-800/80 backdrop-blur-xl shrink-0 select-none z-20 transition-all duration-300">
+    <aside className="w-72 h-screen flex flex-col bg-white border-r border-zinc-200 shrink-0 select-none z-20 transition-all duration-300">
       {/* Top Header */}
-      <div className="flex items-center justify-between p-4 border-b border-slate-900">
+      <div className="flex items-center justify-between p-4 border-b border-zinc-200">
         <div className="flex items-center gap-2.5">
-          <div className="w-8 h-8 rounded-xl bg-indigo-600/20 border border-indigo-500/30 flex items-center justify-center text-indigo-400 shadow-sm">
+          <div className="w-8 h-8 rounded-xl bg-blue-50 border border-blue-100 flex items-center justify-center text-blue-600 shadow-sm">
             <Bot className="w-5 h-5" />
           </div>
           <div className="flex flex-col">
-            <span className="text-sm font-bold text-slate-100 leading-tight">
+            <span className="text-sm font-bold text-zinc-950 leading-tight">
               {assistantName}
             </span>
-            <span className="text-[10px] text-slate-500 font-mono">v1.0 • Phase 1</span>
+            <span className="text-[10px] text-zinc-500 font-mono">v1.0 - Phase 1</span>
           </div>
         </div>
         <button
           onClick={toggleSidebar}
-          className="p-1.5 rounded-lg text-slate-500 hover:text-slate-300 hover:bg-slate-900 transition-colors"
+          className="p-1.5 rounded-lg text-zinc-500 hover:text-zinc-700 hover:bg-white transition-colors"
           title="Collapse Sidebar"
         >
           <PanelLeftClose className="w-4 h-4" />
@@ -105,31 +105,32 @@ export const Sidebar: React.FC<SidebarProps> = ({
       />
 
       {/* Bottom Status & Settings */}
-      <div className="p-3 border-t border-slate-900 bg-slate-950/60 space-y-2">
+      <div className="p-3 border-t border-zinc-200 bg-zinc-50 space-y-2">
         {/* Model Indicator Badge */}
-        <div className="flex items-center justify-between px-3 py-2 rounded-xl bg-slate-900/60 border border-slate-800/60 text-xs">
+        <div className="flex items-center justify-between px-3 py-2 rounded-xl bg-white border border-zinc-200 text-xs shadow-sm">
           <div className="flex items-center gap-2 min-w-0">
             <span
               className={`w-2 h-2 rounded-full shrink-0 ${
                 isBackendReady ? 'bg-emerald-400 shadow-[0_0_8px_#34d399]' : 'bg-amber-400'
               }`}
             />
-            <span className="font-mono text-[11px] text-slate-300 truncate">
+            <span className="font-mono text-[11px] text-zinc-700 truncate">
               {selectedModel || 'No Model'}
             </span>
           </div>
-          <Sparkles className="w-3.5 h-3.5 text-indigo-400 shrink-0" />
+          <Sparkles className="w-3.5 h-3.5 text-blue-600 shrink-0" />
         </div>
 
         {/* Settings Button */}
         <button
           onClick={onOpenSettings}
-          className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-medium text-slate-400 hover:text-slate-100 hover:bg-slate-900/80 transition-colors cursor-pointer"
+          className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-medium text-zinc-600 hover:text-zinc-950 hover:bg-white transition-colors cursor-pointer"
         >
-          <Settings className="w-4 h-4 text-slate-400" />
+          <Settings className="w-4 h-4 text-zinc-600" />
           <span>Settings</span>
         </button>
       </div>
     </aside>
   );
 };
+

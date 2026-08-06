@@ -81,10 +81,39 @@ export interface AppSettings {
   onboardingComplete: boolean;
 }
 
-export type QueryIntent = 'general' | 'research' | 'comparison' | 'coding' | 'planning';
+export type QueryIntent =
+  | 'general'
+  | 'biography'
+  | 'definition'
+  | 'explanation'
+  | 'coding'
+  | 'debugging'
+  | 'research'
+  | 'summarization'
+  | 'translation'
+  | 'mathematics'
+  | 'creative-writing'
+  | 'email-document'
+  | 'data-analysis'
+  | 'file-analysis'
+  | 'planning'
+  | 'comparison'
+  | 'brainstorming';
 
 export interface FormattedSection {
   title: string;
   type: string;
   content: string;
+}
+
+export type TimelineStepStatus = 'pending' | 'running' | 'completed' | 'failed' | 'skipped';
+
+export type TimelinePhase = 'analyze' | 'gather' | 'plan' | 'generate' | 'validate' | 'format';
+
+export interface ThinkingTimelineStep {
+  id: string;
+  title: string;
+  detail?: string;
+  phase: TimelinePhase;
+  status: TimelineStepStatus;
 }

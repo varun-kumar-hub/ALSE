@@ -20,8 +20,8 @@ export const Badge: React.FC<BadgeProps> = ({
     warning: 'bg-amber-500/10 text-amber-400 border-amber-500/20',
     error: 'bg-rose-500/10 text-rose-400 border-rose-500/20',
     info: 'bg-sky-500/10 text-sky-400 border-sky-500/20',
-    accent: 'bg-indigo-500/15 text-indigo-300 border-indigo-500/30',
-    neutral: 'bg-slate-800/80 text-slate-300 border-slate-700/50',
+    accent: 'bg-blue-50 text-blue-700 border-blue-100',
+    neutral: 'bg-zinc-100 text-zinc-700 border-zinc-200',
   };
 
   const sizeStyles = {
