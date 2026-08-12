@@ -159,14 +159,15 @@ export async function webSearch(query: string, limit = 5): Promise<WebToolResult
 
   const isBrowser = typeof window !== 'undefined' && !('__TAURI_INTERNALS__' in window);
 
-  // Fallback 1: DuckDuckGo HTML POST Search (Desktop runtime only; browsers block with CORS)
-  if (!isBrowser) {
-    try {
-      const searchUrl = 'https://html.duckduckgo.com/html/';
+  // 1. DuckDuckGo HTML Search (Direct in Desktop, CORS Proxied in Browser)
+  try {
+    let rawHtml = '';
+    const ddgUrl = `https://html.duckduckgo.com/html/?q=${encodeURIComponent(trimmedQuery)}`;
+    
+    if (!isBrowser) {
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 6000);
-
-      const resp = await fetch(searchUrl, {
+      const resp = await fetch(ddgUrl, {
         method: 'POST',
         headers: {
           'User-Agent': USER_AGENT,
@@ -175,36 +176,52 @@ export async function webSearch(query: string, limit = 5): Promise<WebToolResult
         body: `q=${encodeURIComponent(trimmedQuery)}`,
         signal: controller.signal,
       }).finally(() => clearTimeout(timeoutId));
-
-      if (resp.ok) {
-        const rawHtml = await resp.text();
-        const reg = /class="result__a"[^>]*href="([^"]+)"[^>]*>([\s\S]*?)<\/a>/gi;
-        const snippetReg = /class="result__snippet"[^>]*>([\s\S]*?)<\/a>/gi;
-
-        const snippets: string[] = [];
-        let snippetMatch: RegExpExecArray | null;
-        while ((snippetMatch = snippetReg.exec(rawHtml)) !== null) {
-          snippets.push(snippetMatch[1].replace(/<[^>]+>/g, '').trim());
-        }
-
-        let match: RegExpExecArray | null;
-        let idx = 0;
-        while ((match = reg.exec(rawHtml)) !== null && results.length < maxResults) {
-          let rawHref = match[1];
-          if (rawHref.startsWith('//')) rawHref = `https:${rawHref}`;
-          const url = unwrapDdgRedirect(rawHref);
-          const title = match[2].replace(/<[^>]+>/g, '').trim();
-          const snippet = snippets[idx] || '';
-
-          if (url.startsWith('http') && isUrlSafe(url)) {
-            results.push({ title, url, snippet });
-          }
-          idx++;
+      if (resp.ok) rawHtml = await resp.text();
+    } else {
+      // Browser mode: Fetch through resilient CORS proxies
+      try {
+        const proxyUrl1 = `https://api.allorigins.win/raw?url=${encodeURIComponent(ddgUrl)}`;
+        const resp1 = await fetch(proxyUrl1);
+        if (resp1.ok) rawHtml = await resp1.text();
+      } catch {
+        // try second proxy
+        try {
+          const proxyUrl2 = `https://corsproxy.io/?url=${encodeURIComponent(ddgUrl)}`;
+          const resp2 = await fetch(proxyUrl2);
+          if (resp2.ok) rawHtml = await resp2.text();
+        } catch {
+          // ignore
         }
       }
-    } catch {
-      // Ignore and proceed to Fallback 2
     }
+
+    if (rawHtml) {
+      const reg = /class="result__a"[^>]*href="([^"]+)"[^>]*>([\s\S]*?)<\/a>/gi;
+      const snippetReg = /class="result__snippet"[^>]*>([\s\S]*?)<\/a>/gi;
+
+      const snippets: string[] = [];
+      let snippetMatch: RegExpExecArray | null;
+      while ((snippetMatch = snippetReg.exec(rawHtml)) !== null) {
+        snippets.push(snippetMatch[1].replace(/<[^>]+>/g, '').trim());
+      }
+
+      let match: RegExpExecArray | null;
+      let idx = 0;
+      while ((match = reg.exec(rawHtml)) !== null && results.length < maxResults) {
+        let rawHref = match[1];
+        if (rawHref.startsWith('//')) rawHref = `https:${rawHref}`;
+        const url = unwrapDdgRedirect(rawHref);
+        const title = match[2].replace(/<[^>]+>/g, '').trim();
+        const snippet = snippets[idx] || '';
+
+        if (url.startsWith('http') && isUrlSafe(url)) {
+          results.push({ title, url, snippet });
+        }
+        idx++;
+      }
+    }
+  } catch {
+    // Proceed to fallbacks
   }
 
   // Fallback 2: DuckDuckGo Instant Answer API

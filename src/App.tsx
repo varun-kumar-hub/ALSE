@@ -192,25 +192,30 @@ export function App() {
         }
       }
     } else {
-      // Auto-fetch Wikipedia Grounding for entities, movies, people, actors, dates, biographies
-      const wikiFact = await getFactGroundedSummary(userPrompt);
-      if (wikiFact) {
-        webContext += `\n\n${wikiFact}\n\n`;
-        actualSourcesUsed.push('Wikipedia Grounding');
-      }
-
-      if (
+      // 1. Live Web Search: Auto-fetch live web results for real-time questions, movies, release dates, news, people
+      const isSearchWorthy =
         intent === 'research' ||
-        /\b(search for|search|lookup|look up|find latest|what is the latest|news about|who is|tell me about|biography|movies|filmography)\b/i.test(userPrompt) ||
-        !wikiFact
-      ) {
-        const searchQuery = userPrompt
-          .replace(/\b(search for|search|lookup|look up|find latest|what is the latest|news about|who is|tell me about)\b/gi, '')
+        intent === 'biography' ||
+        intent === 'general' ||
+        /\b(when|who|what|where|release date|movie|film|news|latest|upcoming|update|cast|director|box office)\b/i.test(userPrompt);
+
+      if (isSearchWorthy) {
+        const cleanQuery = userPrompt
+          .replace(/\b(search for|search|lookup|look up|find latest|what is the latest|news about|tell me about)\b/gi, '')
           .trim() || userPrompt;
-        const searchRes = await webSearch(searchQuery, 5);
-        if (searchRes.ok) {
+        const searchRes = await webSearch(cleanQuery, 5);
+        if (searchRes.ok && searchRes.content) {
           webContext += `\n\n[Live Web Search Results]:\n${searchRes.content}\n\n`;
           actualSourcesUsed.push('Web Search');
+        }
+      }
+
+      // 2. Wikipedia Grounding for encyclopedic biographies & entities
+      if (intent === 'biography' || /\b(who is|who was|biography of|bio of|history of)\b/i.test(userPrompt)) {
+        const wikiFact = await getFactGroundedSummary(userPrompt);
+        if (wikiFact) {
+          webContext += `\n\n${wikiFact}\n\n`;
+          actualSourcesUsed.push('Wikipedia Grounding');
         }
       }
     }
