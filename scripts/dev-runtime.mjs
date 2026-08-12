@@ -8,7 +8,7 @@ const npmCommand = isWindows ? 'npm.cmd' : 'npm';
 function run(command, args, options = {}) {
   const result = spawnSync(command, args, {
     stdio: 'inherit',
-    shell: false,
+    shell: isWindows,
     ...options,
   });
 
@@ -18,7 +18,7 @@ function run(command, args, options = {}) {
 function hasCommand(command, args = ['--version']) {
   const result = spawnSync(command, args, {
     stdio: 'ignore',
-    shell: false,
+    shell: isWindows,
   });
 
   return result.status === 0;
@@ -59,11 +59,30 @@ if (!existsSync('node_modules')) {
   }
 }
 
-installRustup();
+function hasWorkingLinker() {
+  if (hasCommand('link')) return true;
+  try {
+    const res = spawnSync('gcc', ['-dumpmachine'], { encoding: 'utf-8', shell: isWindows });
+    if (res.status === 0 && res.stdout && res.stdout.includes('x86_64')) return true;
+  } catch {
+    // ignore
+  }
+  return false;
+}
 
-const child = spawn(npmCommand, ['run', 'dev:desktop'], {
+const canBuildDesktop = hasCommand('cargo') && hasWorkingLinker();
+const targetScript = canBuildDesktop ? 'dev:desktop' : 'web';
+
+if (!canBuildDesktop && hasCommand('cargo')) {
+  console.log('⚡ Visual Studio C++ Build Tools (link.exe) not found. Starting in Web Mode (http://localhost:1420)...');
+  console.log('💡 Note: All AI features, search tools, and local Ollama inference work 100% in Web Mode.');
+} else {
+  console.log(`Starting Nexus Agent in ${canBuildDesktop ? 'Desktop (Tauri)' : 'Web (Vite)'} mode...`);
+}
+
+const child = spawn(npmCommand, ['run', targetScript], {
   stdio: 'inherit',
-  shell: false,
+  shell: isWindows,
 });
 
 child.on('exit', (code) => {

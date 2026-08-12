@@ -29,11 +29,20 @@ const localStorageFallback = {
   },
 };
 
+function isTauri(): boolean {
+  return typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window;
+}
+
 /**
  * Initialize SQLite database connection and run schema migrations.
  */
 export async function initDatabase(): Promise<Database | null> {
   if (dbInstance) return dbInstance;
+  if (isFallbackMode) return null;
+  if (!isTauri()) {
+    isFallbackMode = true;
+    return null;
+  }
 
   try {
     dbInstance = await Database.load('sqlite:ai_os.db');
@@ -90,6 +99,25 @@ async function runMigrations(db: Database) {
       content TEXT NOT NULL,
       category TEXT,
       created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+  `);
+
+  await db.execute(`
+    CREATE TABLE IF NOT EXISTS workspace_projects (
+      id TEXT PRIMARY KEY,
+      name TEXT NOT NULL,
+      description TEXT,
+      created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+  `);
+
+  await db.execute(`
+    CREATE TABLE IF NOT EXISTS notebook_notes (
+      id TEXT PRIMARY KEY,
+      title TEXT NOT NULL,
+      category TEXT NOT NULL DEFAULT 'general',
+      content TEXT NOT NULL,
+      updated_at TEXT NOT NULL DEFAULT (datetime('now'))
     );
   `);
 
@@ -210,6 +238,23 @@ export async function getMessages(chatId: string): Promise<ChatMessage[]> {
   );
 }
 
+export async function getSanitizedMessagesForMode(
+  chatId: string,
+  targetMode: 'local' | 'cloud' | 'hybrid'
+): Promise<ChatMessage[]> {
+  const messages = await getMessages(chatId);
+  if (targetMode !== 'cloud') return messages;
+
+  // Filter out unformatted reasoning tags (<think>...</think>) produced by local models
+  return messages.map((m) => {
+    if (m.role === 'assistant') {
+      const sanitizedContent = m.content.replace(/<think>[\s\S]*?<\/think>/gi, '').trim();
+      return { ...m, content: sanitizedContent || m.content };
+    }
+    return m;
+  });
+}
+
 export async function addMessage(
   chatId: string,
   role: 'user' | 'assistant' | 'system',
@@ -306,6 +351,7 @@ export async function getAllSettings(): Promise<AppSettings> {
   const autoStartOllama = (await getSetting('autoStartOllama', 'true')) === 'true';
   const keepOllamaRunning = (await getSetting('keepOllamaRunning', 'true')) === 'true';
   const onboardingComplete = (await getSetting('onboardingComplete', 'false')) === 'true';
+  const skipLauncherInDev = (await getSetting('skipLauncherInDev', 'true')) === 'true';
 
   return {
     assistantName,
@@ -319,5 +365,89 @@ export async function getAllSettings(): Promise<AppSettings> {
     autoStartOllama,
     keepOllamaRunning,
     onboardingComplete,
+    skipLauncherInDev,
   };
+}
+
+/* ================= Projects & Notes CRUD ================= */
+
+export interface ProjectItem {
+  id: string;
+  name: string;
+  description?: string;
+  created_at: string;
+}
+
+export interface NoteItem {
+  id: string;
+  title: string;
+  category: 'code' | 'research' | 'snippet' | 'general';
+  content: string;
+  updatedAt: string;
+}
+
+export async function getProjects(): Promise<ProjectItem[]> {
+  const db = await initDatabase();
+  if (isFallbackMode || !db) {
+    const raw = localStorage.getItem('ai_os_projects');
+    return raw ? JSON.parse(raw) : [];
+  }
+  return db.select<ProjectItem[]>(`SELECT id, name, description, created_at FROM workspace_projects ORDER BY created_at DESC`);
+}
+
+export async function createProject(name: string, description?: string): Promise<ProjectItem> {
+  const id = String(Date.now());
+  const created_at = new Date().toISOString();
+  const project: ProjectItem = { id, name, description, created_at };
+  const db = await initDatabase();
+  if (isFallbackMode || !db) {
+    const existing = await getProjects();
+    localStorage.setItem('ai_os_projects', JSON.stringify([project, ...existing]));
+    return project;
+  }
+  await db.execute(`INSERT INTO workspace_projects (id, name, description, created_at) VALUES ($1, $2, $3, $4)`, [id, name, description || '', created_at]);
+  return project;
+}
+
+export async function getNotebookNotes(): Promise<NoteItem[]> {
+  const db = await initDatabase();
+  if (isFallbackMode || !db) {
+    const raw = localStorage.getItem('ai_os_notes');
+    return raw ? JSON.parse(raw) : [];
+  }
+  const rows = await db.select<{ id: string; title: string; category: string; content: string; updated_at: string }[]>(
+    `SELECT id, title, category, content, updated_at FROM notebook_notes ORDER BY updated_at DESC`
+  );
+  return rows.map((r) => ({
+    id: r.id,
+    title: r.title,
+    category: r.category as NoteItem['category'],
+    content: r.content,
+    updatedAt: r.updated_at,
+  }));
+}
+
+export async function saveNotebookNote(note: NoteItem): Promise<void> {
+  const db = await initDatabase();
+  if (isFallbackMode || !db) {
+    const existing = await getNotebookNotes();
+    const filtered = existing.filter((n) => n.id !== note.id);
+    localStorage.setItem('ai_os_notes', JSON.stringify([note, ...filtered]));
+    return;
+  }
+  await db.execute(
+    `INSERT INTO notebook_notes (id, title, category, content, updated_at) VALUES ($1, $2, $3, $4, $5)
+     ON CONFLICT(id) DO UPDATE SET title = excluded.title, category = excluded.category, content = excluded.content, updated_at = excluded.updated_at`,
+    [note.id, note.title, note.category, note.content, note.updatedAt]
+  );
+}
+
+export async function deleteNotebookNote(id: string): Promise<void> {
+  const db = await initDatabase();
+  if (isFallbackMode || !db) {
+    const existing = await getNotebookNotes();
+    localStorage.setItem('ai_os_notes', JSON.stringify(existing.filter((n) => n.id !== id)));
+    return;
+  }
+  await db.execute(`DELETE FROM notebook_notes WHERE id = $1`, [id]);
 }

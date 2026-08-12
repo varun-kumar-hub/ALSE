@@ -2,6 +2,16 @@ import React, { useState } from 'react';
 import { MessageSquare, Pin, Trash2, Edit2, Check, X } from 'lucide-react';
 import { Chat } from '../../services/types';
 
+function formatRelativeTime(dateStr: string): string {
+  if (!dateStr) return 'Just now';
+  const diffSec = Math.floor((Date.now() - new Date(dateStr).getTime()) / 1000);
+  if (diffSec < 60) return 'Just now';
+  if (diffSec < 3600) return `${Math.floor(diffSec / 60)}m ago`;
+  if (diffSec < 86400) return `${Math.floor(diffSec / 3600)}h ago`;
+  if (diffSec < 172800) return 'Yesterday';
+  return `${Math.floor(diffSec / 86400)}d ago`;
+}
+
 interface ChatListItemProps {
   chat: Chat;
   isActive: boolean;
@@ -58,7 +68,10 @@ export const ChatListItem: React.FC<ChatListItemProps> = ({
           </button>
         </form>
       ) : (
-        <span className="flex-1 truncate">{chat.title}</span>
+        <div className="flex-1 min-w-0 flex flex-col">
+          <span className="truncate text-xs font-semibold">{chat.title}</span>
+          <span className="text-[9px] text-zinc-400 font-mono">{formatRelativeTime(chat.updated_at)}</span>
+        </div>
       )}
 
       {/* Action buttons on hover */}

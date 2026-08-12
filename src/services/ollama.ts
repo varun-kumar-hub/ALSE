@@ -7,7 +7,7 @@ import {
   StartupResult,
 } from './types';
 
-const OLLAMA_BASE_URL = 'http://127.0.0.1:11434';
+const OLLAMA_BASE_URL = typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window ? 'http://127.0.0.1:11434' : '';
 
 function isTauriRuntimeAvailable(): boolean {
   return typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window;
@@ -68,21 +68,44 @@ export async function streamChat(
   messages: ChatMessage[],
   onChunk: (chunk: ChatStreamChunk) => void
 ): Promise<void> {
-  if (!isTauriRuntimeAvailable()) {
-    await streamChatViaHttp(model, messages, onChunk);
+  // Always use browser fetch first so requests are captured live in DevTools Network tab
+  try {
+    const baseUrl = OLLAMA_BASE_URL || 'http://127.0.0.1:11434';
+    const response = await fetch(`${baseUrl}/api/chat`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model,
+        messages: messages.map((m) => ({ role: m.role, content: m.content })),
+        stream: true,
+      }),
+    });
+
+    if (response.ok && response.body) {
+      await readNdjsonStream(response.body, (chunk) => {
+        onChunk(chunk as ChatStreamChunk);
+      });
+      return;
+    }
+  } catch (err) {
+    console.warn('Fetch stream error, checking Tauri IPC fallback:', err);
+  }
+
+  if (isTauriRuntimeAvailable()) {
+    const channel = new Channel<ChatStreamChunk>();
+    channel.onmessage = (chunk) => {
+      onChunk(chunk);
+    };
+
+    await invoke('chat_stream', {
+      model,
+      messages: messages.map((m) => ({ role: m.role, content: m.content })),
+      onChunk: channel,
+    });
     return;
   }
 
-  const channel = new Channel<ChatStreamChunk>();
-  channel.onmessage = (chunk) => {
-    onChunk(chunk);
-  };
-
-  await invoke('chat_stream', {
-    model,
-    messages: messages.map((m) => ({ role: m.role, content: m.content })),
-    onChunk: channel,
-  });
+  await streamChatViaHttp(model, messages, onChunk);
 }
 
 export async function generateChatTitle(

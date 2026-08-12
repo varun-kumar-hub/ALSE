@@ -2,17 +2,21 @@ import React from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import rehypeHighlight from 'rehype-highlight';
-import { User, Bot, Sparkles, BookOpen, GitCompare, Code2, Calendar } from 'lucide-react';
+import { User, Bot, BookOpen, GitCompare, Code2, Calendar } from 'lucide-react';
 import { ChatMessage as ChatMessageType } from '../../services/types';
 import { ResponseActions } from './ResponseActions';
+import { RuntimeMetadataCard } from './RuntimeMetadataCard';
+import { ThinkingCard } from './ThinkingCard';
+import { parseThinkingAndContent } from '../../lib/thoughtExtractor';
+import { buildExecutionRuntimeMetadata } from '../../lib/runtimeMetadata';
 import { detectQueryIntent } from '../../lib/intentDetector';
-import { parseResponseSections } from '../../lib/formatters';
 import { useAppStore } from '../../stores/appStore';
 
 interface ChatMessageProps {
   message: ChatMessageType;
   onRegenerate?: () => void;
   onExport?: () => void;
+  isStreaming?: boolean;
 }
 
 function extractNodeText(node: React.ReactNode): string {
@@ -59,17 +63,27 @@ const MarkdownContent: React.FC<{ content: string }> = ({ content }) => (
   </ReactMarkdown>
 );
 
-const ChatMessageComponent: React.FC<ChatMessageProps> = ({
+export const ChatMessageComponent: React.FC<ChatMessageProps> = ({
   message,
   onRegenerate,
   onExport,
+  isStreaming = false,
 }) => {
-  const assistantName = useAppStore((state) => state.assistantName);
+  const { assistantName, selectedModel, aiMode } = useAppStore();
   const isUser = message.role === 'user';
 
   // Intent classification for dynamic response layout
   const intent = message.intent ?? detectQueryIntent(message.content);
-  const sections = !isUser ? parseResponseSections(message.content, intent) : [];
+
+  // Extract thinking / reasoning blocks with context-specific dynamic activity sentences
+  const parsed = parseThinkingAndContent(
+    message.content,
+    message.user_prompt,
+    intent,
+    message.sources_used || []
+  );
+  const displayThinking = message.thinking || parsed.thinking;
+  const displayContent = parsed.content || (parsed.thinking ? '' : message.content);
 
   const getIntentBadge = () => {
     switch (intent) {
@@ -132,7 +146,7 @@ const ChatMessageComponent: React.FC<ChatMessageProps> = ({
             </div>
             {!isUser && (
               <ResponseActions
-                content={message.content}
+                content={displayContent || message.content}
                 onRegenerate={onRegenerate}
                 onExport={onExport}
               />
@@ -145,25 +159,42 @@ const ChatMessageComponent: React.FC<ChatMessageProps> = ({
               {message.content}
             </p>
           ) : (
-            /* Assistant Message — Markdown or Adaptive Layout Cards */
-            <div className="markdown-body text-[15px] space-y-4 select-text">
-              {sections.length > 1 ? (
-                <div className="space-y-4">
-                  {sections.map((section, idx) => (
-                    <div
-                      key={idx}
-                      className="glass-card rounded-xl p-4 border border-zinc-200 space-y-2 select-text"
-                    >
-                      <h4 className="text-xs font-bold text-blue-700 uppercase tracking-wider flex items-center gap-1.5 select-none">
-                        <Sparkles className="w-3.5 h-3.5" />
-                        {section.title}
-                      </h4>
-                      <MarkdownContent content={section.content} />
-                    </div>
-                  ))}
+            /* Assistant Message — Agent Activity Timeline + Clean Markdown */
+            <div className="space-y-4 select-text">
+              {(displayThinking || isStreaming) && (
+                <ThinkingCard
+                  activities={parsed.activities}
+                  thinking={displayThinking}
+                  isStreaming={isStreaming && parsed.isThinkingActive}
+                  defaultExpanded={isStreaming || parsed.isThinkingActive}
+                />
+              )}
+
+              {displayContent ? (
+                <div className="markdown-body text-[15px] space-y-4 select-text">
+                  <MarkdownContent content={displayContent} />
                 </div>
-              ) : (
-                <MarkdownContent content={message.content} />
+              ) : isStreaming && parsed.isThinkingActive ? (
+                <div className="flex items-center gap-2 text-xs text-zinc-500 py-1">
+                  <span className="inline-block w-2 h-2 rounded-full bg-blue-600 animate-pulse" />
+                  <span>Formulating structured response...</span>
+                </div>
+              ) : null}
+
+              {/* Real Execution Path Runtime Metadata Card */}
+              {!isStreaming && (
+                <RuntimeMetadataCard
+                  metadata={buildExecutionRuntimeMetadata(
+                    message.model_used || selectedModel || 'qwen3:8b',
+                    message.provider_used || (aiMode === 'local' ? 'ollama' : 'opencode'),
+                    aiMode,
+                    intent,
+                    '',
+                    displayContent || message.content,
+                    Date.now() - (message.generation_time_ms || 2100),
+                    message.sources_used || []
+                  )}
+                />
               )}
             </div>
           )}

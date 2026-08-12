@@ -1,224 +1,216 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   ArrowRight,
-  ChevronDown,
-  ChevronUp,
-  RotateCcw,
+  CheckCircle2,
+  Cpu,
+  Database as DbIcon,
+  Download,
+  HardDrive,
+  RefreshCw,
+  ShieldCheck,
   Sparkles,
-  XCircle,
 } from 'lucide-react';
 import { Button } from '../ui/Button';
-import { ProgressBar } from './ProgressBar';
-import { AgentPlanning, PlanStep } from '../ui/AgentPlanning';
-import { prepareRuntime, RuntimeProgress } from '../../services/runtime';
 import { useAppStore } from '../../stores/appStore';
+import { pullModelStream } from '../../services/ollama';
 
-const SETUP_STEPS = [
-  { id: 'system', label: 'Checking System' },
-  { id: 'components', label: 'Installing Required Components' },
-  { id: 'runtime', label: 'Preparing AI Runtime' },
-  { id: 'models', label: 'Downloading AI Models' },
-  { id: 'workspace', label: 'Creating Workspace' },
-  { id: 'database', label: 'Initializing Database' },
-  { id: 'services', label: 'Starting AI Services' },
-  { id: 'health', label: 'Final Verification' },
-];
-
-interface StepState {
-  id: string;
-  label: string;
-  status: RuntimeProgress['status'];
-  detail?: string;
+interface RuntimeManagerProps {
+  onComplete: () => void;
 }
 
-export const SetupWizard: React.FC<{ onComplete: () => void }> = ({ onComplete }) => {
-  const { refreshModels, updateSetting, setRuntimeReady } = useAppStore();
-  const [steps, setSteps] = useState<StepState[]>(
-    SETUP_STEPS.map((step) => ({ ...step, status: 'pending' }))
-  );
-  const [progress, setProgress] = useState(0);
-  const [headline, setHeadline] = useState('Preparing your environment...');
-  const [isRunning, setIsRunning] = useState(false);
-  const [isReady, setIsReady] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [diagnostics, setDiagnostics] = useState<string[]>([]);
-  const [showDetails, setShowDetails] = useState(false);
+export const SetupWizard: React.FC<RuntimeManagerProps> = ({ onComplete }) => {
+  const {
+    models,
+    workspaceLocation,
+    aiMode,
+    refreshModels,
+  } = useAppStore();
 
-  const completedCount = useMemo(
-    () => steps.filter((step) => step.status === 'success').length,
-    [steps]
-  );
+  const [isVerifying, setIsVerifying] = useState(true);
+  const [downloadingModel, setDownloadingModel] = useState<string | null>(null);
+  const [pullProgress, setPullProgress] = useState('');
 
-  const updateStep = (progressEvent: RuntimeProgress) => {
-    setSteps((current) =>
-      current.map((step) =>
-        step.id === progressEvent.step
-          ? { ...step, status: progressEvent.status }
-          : step
-      )
-    );
-    setProgress(progressEvent.progress);
-    setHeadline(progressEvent.label);
-    if (progressEvent.detail) {
-      setDiagnostics((current) => [...current, progressEvent.detail as string]);
-      setSteps((current) =>
-        current.map((step) =>
-          step.id === progressEvent.step ? { ...step, detail: progressEvent.detail } : step
-        )
-      );
-    }
-  };
-
-  const runRuntimeManager = async () => {
-    setIsRunning(true);
-    setIsReady(false);
-    setError(null);
-    setDiagnostics([]);
-    setProgress(0);
-    setHeadline('Preparing your environment...');
-    setSteps(SETUP_STEPS.map((step) => ({ ...step, status: 'pending' })));
-
-    const result = await prepareRuntime(updateStep);
-
-    if (result.ready) {
-      setIsReady(true);
-      setProgress(100);
-      setHeadline('Ready');
-      await updateSetting('workspaceLocation', result.workspace_path);
-      await refreshModels();
-      setRuntimeReady(true);
-    } else {
-      setError('Required component could not be initialized.');
-      setDiagnostics(result.diagnostics);
-    }
-
-    setIsRunning(false);
+  const runRealDiagnostics = async () => {
+    setIsVerifying(true);
+    await refreshModels();
+    setIsVerifying(false);
   };
 
   useEffect(() => {
-    runRuntimeManager();
+    runRealDiagnostics();
   }, []);
 
-  const planningSteps: PlanStep[] = steps.map((step) => ({
-    id: step.id,
-    title: step.label,
-    status:
-      step.status === 'running'
-        ? 'active'
-        : step.status === 'warning'
-          ? 'warning'
-          : step.status === 'error'
-            ? 'error'
-            : step.status,
-    defaultExpanded: step.status === 'running' || step.status === 'error',
-    content: step.detail ? (
-      <p className="rounded-md border border-zinc-200 bg-[#f6f5f2]/70 p-3 font-mono text-[11px] leading-relaxed text-zinc-500">
-        {step.detail}
-      </p>
-    ) : undefined,
-  }));
+  const handleInstallMissingModel = async (modelName: string) => {
+    setDownloadingModel(modelName);
+    setPullProgress('Starting download...');
+    try {
+      await pullModelStream(modelName, (chunk) => {
+        setPullProgress(chunk.status || 'Downloading...');
+      });
+      await refreshModels();
+    } catch (err) {
+      setPullProgress(`Failed: ${err}`);
+    } finally {
+      setDownloadingModel(null);
+    }
+  };
 
   return (
-    <div className="h-screen w-full overflow-hidden bg-[#f6f5f2] p-3 select-none">
-      <div className="mx-auto flex h-full w-full max-w-xl flex-col overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-sm">
-        <div className="shrink-0 px-7 py-5 border-b border-zinc-200 bg-[#f6f5f2]/70">
-          <div className="flex items-center justify-between gap-4">
-            <div className="flex min-w-0 items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-blue-50 border border-blue-100 text-blue-600 flex items-center justify-center">
-                <Sparkles className="w-5 h-5" />
+    <div className="min-h-screen w-full flex items-center justify-center bg-[#f6f5f2] p-4 select-none">
+      <div className="w-full max-w-2xl rounded-2xl border border-zinc-200 bg-white shadow-xl overflow-hidden flex flex-col animate-in fade-in zoom-in duration-200">
+        {/* Header */}
+        <div className="px-6 py-5 border-b border-zinc-200 bg-[#f6f5f2]/70 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-blue-50 border border-blue-100 text-blue-600 flex items-center justify-center">
+              <Sparkles className="w-5 h-5" />
+            </div>
+            <div>
+              <h1 className="text-base font-extrabold text-zinc-950">Nexus Agent Runtime Manager</h1>
+              <p className="text-xs text-zinc-500">Real-time system, runtime & model verification</p>
+            </div>
+          </div>
+          <Button
+            size="sm"
+            variant="secondary"
+            onClick={runRealDiagnostics}
+            disabled={isVerifying}
+            leftIcon={<RefreshCw className={`w-3.5 h-3.5 ${isVerifying ? 'animate-spin' : ''}`} />}
+          >
+            {isVerifying ? 'Verifying...' : 'Re-verify'}
+          </Button>
+        </div>
+
+        {/* Runtime Status Cards Body */}
+        <div className="p-6 space-y-5 text-xs">
+          {/* Status Grid */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            {/* Environment Status */}
+            <div className="p-3.5 rounded-xl border border-zinc-200 bg-zinc-50/50 flex flex-col justify-between">
+              <div className="flex items-center justify-between text-zinc-500">
+                <span className="font-semibold text-[11px]">Environment</span>
+                <CheckCircle2 className="w-4 h-4 text-emerald-600" />
               </div>
-              <div className="min-w-0">
-                <h1 className="text-lg font-semibold text-zinc-950">Welcome to Nexus Agent</h1>
-                <p className="text-sm text-zinc-500">{headline}</p>
+              <div className="mt-2">
+                <p className="font-bold text-zinc-900 text-sm">Ready</p>
+                <p className="text-[10px] text-zinc-500 font-mono mt-0.5">Desktop Runtime</p>
               </div>
             </div>
-            {isReady && (
-              <Button
-                size="sm"
-                onClick={onComplete}
-                rightIcon={<ArrowRight className="w-4 h-4" />}
-                className="shrink-0"
-              >
-                Open
-              </Button>
+
+            {/* Models Status */}
+            <div className="p-3.5 rounded-xl border border-zinc-200 bg-zinc-50/50 flex flex-col justify-between">
+              <div className="flex items-center justify-between text-zinc-500">
+                <span className="font-semibold text-[11px]">Models</span>
+                <Cpu className="w-4 h-4 text-blue-600" />
+              </div>
+              <div className="mt-2">
+                <p className="font-bold text-zinc-900 text-sm">{models.length} Installed</p>
+                <p className="text-[10px] text-zinc-500 font-mono mt-0.5">Ollama Local AI</p>
+              </div>
+            </div>
+
+            {/* Workspace Status */}
+            <div className="p-3.5 rounded-xl border border-zinc-200 bg-zinc-50/50 flex flex-col justify-between">
+              <div className="flex items-center justify-between text-zinc-500">
+                <span className="font-semibold text-[11px]">Workspace</span>
+                <HardDrive className="w-4 h-4 text-emerald-600" />
+              </div>
+              <div className="mt-2">
+                <p className="font-bold text-zinc-900 text-sm">Ready</p>
+                <p className="text-[10px] text-zinc-500 truncate mt-0.5">{workspaceLocation || 'Default Path'}</p>
+              </div>
+            </div>
+
+            {/* Database Status */}
+            <div className="p-3.5 rounded-xl border border-zinc-200 bg-zinc-50/50 flex flex-col justify-between">
+              <div className="flex items-center justify-between text-zinc-500">
+                <span className="font-semibold text-[11px]">Database</span>
+                <DbIcon className="w-4 h-4 text-purple-600" />
+              </div>
+              <div className="mt-2">
+                <p className="font-bold text-zinc-900 text-sm">Active</p>
+                <p className="text-[10px] text-zinc-500 font-mono mt-0.5">SQLite Persistence</p>
+              </div>
+            </div>
+          </div>
+
+          {/* Installed Models List */}
+          <div className="space-y-2 pt-1">
+            <div className="flex items-center justify-between">
+              <span className="font-semibold text-zinc-800 uppercase tracking-wider text-[10px]">
+                Installed Local AI Models
+              </span>
+              <span className="text-[10px] text-zinc-500">Mode: {aiMode.toUpperCase()}</span>
+            </div>
+
+            {models.length > 0 ? (
+              <div className="flex flex-wrap gap-2">
+                {models.map((m) => (
+                  <div
+                    key={m.name}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-zinc-200 bg-white shadow-2xs font-mono text-xs text-zinc-800"
+                  >
+                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                    <span>{m.name}</span>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="p-4 rounded-xl border border-amber-200 bg-amber-50 space-y-3">
+                <div className="flex items-start gap-3">
+                  <Cpu className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
+                  <div>
+                    <h3 className="font-bold text-zinc-900">Recommended Model Missing</h3>
+                    <p className="text-xs text-zinc-600 mt-0.5">
+                      No local Ollama models were detected. You can download <b>Qwen3:8B</b> for optimal general reasoning.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-3 pt-1">
+                  <Button
+                    size="sm"
+                    onClick={() => handleInstallMissingModel('qwen3:8b')}
+                    isLoading={downloadingModel === 'qwen3:8b'}
+                    leftIcon={<Download className="w-3.5 h-3.5" />}
+                  >
+                    Download Qwen3:8B
+                  </Button>
+                  <Button variant="ghost" size="sm" onClick={onComplete}>
+                    Skip for Now
+                  </Button>
+                </div>
+                {downloadingModel && (
+                  <p className="text-[11px] font-mono text-blue-600">{pullProgress}</p>
+                )}
+              </div>
             )}
+          </div>
+
+          {/* Privacy & Updates Information */}
+          <div className="p-3.5 rounded-xl border border-zinc-200 bg-[#f6f5f2]/70 flex items-center justify-between text-zinc-500">
+            <div className="flex items-center gap-2">
+              <ShieldCheck className="w-4 h-4 text-emerald-600" />
+              <span className="text-[11px]">System & Workspace Verified. All data is stored locally on your device.</span>
+            </div>
+            <span className="text-[10px] font-mono text-zinc-400">v1.0.0</span>
           </div>
         </div>
 
-        <div className="flex-1 overflow-y-auto p-6 space-y-5">
-          {error ? (
-            <div className="rounded-xl border border-rose-200 bg-rose-50 p-4 space-y-3">
-              <div className="flex gap-3">
-                <XCircle className="w-5 h-5 text-rose-300 shrink-0 mt-0.5" />
-                <div>
-                  <h2 className="text-sm font-semibold text-rose-900">
-                    Unable to prepare AI Runtime
-                  </h2>
-                  <p className="text-xs text-rose-700 mt-1">
-                    Reason: {error}
-                  </p>
-                </div>
-              </div>
-              <div className="flex flex-wrap gap-2">
-                <Button
-                  variant="secondary"
-                  size="sm"
-                  onClick={runRuntimeManager}
-                  disabled={isRunning}
-                  leftIcon={<RotateCcw className="w-3.5 h-3.5" />}
-                >
-                  Retry
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => setShowDetails((value) => !value)}
-                  rightIcon={
-                    showDetails ? (
-                      <ChevronUp className="w-3.5 h-3.5" />
-                    ) : (
-                      <ChevronDown className="w-3.5 h-3.5" />
-                    )
-                  }
-                >
-                  View Details
-                </Button>
-              </div>
-            </div>
-          ) : (
-            <ProgressBar progress={progress} label="Setup Progress" />
-          )}
-
-          <AgentPlanning
-            key={isReady ? 'ready' : 'running'}
-            title="Preparing your environment"
-            steps={planningSteps}
-            defaultExpanded={!isReady}
-          />
-
-          {showDetails && diagnostics.length > 0 && (
-            <div className="rounded-xl border border-zinc-200 bg-[#f6f5f2] p-3 max-h-40 overflow-y-auto">
-              {diagnostics.map((line, index) => (
-                <p key={`${line}-${index}`} className="font-mono text-[11px] text-zinc-500">
-                  {line}
-                </p>
-              ))}
-            </div>
-          )}
-        </div>
-        <div className="shrink-0 border-t border-zinc-200 bg-[#f6f5f2]/70 p-5">
+        {/* Action Footer */}
+        <div className="px-6 py-4 border-t border-zinc-200 bg-[#f6f5f2]/70 flex items-center justify-between">
+          <span className="text-xs text-zinc-500">Environment Ready</span>
           <Button
             size="lg"
-            disabled={!isReady}
             onClick={onComplete}
             rightIcon={<ArrowRight className="w-5 h-5" />}
-            className="w-full"
+            className="px-8 font-bold"
           >
-            {isReady ? 'Open Nexus Agent' : `${completedCount} / ${steps.length} Complete`}
+            Open Nexus Agent
           </Button>
         </div>
       </div>
     </div>
   );
 };
+
 

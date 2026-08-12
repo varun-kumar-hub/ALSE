@@ -1,4 +1,5 @@
 import { streamChat as streamOllamaChat, generateChatTitle as generateOllamaTitle } from './ollama';
+import { PROVIDER_REGISTRY } from './providerRegistry';
 import {
   AiExecutionMode,
   ChatMessage,
@@ -34,7 +35,7 @@ const LOCAL_CAPABILITIES: ProviderCapability[] = [
   'embeddings',
 ];
 
-const CLOUD_CAPABILITIES: ProviderCapability[] = [
+export const CLOUD_CAPABILITIES: ProviderCapability[] = [
   'chat',
   'streaming',
   'title-generation',
@@ -55,56 +56,18 @@ export const DEFAULT_PROVIDER_CONFIGS: ProviderConfig[] = [
     defaultModel: 'qwen3:8b',
     capabilities: LOCAL_CAPABILITIES,
   },
-  {
-    id: 'openai',
-    name: 'OpenAI',
-    kind: 'cloud',
+  ...Object.values(PROVIDER_REGISTRY).map((reg) => ({
+    id: reg.id,
+    name: reg.name,
+    kind: reg.kind,
     enabled: false,
-    defaultModel: 'gpt-4o-mini',
+    defaultModel: reg.defaultModel,
     apiKeySet: false,
     apiKey: '',
-    capabilities: CLOUD_CAPABILITIES,
-  },
-  {
-    id: 'anthropic',
-    name: 'Claude (Anthropic)',
-    kind: 'cloud',
-    enabled: false,
-    defaultModel: 'claude-3-5-sonnet-20241022',
-    apiKeySet: false,
-    apiKey: '',
-    capabilities: CLOUD_CAPABILITIES,
-  },
-  {
-    id: 'gemini',
-    name: 'Google Gemini',
-    kind: 'cloud',
-    enabled: false,
-    defaultModel: 'gemini-1.5-flash',
-    apiKeySet: false,
-    apiKey: '',
-    capabilities: CLOUD_CAPABILITIES,
-  },
-  {
-    id: 'groq',
-    name: 'Groq',
-    kind: 'cloud',
-    enabled: false,
-    defaultModel: 'llama-3.3-70b-versatile',
-    apiKeySet: false,
-    apiKey: '',
-    capabilities: ['chat', 'streaming', 'title-generation', 'json', 'coding'],
-  },
-  {
-    id: 'openrouter',
-    name: 'OpenRouter',
-    kind: 'cloud',
-    enabled: false,
-    defaultModel: 'openai/gpt-4o-mini',
-    apiKeySet: false,
-    apiKey: '',
-    capabilities: CLOUD_CAPABILITIES,
-  },
+    baseUrl: reg.isCustom ? reg.baseUrl : undefined,
+    isCustom: reg.isCustom,
+    capabilities: reg.capabilities,
+  })),
 ];
 
 export function getModelAgentRoleLabel(modelName: string): string {
@@ -171,14 +134,17 @@ class OpenAICompatibleProvider implements AiProvider {
 
   constructor(config: ProviderConfig, endpoint?: string) {
     this.config = config;
+    const reg = PROVIDER_REGISTRY[config.id];
     if (endpoint) {
       this.endpoint = endpoint;
-    } else if (config.id === 'groq') {
-      this.endpoint = 'https://api.groq.com/openai/v1/chat/completions';
-    } else if (config.id === 'openrouter') {
-      this.endpoint = 'https://openrouter.ai/api/v1/chat/completions';
+    } else if (config.baseUrl && config.baseUrl.trim().length > 0) {
+      const norm = normalizeBaseUrl(config.id, config.baseUrl);
+      this.endpoint = `${norm}/chat/completions`;
+    } else if (reg && reg.chatEndpoint) {
+      this.endpoint = reg.chatEndpoint;
     } else {
-      this.endpoint = 'https://api.openai.com/v1/chat/completions';
+      const norm = normalizeBaseUrl(config.id);
+      this.endpoint = `${norm}/chat/completions`;
     }
   }
 
@@ -529,15 +495,13 @@ export class ProviderManager {
         return new OllamaProvider(config);
       }
       if (config.apiKey && config.apiKey.trim().length > 0) {
-        if (config.id === 'openai' || config.id === 'groq' || config.id === 'openrouter') {
-          return new OpenAICompatibleProvider(config);
-        }
         if (config.id === 'anthropic') {
           return new AnthropicProvider(config);
         }
         if (config.id === 'gemini') {
           return new GeminiProvider(config);
         }
+        return new OpenAICompatibleProvider(config);
       }
       return new PendingCloudProvider(config);
     });
@@ -551,25 +515,23 @@ export class ProviderManager {
     request: ProviderRouteRequest,
     selectedModel: string,
     messages: ChatMessage[],
-    onChunk: (chunk: ChatStreamChunk) => void,
-    installedModels: string[] = []
+    onChunk: (chunk: ChatStreamChunk) => void
   ): Promise<void> {
-    const provider = this.selectProvider(request);
-    let targetModel = selectedModel;
-
-    if (provider.config.id === 'ollama') {
-      targetModel = resolveModelForCapability(request.intent, selectedModel, installedModels);
-    } else {
-      targetModel = provider.config.defaultModel || selectedModel;
-    }
+    const provider = this.selectProvider(request, selectedModel);
+    
+    // Respect user's selected model strictly without auto-overriding
+    const targetModel = selectedModel && selectedModel.trim().length > 0
+      ? selectedModel
+      : (provider.config.defaultModel || 'qwen3:8b');
 
     await provider.stream(targetModel, messages, onChunk);
   }
 
   async generateTitle(prompt: string, selectedModel: string): Promise<string> {
-    const provider = this.selectProvider({
-      capabilities: ['title-generation'],
-    });
+    const provider = this.selectProvider(
+      { capabilities: ['title-generation'] },
+      selectedModel
+    );
     const targetModel =
       provider.config.id === 'ollama'
         ? selectedModel
@@ -577,12 +539,33 @@ export class ProviderManager {
     return provider.generateTitle(targetModel, prompt);
   }
 
-  selectProvider(request: ProviderRouteRequest): AiProvider {
+  selectProvider(request: ProviderRouteRequest, selectedModel?: string): AiProvider {
+    // If user explicitly selected a model belonging to a specific cloud provider, route to it directly
+    if (selectedModel) {
+      const targetProviderId = getProviderIdForModel(selectedModel);
+      if (targetProviderId) {
+        const matched = this.providers.find((p) => p.config.id === targetProviderId);
+        if (matched && matched.config.apiKey && matched.config.apiKey.trim().length > 0) {
+          return matched;
+        }
+      }
+    }
+
     const providers = this.getEnabledProviders();
     const preferred = this.getPreferredProviders(request, providers);
     const capable = preferred.find((provider) => supportsAll(provider.config, request.capabilities));
 
     if (capable) return capable;
+
+    if (this.mode === 'cloud') {
+      const cloudProviders = this.providers.filter(
+        (p) => p.config.kind === 'cloud' && (p.config.apiKeySet || Boolean(p.config.apiKey?.trim()))
+      );
+      if (cloudProviders.length > 0) {
+        return cloudProviders[0];
+      }
+      throw new Error('Cloud Mode is active but no cloud provider API keys are verified or enabled. Please verify your API key in Settings -> Cloud Providers.');
+    }
 
     const localFallback = providers.find((provider) => provider.config.kind === 'local');
     if (localFallback) return localFallback;
@@ -699,10 +682,88 @@ function sortByKind(
   );
 }
 
+export function getProviderIdForModel(modelName: string): string | null {
+  if (!modelName) return null;
+  const lower = modelName.toLowerCase();
+  if (lower.includes('opencode') || lower.includes('zen-coder')) return 'opencode';
+  if (lower.includes('gpt-') || lower.includes('openai') || lower.includes('o1-') || lower.includes('o3-')) return 'openai';
+  if (lower.includes('claude') || lower.includes('anthropic')) return 'anthropic';
+  if (lower.includes('gemini') || lower.includes('google')) return 'gemini';
+  if (lower.includes('groq')) return 'groq';
+  if (lower.includes('openrouter')) return 'openrouter';
+  return null;
+}
+
 function sortWithDefault(providers: AiProvider[], defaultProvider?: AiProvider): AiProvider[] {
   if (!defaultProvider) return providers;
   return [
     defaultProvider,
     ...providers.filter((provider) => provider.config.id !== defaultProvider.config.id),
   ];
+}
+
+/* ================= Pre-Flight Verification & Base URL Normalizer (FR-1, FR-2) ================= */
+
+export function normalizeBaseUrl(providerId: string, customBaseUrl?: string): string {
+  if (customBaseUrl && customBaseUrl.trim().length > 0) {
+    let url = customBaseUrl.trim().replace(/\/+$/, '');
+    if (!url.endsWith('/v1') && !url.includes('/v1/')) {
+      url = `${url}/v1`;
+    }
+    return url;
+  }
+
+  const reg = PROVIDER_REGISTRY[providerId];
+  if (reg && reg.baseUrl) {
+    return reg.baseUrl.replace(/\/+$/, '');
+  }
+
+  if (providerId === 'openrouter') return 'https://openrouter.ai/api/v1';
+  if (providerId === 'groq') return 'https://api.groq.com/openai/v1';
+  return 'https://api.openai.com/v1';
+}
+
+export async function verifyProviderConnection(
+  providerId: string,
+  apiKey: string,
+  baseUrl?: string
+): Promise<{ ok: boolean; message: string; modelCount?: number }> {
+  if (!apiKey || !apiKey.trim()) {
+    return { ok: false, message: 'API key cannot be empty.' };
+  }
+
+  const normBaseUrl = normalizeBaseUrl(providerId, baseUrl);
+  const headers: Record<string, string> = {
+    Authorization: `Bearer ${apiKey.trim()}`,
+    'Content-Type': 'application/json',
+  };
+
+  try {
+    const targetUrl = `${normBaseUrl}/models`;
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 8000);
+
+    const resp = await fetch(targetUrl, {
+      method: 'GET',
+      headers,
+      signal: controller.signal,
+    }).finally(() => clearTimeout(timeoutId));
+
+    if (resp.ok) {
+      const data = await resp.json();
+      const count = Array.isArray(data.data) ? data.data.length : 1;
+      return { ok: true, message: `Connected! ${count} models verified.`, modelCount: count };
+    }
+
+    if (resp.status === 401) {
+      return { ok: false, message: 'HTTP 401 Unauthorized: Invalid API Key.' };
+    }
+    if (resp.status === 404) {
+      return { ok: false, message: `HTTP 404 Not Found: Base URL endpoint (${normBaseUrl}) invalid.` };
+    }
+
+    return { ok: false, message: `HTTP ${resp.status} ${resp.statusText}: Key verification failed.` };
+  } catch (err) {
+    return { ok: false, message: `Connection error: ${err instanceof Error ? err.message : String(err)}` };
+  }
 }

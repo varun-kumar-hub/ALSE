@@ -14,6 +14,8 @@ import {
   updateTimelinePhase,
 } from '../lib/thinkingTimeline';
 
+import { isDevMode } from '../lib/env';
+
 interface AppState {
   sidebarOpen: boolean; 
   activeView: 'welcome' | 'setup' | 'chat' | 'settings';
@@ -37,6 +39,7 @@ interface AppState {
   autoStartOllama: boolean;
   keepOllamaRunning: boolean;
   onboardingComplete: boolean;
+  skipLauncherInDev: boolean;
 
   // Actions
   setSidebarOpen: (open: boolean) => void;
@@ -90,6 +93,7 @@ export const useAppStore = create<AppState>((set) => ({
   autoStartOllama: true,
   keepOllamaRunning: true,
   onboardingComplete: false,
+  skipLauncherInDev: true,
 
   setSidebarOpen: (open) => set({ sidebarOpen: open }),
   toggleSidebar: () => set((state) => ({ sidebarOpen: !state.sidebarOpen })),
@@ -123,10 +127,14 @@ export const useAppStore = create<AppState>((set) => ({
   initApp: async () => {
     // 1. Load settings from SQLite / storage
     const settings = await getAllSettings();
+    const availableModels = await listModels();
+    const inDev = isDevMode();
+    const skipDev = settings.skipLauncherInDev ?? true;
+
     set({
       assistantName: settings.assistantName,
       theme: settings.theme,
-      selectedModel: settings.defaultModel,
+      selectedModel: settings.defaultModel || (availableModels.length > 0 ? availableModels[0].name : 'qwen3:8b'),
       aiMode: settings.aiMode,
       defaultProvider: settings.defaultProvider,
       providerConfigs: settings.providerConfigs,
@@ -135,8 +143,36 @@ export const useAppStore = create<AppState>((set) => ({
       autoStartOllama: settings.autoStartOllama,
       keepOllamaRunning: settings.keepOllamaRunning,
       onboardingComplete: settings.onboardingComplete,
-      activeView: settings.onboardingComplete ? 'setup' : 'welcome',
+      skipLauncherInDev: skipDev,
+      models: availableModels,
     });
+
+    if (inDev && skipDev) {
+      // Development Mode: SKIP LAUNCHER COMPLETELY
+      set({ activeView: 'chat' });
+
+      // Perform silent background diagnostics for developers
+      if (availableModels.length === 0) {
+        console.warn(
+          '%c[Nexus Agent Dev Mode] Ollama or local models not detected.\nRun: "ollama pull qwen3:8b"',
+          'color: #f59e0b; font-weight: bold;'
+        );
+      } else {
+        console.log(
+          `%c[Nexus Agent Dev Mode] Started with ${availableModels.length} models ready. Launcher skipped.`,
+          'color: #10b981; font-weight: bold;'
+        );
+      }
+    } else {
+      // Production Mode: Determine if launcher is needed
+      if (!settings.onboardingComplete) {
+        set({ activeView: 'welcome' });
+      } else if (availableModels.length === 0 && settings.aiMode === 'local') {
+        set({ activeView: 'setup' });
+      } else {
+        set({ activeView: 'chat' });
+      }
+    }
   },
 
   refreshModels: async () => {
@@ -159,5 +195,6 @@ export const useAppStore = create<AppState>((set) => ({
     if (key === 'autoStartOllama') set({ autoStartOllama: value === 'true' });
     if (key === 'keepOllamaRunning') set({ keepOllamaRunning: value === 'true' });
     if (key === 'onboardingComplete') set({ onboardingComplete: value === 'true' });
+    if (key === 'skipLauncherInDev') set({ skipLauncherInDev: value === 'true' });
   },
 }));

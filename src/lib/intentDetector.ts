@@ -1,3 +1,4 @@
+
 import { QueryIntent } from '../services/types';
 
 /**
@@ -11,11 +12,12 @@ export function detectQueryIntent(prompt: string): QueryIntent {
   const hasCodeBlock = /```[\s\S]*```/.test(prompt);
   const hasQuestionShape = /^(who|what|when|where|why|how)\b/.test(text);
 
-  // Person / biography requests must win over programming-language false positives.
+  // Person / biography / entity requests must win over generic fallbacks.
   if (
     /\b(who is|who was|tell me about|short description of|brief description of|bio(?:graphy)? of|profile of)\b/.test(text) ||
     /\b(give me|provide|write)\b.*\b(short|brief)?\s*(description|bio|biography)\b.*\b(of|about)\b/.test(text) ||
-    /\b(who invented|founder of|creator of|invented by|created by)\b/.test(text)
+    /\b(who invented|founder of|creator of|invented by|created by)\b/.test(text) ||
+    /^[a-z0-9]{2,6}$/i.test(text) // E.g., "ntr", "srk", "kcr", "ysr", "balayya"
   ) {
     return 'biography';
   }
@@ -79,6 +81,26 @@ export function detectQueryIntent(prompt: string): QueryIntent {
 
   if (/\b(explain|why does|how does|how do|walk me through)\b/.test(text)) {
     return 'explanation';
+  }
+
+  if (/\b(study notes|cheatsheet|flashcards|exam prep|lecture notes)\b/.test(text)) {
+    return 'study-notes';
+  }
+
+  if (/\b(symptoms|diagnosis|medical|medicine|dosage|treatment|health condition|doctor)\b/.test(text)) {
+    return 'medical';
+  }
+
+  if (/\b(legal|contract|clause|terms|liability|compliance|statute|lawsuit)\b/.test(text)) {
+    return 'legal';
+  }
+
+  if (/\b(analyze image|screenshot|picture|photo|diagram|ocr|extract text from image)\b/.test(text)) {
+    return 'image-analysis';
+  }
+
+  if (/\b(documentation|readme|api doc|user manual|guide|architecture doc)\b/.test(text)) {
+    return 'documentation';
   }
 
   if (/\b(research|deep dive|report on|literature review|sources|citations|references|latest)\b/.test(text) || (!hasQuestionShape && text.length > 240)) {

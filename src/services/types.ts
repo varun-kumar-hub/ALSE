@@ -11,6 +11,11 @@ export interface OllamaModel {
   };
 }
 
+export interface SourceContribution {
+  name: string;
+  percentage: number;
+}
+
 export interface ChatMessage {
   id?: string;
   chat_id?: string;
@@ -18,8 +23,26 @@ export interface ChatMessage {
   content: string;
   created_at?: string;
   tokens_used?: number;
+  input_tokens?: number;
+  output_tokens?: number;
+  context_tokens?: number;
+  embedding_tokens?: number;
   generation_time_ms?: number;
+  first_token_ms?: number;
+  speed_tps?: number;
   intent?: QueryIntent;
+  confidence_score?: number;
+  confidence_reason?: string;
+  sources_breakdown?: SourceContribution[];
+  execution_graph?: string[];
+  cost_estimate?: string;
+  provider_used?: string;
+  model_used?: string;
+  timestamp_iso?: string;
+  timezone?: string;
+  sources_used?: string[];
+  thinking?: string;
+  user_prompt?: string;
 }
 
 export interface Chat {
@@ -82,6 +105,7 @@ export interface AppSettings {
   autoStartOllama: boolean;
   keepOllamaRunning: boolean;
   onboardingComplete: boolean;
+  skipLauncherInDev: boolean;
 }
 
 export type QueryIntent =
@@ -101,7 +125,12 @@ export type QueryIntent =
   | 'file-analysis'
   | 'planning'
   | 'comparison'
-  | 'brainstorming';
+  | 'brainstorming'
+  | 'study-notes'
+  | 'medical'
+  | 'legal'
+  | 'image-analysis'
+  | 'documentation';
 
 export interface FormattedSection {
   title: string;
@@ -119,6 +148,7 @@ export interface ThinkingTimelineStep {
   detail?: string;
   phase: TimelinePhase;
   status: TimelineStepStatus;
+  timestamp?: string;
 }
 
 export type AiExecutionMode = 'local' | 'cloud' | 'hybrid';
@@ -145,6 +175,9 @@ export interface ProviderConfig {
   defaultModel: string;
   apiKeySet?: boolean;
   apiKey?: string;
+  baseUrl?: string;
+  discoveredModels?: string[];
+  isCustom?: boolean;
   capabilities: ProviderCapability[];
 }
 

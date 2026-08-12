@@ -110,7 +110,80 @@ button {
     color: #ffffff;
     background-color: #0f0f0f98;
   }
-  button:active {
-    background-color: #0f0f0f69;
-  }
 }
+
+/* Clean Markdown Typography & Table Styling */
+.prose {
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  line-height: 1.65;
+  color: #18181b;
+}
+
+.prose p {
+  margin-top: 0.75rem;
+  margin-bottom: 0.75rem;
+}
+
+.prose h1, .prose h2, .prose h3, .prose h4 {
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  color: #09090b;
+  margin-top: 1.5rem;
+  margin-bottom: 0.75rem;
+}
+
+.prose h1 { font-size: 1.5rem; }
+.prose h2 { font-size: 1.25rem; }
+.prose h3 { font-size: 1.1rem; }
+
+.prose ul {
+  list-style-type: disc;
+  padding-left: 1.25rem;
+  margin-top: 0.5rem;
+  margin-bottom: 0.75rem;
+}
+
+.prose ol {
+  list-style-type: decimal;
+  padding-left: 1.25rem;
+  margin-top: 0.5rem;
+  margin-bottom: 0.75rem;
+}
+
+.prose li {
+  margin-top: 0.25rem;
+  margin-bottom: 0.25rem;
+}
+
+.prose table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 1rem;
+  margin-bottom: 1rem;
+  font-size: 0.85rem;
+}
+
+.prose th, .prose td {
+  border: 1px solid #e4e4e7;
+  padding: 0.5rem 0.75rem;
+  text-align: left;
+}
+
+.prose th {
+  background-color: #f4f4f5;
+  font-weight: 700;
+  color: #09090b;
+}
+
+.prose blockquote {
+  border-left: 4px solid #2563eb;
+  padding-left: 1rem;
+  margin-left: 0;
+  color: #52525b;
+  font-style: italic;
+  background: #eff6ff;
+  padding-top: 0.5rem;
+  padding-bottom: 0.5rem;
+  border-radius: 0 0.5rem 0.5rem 0;
+}
+

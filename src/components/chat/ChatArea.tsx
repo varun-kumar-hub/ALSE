@@ -1,10 +1,10 @@
 import React, { useRef, useEffect, useState, useCallback } from 'react';
-import { ArrowDown, Bot } from 'lucide-react';
+import { ArrowDown } from 'lucide-react';
 import { ChatHeader } from './ChatHeader';
 import { ChatMessage } from './ChatMessage';
 import { ChatInput } from './ChatInput';
 import { StreamingIndicator } from './StreamingIndicator';
-import { AgentPlanning, PlanStep } from '../ui/AgentPlanning';
+import { OSDashboard } from '../dashboard/OSDashboard';
 import { ChatMessage as ChatMessageType } from '../../services/types';
 import { useAppStore } from '../../stores/appStore';
 
@@ -30,7 +30,6 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
     streamingContent,
     generationStage,
     thinkingTimeline,
-    assistantName,
   } = useAppStore();
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
@@ -38,19 +37,6 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
   const scrollFrameRef = useRef<number | null>(null);
   const scrollListenerFrameRef = useRef<number | null>(null);
   const [showJumpToLatest, setShowJumpToLatest] = useState(false);
-
-  const thinkingSteps: PlanStep[] = thinkingTimeline.map((step) => ({
-    id: step.id,
-    title: step.title,
-    status: step.status,
-    duration: step.status === 'running' ? '...' : undefined,
-    defaultExpanded: step.status === 'running',
-    content: step.detail ? (
-      <div className="rounded-lg border border-zinc-200 bg-zinc-50 p-3 text-xs leading-relaxed text-zinc-600 select-text">
-        {step.detail}
-      </div>
-    ) : undefined,
-  }));
 
   const isNearBottom = useCallback(() => {
     const container = scrollContainerRef.current;
@@ -136,20 +122,13 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
         className="flex-1 overflow-y-auto"
       >
         {messages.length === 0 ? (
-          /* Empty Chat Welcome Screen */
-          <div className="h-full flex flex-col items-center justify-center p-6 text-center max-w-xl mx-auto space-y-6 select-none animate-in fade-in duration-300">
-            <div className="w-16 h-16 rounded-2xl bg-blue-50 border border-blue-100 flex items-center justify-center text-blue-600 shadow-sm">
-              <Bot className="w-8 h-8" />
-            </div>
-            <div className="space-y-2">
-              <h2 className="text-3xl font-extrabold tracking-tight text-zinc-950">
-                How can {assistantName} help you today?
-              </h2>
-              <p className="text-sm text-zinc-500">
-                Ask research questions, compare technologies, write code, or plan projects.
-              </p>
-            </div>
-          </div>
+          <OSDashboard
+            onNewChat={() => onSendMessage('Hello')}
+            onOpenSettings={() => {
+              const settingsBtn = document.querySelector<HTMLButtonElement>('button[title="Open Settings"]');
+              settingsBtn?.click();
+            }}
+          />
         ) : (
           /* Render Messages */
           <div className="py-4">
@@ -166,17 +145,10 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
             {isStreaming && (
               <div className="py-4 px-4 md:px-8 bg-transparent">
                 <div className="max-w-4xl mx-auto flex flex-col gap-3">
-                  {thinkingSteps.length > 0 && (
-                    <AgentPlanning
-                      title="Execution plan"
-                      steps={thinkingSteps}
-                      defaultExpanded
-                      className="max-w-2xl"
-                    />
-                  )}
                   <StreamingIndicator stage={generationStage} />
                   {streamingContent && (
                     <ChatMessage
+                      isStreaming={true}
                       message={{
                         role: 'assistant',
                         content: streamingContent,
