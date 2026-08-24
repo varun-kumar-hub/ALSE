@@ -1,6 +1,7 @@
 import { validateAndNormalizeUrl } from './urlValidator';
 import { acquireWebPage } from './webAcquisitionEngine';
 import { htmlToTextAndLinks } from './webTools';
+import { defaultWebPipeline } from './webSearchProvider';
 
 export type ResourceType =
   | 'Web Page'
@@ -85,15 +86,40 @@ export class URLIntelligenceEngine {
     const siteMapTree: Record<string, string[]> = {};
     const sources: { title: string; url: string; domain: string }[] = [];
 
-    // 1. Discover robots.txt & sitemap.xml
+    // 1. Search Engine Index Discovery (site:domain)
+    onProgress?.(`✦ Searching search engine index for site:${domain}...`);
+    try {
+      const searchRes = await defaultWebPipeline.executeSearch(`site:${domain}`, 8);
+      if (searchRes.ok && searchRes.results.length > 0) {
+        for (const r of searchRes.results) {
+          if (!visited.has(r.url) && r.url.startsWith(origin)) {
+            queue.push({ url: r.url, depth: 1, parent: 'Search Index' });
+            resources.push({
+              url: r.url,
+              depth: 1,
+              type: 'Web Page',
+              httpStatus: 200,
+              title: r.title,
+              snippet: r.snippet,
+              discoveredFrom: 'Search Engine Index',
+            });
+            sources.push({ title: r.title, url: r.url, domain });
+          }
+        }
+      }
+    } catch {
+      // Ignore search fallback errors
+    }
+
+    // 2. Discover robots.txt & sitemap.xml
     onProgress?.(`✦ Scanning sitemaps & robots.txt...`);
     await this.discoverSitemapAndRobots(origin, queue, visited, resources);
 
-    // 2. Discover OpenAPI/Swagger specs
+    // 3. Discover OpenAPI/Swagger specs
     onProgress?.(`✦ Checking public API specifications...`);
     await this.discoverApiEndpoints(origin, resources);
 
-    // 3. Crawl Same-Origin BFS Queue
+    // 4. Crawl Same-Origin Queue
     onProgress?.(`✦ Crawling website structure (max ${maxPages} pages)...`);
     
     while (queue.length > 0 && visited.size < maxPages) {
@@ -131,14 +157,38 @@ export class URLIntelligenceEngine {
           type: this.classifyResource(current.url, 'text/html'),
           httpStatus: 200,
           title,
-          snippet: pageContent.metadata?.description || pageContent.markdown.slice(0, 200),
+          snippet: pageContent.metadata?.description || pageContent.markdown.slice(0, 250),
         });
 
-        sources.push({
-          title,
-          url: current.url,
-          domain,
-        });
+        if (!sources.some((s) => s.url === current.url)) {
+          sources.push({
+            title,
+            url: current.url,
+            domain,
+          });
+        }
+
+        // Extract API & App Routes declared in scripts or page content
+        const apiRouteMatches = pageContent.markdown.matchAll(/["'](\/(?:api|v1|v2|auth|student|faculty|portal|courses|results|attendance|fees|registration)[^"'\s>]+)["']/gi);
+        for (const m of apiRouteMatches) {
+          const route = m[1];
+          try {
+            const fullUrl = new URL(route, origin).toString();
+            if (!resources.some((r) => r.url === fullUrl)) {
+              resources.push({
+                url: fullUrl,
+                depth: current.depth + 1,
+                type: route.includes('/api/') ? 'API' : 'Web Page',
+                httpStatus: 200,
+                title: `Discovered Route: ${route}`,
+                discoveredFrom: current.url,
+              });
+              if (!visited.has(fullUrl)) {
+                queue.push({ url: fullUrl, depth: current.depth + 1, parent: current.url });
+              }
+            }
+          } catch {}
+        }
 
         // Record child links for site map
         siteMapTree[current.url] = links;
@@ -197,7 +247,7 @@ export class URLIntelligenceEngine {
       protectedResources,
       contextText,
       sources,
-      toolsUsed: ['URL Intelligence', 'Sitemap Parser', 'HTML Content Extractor'],
+      toolsUsed: ['URL Intelligence', 'Search Index Grounding', 'Sitemap Parser', 'JavaScript Endpoint Extractor'],
     };
   }
 
@@ -209,9 +259,8 @@ export class URLIntelligenceEngine {
   ): Promise<void> {
     const sitemapUrl = `${origin}/sitemap.xml`;
     try {
-      const resp = await fetch(sitemapUrl, { method: 'GET' });
-      if (resp.ok) {
-        const xmlText = await resp.text();
+      const page = await acquireWebPage(sitemapUrl);
+      if (page && page.markdown.length > 10) {
         resources.push({
           url: sitemapUrl,
           depth: 0,
@@ -219,7 +268,7 @@ export class URLIntelligenceEngine {
           httpStatus: 200,
           title: 'XML Sitemap',
         });
-        const locMatches = xmlText.matchAll(/<loc>(https?:\/\/[^<]+)<\/loc>/gi);
+        const locMatches = page.markdown.matchAll(/<loc>(https?:\/\/[^<]+)<\/loc>/gi);
         for (const m of locMatches) {
           if (m[1] && !visited.has(m[1]) && m[1].startsWith(origin)) {
             queue.push({ url: m[1], depth: 1, parent: sitemapUrl });
@@ -240,8 +289,8 @@ export class URLIntelligenceEngine {
 
     for (const url of candidateApis) {
       try {
-        const resp = await fetch(url, { method: 'GET' });
-        if (resp.ok) {
+        const page = await acquireWebPage(url);
+        if (page && page.markdown.length > 10) {
           resources.push({
             url,
             depth: 1,

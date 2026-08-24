@@ -110,52 +110,72 @@ async function executeEngineFetch(
   const startTime = Date.now();
   const isBrowser = typeof window !== 'undefined' && !('__TAURI_INTERNALS__' in window);
 
-  const userAgent =
-    engine === 'Firefox'
-      ? 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:128.0) Gecko/20100101 Firefox/128.0'
-      : 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36';
-
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 12000);
-
   let rawHtml = '';
 
-  try {
-    const response = await fetch(url, {
-      method: 'GET',
-      headers: {
-        'User-Agent': userAgent,
-        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-        'Accept-Language': 'en-US,en;q=0.9',
-      },
-      signal: controller.signal,
-    });
-    if (response.ok) {
-      rawHtml = await response.text();
+  // 1. Try local dev proxy /proxy/fetch first in browser dev mode to bypass browser CORS completely
+  if (isBrowser) {
+    try {
+      const devProxyUrl = `/proxy/fetch?url=${encodeURIComponent(url)}`;
+      const proxyResp = await fetch(devProxyUrl);
+      if (proxyResp.ok) {
+        rawHtml = await proxyResp.text();
+      } else if (proxyResp.status === 401 || proxyResp.status === 403) {
+        rawHtml = `<title>Protected Resource (HTTP ${proxyResp.status})</title><p>Access Restricted on ${url}</p>`;
+      }
+    } catch {
+      // Continue to direct fetch fallback
     }
-  } catch {
-    if (isBrowser) {
-      // Fallback for browser preview mode CORS restrictions
-      try {
-        const corsProxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`;
-        const proxyResp = await fetch(corsProxyUrl);
-        if (proxyResp.ok) {
-          rawHtml = await proxyResp.text();
-        }
-      } catch {
+  }
+
+  // 2. Direct fetch fallback (for Tauri desktop app mode)
+  if (!rawHtml) {
+    const userAgent =
+      engine === 'Firefox'
+        ? 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:128.0) Gecko/20100101 Firefox/128.0'
+        : 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36';
+
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 10000);
+
+    try {
+      const response = await fetch(url, {
+        method: 'GET',
+        headers: {
+          'User-Agent': userAgent,
+          'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+          'Accept-Language': 'en-US,en;q=0.9',
+        },
+        signal: controller.signal,
+      });
+      if (response.ok) {
+        rawHtml = await response.text();
+      } else if (response.status === 401 || response.status === 403) {
+        rawHtml = `<title>Protected Resource (HTTP ${response.status})</title><p>Access Restricted on ${url}</p>`;
+      }
+    } catch {
+      // Secondary fallback to public CORS proxies if direct fetch failed
+      if (isBrowser) {
         try {
-          const corsProxyUrl2 = `https://corsproxy.io/?${encodeURIComponent(url)}`;
-          const proxyResp2 = await fetch(corsProxyUrl2);
-          if (proxyResp2.ok) {
-            rawHtml = await proxyResp2.text();
+          const corsProxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`;
+          const proxyResp = await fetch(corsProxyUrl);
+          if (proxyResp.ok) {
+            rawHtml = await proxyResp.text();
           }
         } catch {
-          // Ignore
+          try {
+            const corsProxyUrl2 = `https://corsproxy.io/?${encodeURIComponent(url)}`;
+            const proxyResp2 = await fetch(corsProxyUrl2);
+            if (proxyResp2.ok) {
+              rawHtml = await proxyResp2.text();
+            }
+          } catch {
+            // Ignore
+          }
         }
       }
+    } finally {
+      clearTimeout(timeoutId);
     }
-  } finally {
-    clearTimeout(timeoutId);
   }
 
   if (!rawHtml) {

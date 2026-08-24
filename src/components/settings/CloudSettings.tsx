@@ -31,7 +31,24 @@ export const CloudSettings: React.FC<CloudSettingsProps> = ({
   onSaveProvider,
 }) => {
   const [providerSearch, setProviderSearch] = useState('');
-  const [activeProviderId, setActiveProviderId] = useState('opencode');
+  const initialProviderId = React.useMemo(() => {
+    const selectedModel = useAppStore.getState().selectedModel;
+    const providerForModel = providerConfigs.find(
+      (p) =>
+        p.kind === 'cloud' &&
+        (p.defaultModel === selectedModel || p.discoveredModels?.includes(selectedModel))
+    );
+    if (providerForModel) return providerForModel.id;
+
+    const configured = providerConfigs.find(
+      (p) => p.kind === 'cloud' && Boolean(p.apiKey && p.apiKey.trim().length > 0)
+    );
+    if (configured) return configured.id;
+
+    return 'gemini';
+  }, [providerConfigs]);
+
+  const [activeProviderId, setActiveProviderId] = useState(initialProviderId);
   const [detectedPatternBadge, setDetectedPatternBadge] = useState<string | null>(null);
 
   const [validatingId, setValidatingId] = useState<string | null>(null);
@@ -45,7 +62,7 @@ export const CloudSettings: React.FC<CloudSettingsProps> = ({
   const filteredProviders = searchProviders(providerSearch).filter((p) => p.kind === 'cloud');
 
   const handleApiKeyChange = (id: string, newKey: string) => {
-    updateProviderConfig(id, { apiKey: newKey });
+    updateProviderConfig(id, { apiKey: newKey, apiKeySet: Boolean(newKey.trim()) });
     const detected = detectProviderFromApiKey(newKey);
     if (detected && detected.id === id) {
       setDetectedPatternBadge(`Verified Key Pattern: ${detected.name}`);
@@ -100,7 +117,7 @@ export const CloudSettings: React.FC<CloudSettingsProps> = ({
       ? OPENCODE_ZEN_CATALOG
       : activeProviderConfig?.discoveredModels && activeProviderConfig.discoveredModels.length > 0
       ? activeProviderConfig.discoveredModels
-      : [activeProviderConfig?.defaultModel || 'opencode-zen-coder'];
+      : [activeProviderConfig?.defaultModel || 'gemini-2.5-flash'];
 
   return (
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-250 select-none text-xs">
@@ -113,38 +130,43 @@ export const CloudSettings: React.FC<CloudSettingsProps> = ({
           <span className="text-[10px] text-zinc-400 font-mono">Real Authentication Verification</span>
         </div>
 
-        {/* Command Palette Provider Search Bar */}
+        {/* Provider Selector Tabs */}
         <div className="space-y-2">
           <div className="relative">
-            <Search className="w-4 h-4 text-zinc-400 absolute left-3 top-2.5" />
+            <Search className="w-3.5 h-3.5 absolute left-3 top-2.5 text-zinc-400" />
             <input
               type="text"
               placeholder="Search cloud provider (e.g. OpenCode Zen, OpenAI, Claude, Gemini, Groq)..."
               value={providerSearch}
               onChange={(e) => setProviderSearch(e.target.value)}
-              className="w-full pl-9 pr-4 py-2 bg-zinc-50 border border-zinc-200 rounded-xl text-xs text-zinc-900 focus:outline-none focus:border-blue-500 font-medium"
+              className="w-full pl-9 pr-3 py-1.5 bg-zinc-50 border border-zinc-200 rounded-xl text-xs text-zinc-900 focus:outline-none focus:border-blue-500 focus:bg-white transition-all"
             />
           </div>
 
-          {/* Quick Selection Badges */}
-          <div className="flex flex-wrap gap-1.5 pt-1">
-            {filteredProviders.slice(0, 10).map((p) => (
-              <button
-                key={p.id}
-                type="button"
-                onClick={() => {
-                  setActiveProviderId(p.id);
-                  setProviderSearch('');
-                }}
-                className={`text-[10px] px-2.5 py-1 rounded-lg transition-all ${
-                  activeProviderId === p.id
-                    ? 'bg-blue-600 text-white font-bold shadow-sm'
-                    : 'bg-zinc-100 text-zinc-700 hover:bg-zinc-200'
-                }`}
-              >
-                {p.name}
-              </button>
-            ))}
+          <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none">
+            {filteredProviders.map((p) => {
+              const cfg = providerConfigs.find((item) => item.id === p.id);
+              const isConfigured = Boolean(cfg?.apiKey && cfg.apiKey.trim().length > 0);
+              return (
+                <button
+                  key={p.id}
+                  type="button"
+                  onClick={() => setActiveProviderId(p.id)}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition-all flex items-center gap-1.5 ${
+                    activeProviderId === p.id
+                      ? 'bg-blue-600 text-white shadow-sm'
+                      : isConfigured
+                      ? 'bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-100'
+                      : 'bg-zinc-100 text-zinc-600 hover:bg-zinc-200'
+                  }`}
+                >
+                  {p.name}
+                  {isConfigured && (
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 inline-block" />
+                  )}
+                </button>
+              );
+            })}
           </div>
         </div>
 
@@ -169,9 +191,9 @@ export const CloudSettings: React.FC<CloudSettingsProps> = ({
                       <AlertCircle className="w-3 h-3 text-rose-600" /> Auth Failed
                     </span>
                   )
-                ) : activeProviderConfig.apiKeySet ? (
-                  <span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 font-bold flex items-center gap-1">
-                    <Key className="w-3 h-3 text-amber-600" /> Unverified Key
+                ) : activeProviderConfig.apiKeySet || Boolean(activeProviderConfig.apiKey && activeProviderConfig.apiKey.trim().length > 0) ? (
+                  <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 font-bold flex items-center gap-1">
+                    <CheckCircle2 className="w-3 h-3 text-emerald-600" /> Connected Key
                   </span>
                 ) : (
                   <span className="text-[10px] px-2 py-0.5 rounded-full bg-zinc-100 text-zinc-600 font-medium">
