@@ -12,6 +12,11 @@ export function detectQueryIntent(prompt: string): QueryIntent {
   const hasCodeBlock = /```[\s\S]*```/.test(prompt);
   const hasQuestionShape = /^(who|what|when|where|why|how)\b/.test(text);
 
+  // Auto-detect URLs for URL Intelligence & Deep Research
+  if (/(https?:\/\/[^\s<>"]+|www\.[^\s<>"]+)/i.test(prompt)) {
+    return 'research';
+  }
+
   // Person / biography / entity requests must win over generic fallbacks.
   if (
     /\b(who is|who was|tell me about|short description of|brief description of|bio(?:graphy)? of|profile of)\b/.test(text) ||

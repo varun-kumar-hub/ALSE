@@ -16,6 +16,18 @@ export interface SourceContribution {
   percentage: number;
 }
 
+export interface SourceItem {
+  id?: string;
+  title: string;
+  url?: string;
+  domain?: string;
+  type?: 'web' | 'wiki' | 'rfc' | 'doc' | 'pdf' | 'local' | 'paper';
+  snippet?: string;
+  favicon?: string;
+  timestamp?: string;
+  relevance?: number;
+}
+
 export interface ChatMessage {
   id?: string;
   chat_id?: string;
@@ -40,7 +52,8 @@ export interface ChatMessage {
   model_used?: string;
   timestamp_iso?: string;
   timezone?: string;
-  sources_used?: string[];
+  sources_used?: (SourceItem | string)[];
+  tools_used?: string[];
   thinking?: string;
   user_prompt?: string;
 }

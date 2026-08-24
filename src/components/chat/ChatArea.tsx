@@ -3,7 +3,6 @@ import { ArrowDown } from 'lucide-react';
 import { ChatHeader } from './ChatHeader';
 import { ChatMessage } from './ChatMessage';
 import { ChatInput } from './ChatInput';
-import { StreamingIndicator } from './StreamingIndicator';
 import { OSDashboard } from '../dashboard/OSDashboard';
 import { ChatMessage as ChatMessageType } from '../../services/types';
 import { useAppStore } from '../../stores/appStore';
@@ -28,7 +27,6 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
   const {
     isStreaming,
     streamingContent,
-    generationStage,
     thinkingTimeline,
   } = useAppStore();
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -143,20 +141,14 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
 
             {/* In-flight streaming message */}
             {isStreaming && (
-              <div className="py-4 px-4 md:px-8 bg-transparent">
-                <div className="max-w-4xl mx-auto flex flex-col gap-3">
-                  <StreamingIndicator stage={generationStage} />
-                  {streamingContent && (
-                    <ChatMessage
-                      isStreaming={true}
-                      message={{
-                        role: 'assistant',
-                        content: streamingContent,
-                      }}
-                    />
-                  )}
-                </div>
-              </div>
+              <ChatMessage
+                isStreaming={true}
+                message={{
+                  role: 'assistant',
+                  content: streamingContent,
+                  user_prompt: [...messages].reverse().find((m) => m.role === 'user')?.content,
+                }}
+              />
             )}
             <div ref={messagesEndRef} />
           </div>

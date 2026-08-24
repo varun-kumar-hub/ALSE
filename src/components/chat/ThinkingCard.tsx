@@ -1,118 +1,142 @@
-import React, { useState } from 'react';
-import { ChevronDown, ChevronUp, CheckCircle2, CircleDot, Circle, Loader2 } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Sparkles, ChevronDown, ChevronUp, Check } from 'lucide-react';
 import { DynamicActivityItem } from '../../lib/thoughtExtractor';
+import { QueryIntent } from '../../services/types';
 
 interface ThinkingCardProps {
+  isStreaming?: boolean;
+  userPrompt?: string;
+  intent?: QueryIntent;
+  sourcesCount?: number;
+  toolsCount?: number;
+  generationTimeMs?: number;
+  provider?: string;
+  model?: string;
   activities?: DynamicActivityItem[];
   thinking?: string;
-  isStreaming?: boolean;
   defaultExpanded?: boolean;
 }
 
 export const ThinkingCard: React.FC<ThinkingCardProps> = ({
-  activities = [],
-  thinking = '',
   isStreaming = false,
-  defaultExpanded = true,
+  intent = 'general',
+  sourcesCount = 0,
+  toolsCount = 0,
+  generationTimeMs = 0,
+  provider,
+  model,
+  activities = [],
+  thinking,
 }) => {
-  const [isExpanded, setIsExpanded] = useState(defaultExpanded);
+  const [isExpanded, setIsExpanded] = useState(false);
 
-  if (activities.length === 0 && !isStreaming && !thinking) return null;
+  // Auto-collapse when generation finishes
+  useEffect(() => {
+    if (!isStreaming) {
+      setIsExpanded(false);
+    }
+  }, [isStreaming]);
+
+  // Compute adaptive summary label for collapsed state
+  const getSummaryLabel = (): string => {
+    if (intent === 'research' && sourcesCount > 0) {
+      return `Researched · ${sourcesCount} source${sourcesCount > 1 ? 's' : ''}`;
+    }
+    if (sourcesCount > 0) {
+      return `Searched · ${sourcesCount} source${sourcesCount > 1 ? 's' : ''}`;
+    }
+    if (toolsCount > 0) {
+      return `Completed ${toolsCount} action${toolsCount > 1 ? 's' : ''}`;
+    }
+    const sec = Math.max(1, Math.round((generationTimeMs || 1500) / 1000));
+    return `Thought for ${sec}s`;
+  };
+
+  // Filter activities to exclude search steps if web search wasn't performed
+  const filteredActivities = activities.filter((act) => {
+    if (sourcesCount === 0 && /\b(search|source|retriev)\b/i.test(act.text)) {
+      return false;
+    }
+    return true;
+  });
+
+  const displayActivities =
+    filteredActivities.length > 0
+      ? filteredActivities
+      : [
+          { id: 'a1', text: 'Understanding your request', status: 'completed' as const },
+          { id: 'a2', text: 'Selecting relevant information', status: 'completed' as const },
+          { id: 'a3', text: 'Preparing response', status: 'completed' as const },
+        ];
 
   return (
-    <div className="w-full my-3 rounded-2xl border border-zinc-200/90 bg-white text-zinc-900 shadow-sm overflow-hidden transition-all duration-200">
-      {/* Header bar */}
+    <div className="w-full my-1.5 select-none font-sans text-xs">
+      {/* Collapsible minimal Header Row */}
       <button
         type="button"
+        aria-expanded={isExpanded}
         onClick={() => setIsExpanded(!isExpanded)}
-        className="w-full px-4 py-3 flex items-center justify-between bg-zinc-50/80 hover:bg-zinc-100/80 transition-colors text-left select-none border-b border-zinc-100"
+        className="group inline-flex items-center gap-1.5 px-2 py-1 -ml-2 rounded-lg hover:bg-zinc-100/70 text-zinc-500 hover:text-zinc-800 transition-colors cursor-pointer text-left border-none bg-transparent shadow-none outline-none focus-visible:ring-1 focus-visible:ring-zinc-400"
       >
-        <div className="flex items-center gap-2.5">
-          {isStreaming ? (
-            <Loader2 className="w-4 h-4 text-blue-600 animate-spin" />
-          ) : (
-            <div className="w-4 h-4 rounded-full bg-emerald-50 border border-emerald-500/30 flex items-center justify-center text-emerald-600">
-              <CheckCircle2 className="w-3 h-3" />
+        <Sparkles
+          className={`w-3.5 h-3.5 shrink-0 ${
+            isStreaming ? 'text-blue-600 animate-spin' : 'text-zinc-500 group-hover:text-zinc-700'
+          }`}
+        />
+
+        <span className="font-medium text-xs text-zinc-700 group-hover:text-zinc-900">
+          {isStreaming ? 'Thinking...' : getSummaryLabel()}
+        </span>
+
+        {isExpanded ? (
+          <ChevronUp className="w-3.5 h-3.5 text-zinc-400 group-hover:text-zinc-600 shrink-0" />
+        ) : (
+          <ChevronDown className="w-3.5 h-3.5 text-zinc-400 group-hover:text-zinc-600 shrink-0" />
+        )}
+      </button>
+
+      {/* Expanded High-Level Activities Panel */}
+      {isExpanded && (
+        <div className="mt-1.5 mb-2.5 pl-3 py-1 border-l-2 border-zinc-200/80 space-y-1.5 text-xs text-zinc-600 animate-in fade-in duration-150 select-text">
+          {displayActivities.map((act, i) => {
+            const isCompleted = act.status === 'completed' || !isStreaming;
+            const isActive = act.status === 'active' && isStreaming;
+
+            return (
+              <div key={act.id || i} className="flex items-center gap-2">
+                {isCompleted ? (
+                  <Check className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                ) : isActive ? (
+                  <Sparkles className="w-3.5 h-3.5 text-blue-600 animate-spin shrink-0" />
+                ) : (
+                  <span className="w-1.5 h-1.5 rounded-full bg-zinc-300 ml-1 shrink-0" />
+                )}
+                <span
+                  className={
+                    isActive
+                      ? 'text-blue-700 font-medium'
+                      : isCompleted
+                      ? 'text-zinc-700'
+                      : 'text-zinc-400'
+                  }
+                >
+                  {act.text}
+                </span>
+              </div>
+            );
+          })}
+
+          {(provider || model) && (
+            <div className="pt-1 text-[10px] text-zinc-400 font-mono">
+              Engine: {provider === 'ollama' || provider === 'local' ? 'Local Model' : 'Cloud Provider'} ({model || 'qwen3:8b'})
             </div>
           )}
 
-          <span className="text-xs font-bold tracking-wide text-zinc-800 uppercase font-mono">
-            {isStreaming ? 'Thinking' : 'Thought Process'}
-          </span>
-
-          <span className="text-zinc-300">•</span>
-
-          {isStreaming ? (
-            <span className="text-xs text-blue-600 font-medium animate-pulse">
-              Working on request...
-            </span>
-          ) : (
-            <span className="text-xs text-emerald-700 font-medium">
-              Completed
-            </span>
+          {thinking && (
+            <div className="pt-2 text-xs text-zinc-600 font-sans leading-relaxed whitespace-pre-wrap select-text border-t border-zinc-100 mt-2">
+              {thinking}
+            </div>
           )}
-        </div>
-
-        {/* Right side toggle controls */}
-        <div className="flex items-center gap-2 text-zinc-400 hover:text-zinc-600">
-          <span className="text-xs font-mono">•••</span>
-          {isExpanded ? (
-            <ChevronUp className="w-4 h-4" />
-          ) : (
-            <ChevronDown className="w-4 h-4" />
-          )}
-        </div>
-      </button>
-
-      {/* Expandable Natural Dynamic Activities */}
-      {isExpanded && (
-        <div className="p-4 bg-white space-y-3 animate-in fade-in slide-in-from-top-1 duration-200">
-          <div className="relative pl-6 space-y-3.5 before:absolute before:left-[11px] before:top-2 before:bottom-2 before:w-[1.5px] before:bg-zinc-200/80">
-            {activities.map((item) => {
-              const isCompleted = item.status === 'completed';
-              const isActive = item.status === 'active';
-              const isPending = item.status === 'pending';
-
-              return (
-                <div
-                  key={item.id}
-                  className={`relative flex items-start gap-2.5 transition-all duration-200 ${
-                    isPending ? 'opacity-40' : 'opacity-100'
-                  }`}
-                >
-                  {/* Status Indicator Bullet */}
-                  <div className="absolute -left-6 top-0.5 flex items-center justify-center bg-white rounded-full">
-                    {isCompleted ? (
-                      <div className="w-4 h-4 rounded-full bg-emerald-50 border border-emerald-500/40 flex items-center justify-center text-emerald-600">
-                        <CheckCircle2 className="w-2.5 h-2.5" />
-                      </div>
-                    ) : isActive ? (
-                      <div className="w-4 h-4 rounded-full bg-blue-50 border border-blue-500 flex items-center justify-center text-blue-600 shadow-[0_0_8px_rgba(37,99,235,0.25)]">
-                        <CircleDot className="w-2.5 h-2.5 animate-spin-slow" />
-                      </div>
-                    ) : (
-                      <div className="w-4 h-4 rounded-full bg-zinc-100 border border-zinc-300 flex items-center justify-center text-zinc-400">
-                        <Circle className="w-2 h-2" />
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Dynamic Natural Activity Sentence */}
-                  <p
-                    className={`text-[13px] leading-relaxed select-text ${
-                      isActive
-                        ? 'text-blue-700 font-medium'
-                        : isCompleted
-                        ? 'text-zinc-800'
-                        : 'text-zinc-400'
-                    }`}
-                  >
-                    {item.text}
-                  </p>
-                </div>
-              );
-            })}
-          </div>
         </div>
       )}
     </div>

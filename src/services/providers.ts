@@ -1,5 +1,7 @@
+import { invoke, Channel } from '@tauri-apps/api/core';
 import { streamChat as streamOllamaChat, generateChatTitle as generateOllamaTitle } from './ollama';
-import { PROVIDER_REGISTRY } from './providerRegistry';
+import { PROVIDER_REGISTRY, validateProviderModelCompatibility } from './providerRegistry';
+import { fetchWithCorsProxy } from './corsFetch';
 import {
   AiExecutionMode,
   ChatMessage,
@@ -72,7 +74,7 @@ export const DEFAULT_PROVIDER_CONFIGS: ProviderConfig[] = [
 
 export function getModelAgentRoleLabel(modelName: string): string {
   const lower = modelName.toLowerCase();
-  if (lower.includes('coder')) return `${modelName} (Coding Agent)`;
+  if (lower.includes('coder') || lower.includes('sol')) return `${modelName} (Coding Agent)`;
   if (lower.includes('qwen3')) return `${modelName} (General Agent)`;
   if (lower.includes('embed')) return `${modelName} (Embeddings / Memory / RAG)`;
   if (lower.includes('llama3') || lower.includes('llama-3') || lower.includes('llama 3')) {
@@ -157,23 +159,63 @@ class OpenAICompatibleProvider implements AiProvider {
     messages: ChatMessage[],
     onChunk: (chunk: ChatStreamChunk) => void
   ): Promise<void> {
-    if (!this.config.apiKey) {
+    if (!this.config.apiKey || !this.config.apiKey.trim()) {
       onChunk({
         done: true,
         message: {
           role: 'assistant',
-          content: `API key for ${this.config.name} is missing. Please add your key in Settings -> AI Providers.`,
+          content: `Cloud Request Failed (${this.config.name})\n\nProvider: ${this.config.name}\nModel: ${model || this.config.defaultModel}\n\nReason: API Key missing or not configured. Please add your key in Settings -> Cloud Providers.`,
         },
       });
       return;
     }
 
+    // Try Tauri native streaming command first (bypasses browser CORS completely)
+    if (typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window) {
+      try {
+        const channel = new Channel<{ done: boolean; content?: string; error?: string }>();
+        channel.onmessage = (msg) => {
+          if (msg.error) {
+            onChunk({
+              done: true,
+              message: {
+                role: 'assistant',
+                content: `Cloud Request Failed (${this.config.name})\n\nProvider: ${this.config.name}\nModel: ${model || this.config.defaultModel}\n\nReason: ${msg.error}`,
+              },
+            });
+            return;
+          }
+          if (msg.content) {
+            onChunk({
+              done: false,
+              message: { role: 'assistant', content: msg.content },
+            });
+          }
+          if (msg.done) {
+            onChunk({ done: true });
+          }
+        };
+
+        await invoke('cloud_chat_stream', {
+          endpoint: this.endpoint,
+          model: model || this.config.defaultModel,
+          apiKey: this.config.apiKey.trim(),
+          messages: messages.map((m) => ({ role: m.role, content: m.content })),
+          onChunk: channel,
+        });
+        return;
+      } catch (nativeErr) {
+        console.warn('Native cloud stream failed, attempting CORS fallback:', nativeErr);
+      }
+    }
+
+    // Browser Mode fallback fetch
     try {
-      const response = await fetch(this.endpoint, {
+      const response = await fetchWithCorsProxy(this.endpoint, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${this.config.apiKey}`,
+          Authorization: `Bearer ${this.config.apiKey.trim()}`,
         },
         body: JSON.stringify({
           model: model || this.config.defaultModel,
@@ -183,12 +225,21 @@ class OpenAICompatibleProvider implements AiProvider {
       });
 
       if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(`${this.config.name} API error (${response.status}): ${errorText}`);
+        const errorText = await response.text().catch(() => '');
+        onChunk({
+          done: true,
+          message: {
+            role: 'assistant',
+            content: `Cloud Request Failed (${this.config.name})\n\nProvider: ${this.config.name}\nModel: ${model || this.config.defaultModel}\n\nReason: HTTP ${response.status} ${response.statusText} - ${errorText.slice(0, 150) || 'Request rejected by cloud endpoint.'}`,
+          },
+        });
+        return;
       }
 
       const reader = response.body?.getReader();
-      if (!reader) throw new Error('Response body reader not available.');
+      if (!reader) {
+        throw new Error('Response body reader not available.');
+      }
 
       const decoder = new TextDecoder('utf-8');
       let buffer = '';
@@ -219,7 +270,7 @@ class OpenAICompatibleProvider implements AiProvider {
                 });
               }
             } catch {
-              // ignore parse errors on partial chunks
+              // ignore partial chunk parse errors
             }
           }
         }
@@ -231,7 +282,7 @@ class OpenAICompatibleProvider implements AiProvider {
         done: true,
         message: {
           role: 'assistant',
-          content: `Error from ${this.config.name}: ${err instanceof Error ? err.message : String(err)}`,
+          content: `Cloud Request Failed (${this.config.name})\n\nProvider: ${this.config.name}\nModel: ${model || this.config.defaultModel}\n\nReason: ${err instanceof Error ? err.message : String(err)}`,
         },
       });
     }
@@ -263,7 +314,7 @@ class AnthropicProvider implements AiProvider {
         done: true,
         message: {
           role: 'assistant',
-          content: `API key for Claude (Anthropic) is missing. Please add your key in Settings -> AI Providers.`,
+          content: `API key for Claude (Anthropic) is missing. Please add your key in Settings -> Cloud Providers.`,
         },
       });
       return;
@@ -274,7 +325,7 @@ class AnthropicProvider implements AiProvider {
         .filter((m) => m.role === 'user' || m.role === 'assistant')
         .map((m) => ({ role: m.role, content: m.content }));
 
-      const response = await fetch('https://api.anthropic.com/v1/messages', {
+      const response = await fetchWithCorsProxy('https://api.anthropic.com/v1/messages', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -334,7 +385,7 @@ class AnthropicProvider implements AiProvider {
         done: true,
         message: {
           role: 'assistant',
-          content: `Error from Anthropic: ${err instanceof Error ? err.message : String(err)}`,
+          content: `Cloud Request Failed (Anthropic)\n\nReason: ${err instanceof Error ? err.message : String(err)}`,
         },
       });
     }
@@ -366,7 +417,7 @@ class GeminiProvider implements AiProvider {
         done: true,
         message: {
           role: 'assistant',
-          content: `API key for Google Gemini is missing. Please add your key in Settings -> AI Providers.`,
+          content: `API key for Google Gemini is missing. Please add your key in Settings -> Cloud Providers.`,
         },
       });
       return;
@@ -381,7 +432,7 @@ class GeminiProvider implements AiProvider {
         parts: [{ text: m.content }],
       }));
 
-      const response = await fetch(url, {
+      const response = await fetchWithCorsProxy(url, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ contents }),
@@ -432,7 +483,7 @@ class GeminiProvider implements AiProvider {
         done: true,
         message: {
           role: 'assistant',
-          content: `Error from Google Gemini: ${err instanceof Error ? err.message : String(err)}`,
+          content: `Cloud Request Failed (Google Gemini)\n\nReason: ${err instanceof Error ? err.message : String(err)}`,
         },
       });
     }
@@ -461,9 +512,12 @@ class PendingCloudProvider implements AiProvider {
   ): Promise<void> {
     const providerName = this.config.name;
     const content = [
-      `${providerName} is configured as a cloud provider, but no valid API key has been entered.`,
+      `Cloud Request Failed (${providerName})`,
       '',
-      `Please open Settings -> AI Providers and enter your ${providerName} API key to enable cloud execution.`,
+      `Provider: ${providerName}`,
+      `Reason: No valid API key entered.`,
+      '',
+      `Please open Settings -> Cloud Providers and enter your verified ${providerName} API key.`,
     ].join('\n');
 
     onChunk({
@@ -518,11 +572,60 @@ export class ProviderManager {
     onChunk: (chunk: ChatStreamChunk) => void
   ): Promise<void> {
     const provider = this.selectProvider(request, selectedModel);
-    
+
+    // HARD RUNTIME ASSERTIONS
+    if (this.mode === 'cloud') {
+      if (provider.config.kind === 'local' || provider.config.id === 'ollama') {
+        onChunk({
+          done: true,
+          message: {
+            role: 'assistant',
+            content: `Cloud Request Failed (Runtime Isolation Enforcement)\n\nProvider: ${provider.config.name}\nModel: ${selectedModel}\n\nReason: Cloud Mode must not invoke local Ollama provider.`,
+          },
+        });
+        return;
+      }
+      const targetProviderId = getProviderIdForModel(selectedModel);
+      if (targetProviderId === 'ollama') {
+        onChunk({
+          done: true,
+          message: {
+            role: 'assistant',
+            content: `Cloud Request Failed (Model Isolation Enforcement)\n\nProvider: ${provider.config.name}\nModel: ${selectedModel}\n\nReason: Cloud Mode cannot execute local model "${selectedModel}". Please select a Cloud model.`,
+          },
+        });
+        return;
+      }
+    }
+    if (this.mode === 'local' && provider.config.kind === 'cloud') {
+      onChunk({
+        done: true,
+        message: {
+          role: 'assistant',
+          content: `Local Request Failed (Runtime Isolation Enforcement)\n\nProvider: ${provider.config.name}\nModel: ${selectedModel}\n\nReason: Local Mode must not invoke cloud AI provider. Please switch to Cloud/Hybrid mode.`,
+        },
+      });
+      return;
+    }
+
+    // 1. Model & Provider Compatibility Validation
+    const validation = validateProviderModelCompatibility(provider.config.id, selectedModel);
+    if (!validation.valid) {
+      onChunk({
+        done: true,
+        message: {
+          role: 'assistant',
+          content: `Invalid Provider / Model Compatibility:\n\n${validation.reason}`,
+        },
+      });
+      return;
+    }
+
     // Respect user's selected model strictly without auto-overriding
-    const targetModel = selectedModel && selectedModel.trim().length > 0
-      ? selectedModel
-      : (provider.config.defaultModel || 'qwen3:8b');
+    const targetModel =
+      selectedModel && selectedModel.trim().length > 0
+        ? selectedModel
+        : provider.config.defaultModel || 'opencode-zen-coder';
 
     await provider.stream(targetModel, messages, onChunk);
   }
@@ -540,12 +643,40 @@ export class ProviderManager {
   }
 
   selectProvider(request: ProviderRouteRequest, selectedModel?: string): AiProvider {
-    // If user explicitly selected a model belonging to a specific cloud provider, route to it directly
+    // 1. Execution Mode: Cloud (Strict: Never route to Ollama when mode === 'cloud')
+    if (this.mode === 'cloud') {
+      if (selectedModel) {
+        const targetProviderId = getProviderIdForModel(selectedModel);
+        if (targetProviderId && targetProviderId !== 'ollama') {
+          const matched = this.providers.find((p) => p.config.id === targetProviderId);
+          if (matched) return matched;
+        }
+      }
+      // Prefer any cloud provider that has an API key configured
+      const configuredCloud = this.providers.find(
+        (p) => p.config.kind === 'cloud' && Boolean(p.config.apiKey && p.config.apiKey.trim().length > 0)
+      );
+      if (configuredCloud) return configuredCloud;
+
+      const opencode = this.providers.find((p) => p.config.id === 'opencode');
+      if (opencode) return opencode;
+
+      const anyCloud = this.providers.find((p) => p.config.kind === 'cloud');
+      if (anyCloud) return anyCloud;
+    }
+
+    // 2. Execution Mode: Local (Strict: Never route to Cloud when mode === 'local')
+    if (this.mode === 'local') {
+      const local = this.providers.find((p) => p.config.id === 'ollama');
+      if (local) return local;
+    }
+
+    // 3. Explicit model routing for Hybrid mode
     if (selectedModel) {
       const targetProviderId = getProviderIdForModel(selectedModel);
       if (targetProviderId) {
         const matched = this.providers.find((p) => p.config.id === targetProviderId);
-        if (matched && matched.config.apiKey && matched.config.apiKey.trim().length > 0) {
+        if (matched) {
           return matched;
         }
       }
@@ -556,19 +687,6 @@ export class ProviderManager {
     const capable = preferred.find((provider) => supportsAll(provider.config, request.capabilities));
 
     if (capable) return capable;
-
-    if (this.mode === 'cloud') {
-      const cloudProviders = this.providers.filter(
-        (p) => p.config.kind === 'cloud' && (p.config.apiKeySet || Boolean(p.config.apiKey?.trim()))
-      );
-      if (cloudProviders.length > 0) {
-        return cloudProviders[0];
-      }
-      throw new Error('Cloud Mode is active but no cloud provider API keys are verified or enabled. Please verify your API key in Settings -> Cloud Providers.');
-    }
-
-    const localFallback = providers.find((provider) => provider.config.kind === 'local');
-    if (localFallback) return localFallback;
 
     return this.providers[0];
   }
@@ -597,9 +715,7 @@ export class ProviderManager {
 
     if (this.mode === 'cloud') {
       return sortWithDefault(
-        providers.filter(
-          (provider) => provider.config.kind === 'cloud' && provider.config.apiKeySet
-        ),
+        providers.filter((provider) => provider.config.kind === 'cloud'),
         defaultProvider
       );
     }
@@ -615,9 +731,7 @@ export class ProviderManager {
       request.capabilities.includes('vision') ||
       request.capabilities.includes('reasoning')
     ) {
-      return sortByKind(providers, 'cloud', defaultProvider).filter(
-        (provider) => provider.config.kind === 'local' || provider.config.apiKeySet
-      );
+      return sortByKind(providers, 'cloud', defaultProvider);
     }
 
     return sortWithDefault(providers, defaultProvider);
@@ -685,12 +799,13 @@ function sortByKind(
 export function getProviderIdForModel(modelName: string): string | null {
   if (!modelName) return null;
   const lower = modelName.toLowerCase();
-  if (lower.includes('opencode') || lower.includes('zen-coder')) return 'opencode';
-  if (lower.includes('gpt-') || lower.includes('openai') || lower.includes('o1-') || lower.includes('o3-')) return 'openai';
+  if (lower.includes('opencode') || lower.includes('zen-coder') || lower.includes('sol') || lower.includes('terra') || lower.includes('luna')) return 'opencode';
+  if (lower.includes('gpt-4') || lower.includes('gpt-3') || lower.includes('openai') || lower.includes('o1-') || lower.includes('o3-')) return 'openai';
   if (lower.includes('claude') || lower.includes('anthropic')) return 'anthropic';
   if (lower.includes('gemini') || lower.includes('google')) return 'gemini';
   if (lower.includes('groq')) return 'groq';
   if (lower.includes('openrouter')) return 'openrouter';
+  if (lower.includes('qwen') || lower.includes('llama') || lower.includes('mistral') || lower.includes('phi')) return 'ollama';
   return null;
 }
 
@@ -701,8 +816,6 @@ function sortWithDefault(providers: AiProvider[], defaultProvider?: AiProvider):
     ...providers.filter((provider) => provider.config.id !== defaultProvider.config.id),
   ];
 }
-
-/* ================= Pre-Flight Verification & Base URL Normalizer (FR-1, FR-2) ================= */
 
 export function normalizeBaseUrl(providerId: string, customBaseUrl?: string): string {
   if (customBaseUrl && customBaseUrl.trim().length > 0) {
@@ -743,7 +856,7 @@ export async function verifyProviderConnection(
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 8000);
 
-    const resp = await fetch(targetUrl, {
+    const resp = await fetchWithCorsProxy(targetUrl, {
       method: 'GET',
       headers,
       signal: controller.signal,

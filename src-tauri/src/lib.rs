@@ -3,6 +3,7 @@ mod models;
 mod runtime;
 mod services;
 
+use commands::cloud::*;
 use commands::export::*;
 use commands::ollama::*;
 use commands::setup::*;
@@ -30,6 +31,8 @@ pub fn run() {
             run_setup_diagnostics,
             export_chat_markdown,
             prepare_runtime,
+            verify_cloud_provider,
+            cloud_chat_stream,
         ])
         .run(tauri::generate_context!())
         .expect("error while running Nexus Agent application");

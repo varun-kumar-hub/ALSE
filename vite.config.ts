@@ -10,10 +10,7 @@ export default defineConfig(async () => ({
   plugins: [react(), tailwindcss()],
 
   // Vite options tailored for Tauri development and only applied in `tauri dev` or `tauri build`
-  //
-  // 1. prevent Vite from obscuring rust errors
   clearScreen: false,
-  // 2. tauri expects a fixed port, fail if that port is not available
   server: {
     port: 1420,
     strictPort: true,
@@ -22,6 +19,45 @@ export default defineConfig(async () => ({
       '/api': {
         target: 'http://127.0.0.1:11434',
         changeOrigin: true,
+      },
+      '/proxy/opencode': {
+        target: 'https://opencode.ai',
+        changeOrigin: true,
+        secure: false,
+        rewrite: (path) => path.replace(/^\/proxy\/opencode/, ''),
+      },
+      '/proxy/openai': {
+        target: 'https://api.openai.com',
+        changeOrigin: true,
+        secure: false,
+        rewrite: (path) => path.replace(/^\/proxy\/openai/, ''),
+      },
+      '/proxy/anthropic': {
+        target: 'https://api.anthropic.com',
+        changeOrigin: true,
+        secure: false,
+        rewrite: (path) => path.replace(/^\/proxy\/anthropic/, ''),
+      },
+      '/proxy/gemini': {
+        target: 'https://generativelanguage.googleapis.com',
+        changeOrigin: true,
+        secure: false,
+        rewrite: (path) => path.replace(/^\/proxy\/gemini/, ''),
+      },
+      '/proxy/ddg': {
+        target: 'https://html.duckduckgo.com',
+        changeOrigin: true,
+        secure: false,
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        },
+        rewrite: (path) => path.replace(/^\/proxy\/ddg/, ''),
+      },
+      '/proxy/wikipedia': {
+        target: 'https://en.wikipedia.org',
+        changeOrigin: true,
+        secure: false,
+        rewrite: (path) => path.replace(/^\/proxy\/wikipedia/, ''),
       },
     },
     hmr: host
@@ -32,7 +68,7 @@ export default defineConfig(async () => ({
         }
       : undefined,
     watch: {
-      // 3. tell Vite to ignore watching `src-tauri`
+      // tell Vite to ignore watching `src-tauri`
       ignored: ["**/src-tauri/**"],
     },
   },

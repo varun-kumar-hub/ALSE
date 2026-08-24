@@ -73,16 +73,16 @@ export const ChatMessageComponent: React.FC<ChatMessageProps> = ({
   const isUser = message.role === 'user';
 
   // Intent classification for dynamic response layout
-  const intent = message.intent ?? detectQueryIntent(message.content);
+  const intent = message.intent ?? detectQueryIntent(message.user_prompt || message.content);
 
   // Extract thinking / reasoning blocks with context-specific dynamic activity sentences
+  const sourceTitles: string[] = (message.sources_used || []).map((s) => (typeof s === 'string' ? s : s.title));
   const parsed = parseThinkingAndContent(
     message.content,
     message.user_prompt,
     intent,
-    message.sources_used || []
+    sourceTitles
   );
-  const displayThinking = message.thinking || parsed.thinking;
   const displayContent = parsed.content || (parsed.thinking ? '' : message.content);
 
   const getIntentBadge = () => {
@@ -160,24 +160,28 @@ export const ChatMessageComponent: React.FC<ChatMessageProps> = ({
             </p>
           ) : (
             /* Assistant Message — Agent Activity Timeline + Clean Markdown */
-            <div className="space-y-4 select-text">
-              {(displayThinking || isStreaming) && (
-                <ThinkingCard
-                  activities={parsed.activities}
-                  thinking={displayThinking}
-                  isStreaming={isStreaming && parsed.isThinkingActive}
-                  defaultExpanded={isStreaming || parsed.isThinkingActive}
-                />
-              )}
+            <div className="space-y-3 select-text">
+              <ThinkingCard
+                isStreaming={isStreaming}
+                userPrompt={message.user_prompt}
+                intent={intent}
+                sourcesCount={message.sources_used?.length || 0}
+                toolsCount={message.tools_used?.length || 0}
+                generationTimeMs={message.generation_time_ms || 1800}
+                provider={message.provider_used || (aiMode === 'local' ? 'ollama' : 'cloud')}
+                model={message.model_used || selectedModel}
+                activities={parsed.activities}
+                thinking={parsed.thinking}
+              />
 
               {displayContent ? (
                 <div className="markdown-body text-[15px] space-y-4 select-text">
                   <MarkdownContent content={displayContent} />
                 </div>
-              ) : isStreaming && parsed.isThinkingActive ? (
+              ) : isStreaming ? (
                 <div className="flex items-center gap-2 text-xs text-zinc-500 py-1">
                   <span className="inline-block w-2 h-2 rounded-full bg-blue-600 animate-pulse" />
-                  <span>Formulating structured response...</span>
+                  <span>Formulating response...</span>
                 </div>
               ) : null}
 
@@ -189,10 +193,11 @@ export const ChatMessageComponent: React.FC<ChatMessageProps> = ({
                     message.provider_used || (aiMode === 'local' ? 'ollama' : 'opencode'),
                     aiMode,
                     intent,
-                    '',
+                    message.user_prompt || '',
                     displayContent || message.content,
                     Date.now() - (message.generation_time_ms || 2100),
-                    message.sources_used || []
+                    message.sources_used || [],
+                    message.tools_used || []
                   )}
                 />
               )}

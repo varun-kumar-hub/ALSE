@@ -14,6 +14,7 @@ import {
   validateAndDiscoverProvider,
   searchProviders,
   detectProviderFromApiKey,
+  OPENCODE_ZEN_CATALOG,
 } from '../../services/providerRegistry';
 import { ProviderConfig } from '../../services/types';
 
@@ -29,7 +30,7 @@ export const CloudSettings: React.FC<CloudSettingsProps> = ({
   onSaveProvider,
 }) => {
   const [providerSearch, setProviderSearch] = useState('');
-  const [activeProviderId, setActiveProviderId] = useState('openai');
+  const [activeProviderId, setActiveProviderId] = useState('opencode');
   const [detectedPatternBadge, setDetectedPatternBadge] = useState<string | null>(null);
 
   const [validatingId, setValidatingId] = useState<string | null>(null);
@@ -40,7 +41,7 @@ export const CloudSettings: React.FC<CloudSettingsProps> = ({
 
   const activeProviderConfig =
     providerConfigs.find((p) => p.id === activeProviderId) || providerConfigs[0];
-  const filteredProviders = searchProviders(providerSearch);
+  const filteredProviders = searchProviders(providerSearch).filter((p) => p.kind === 'cloud');
 
   const handleApiKeyChange = (id: string, newKey: string) => {
     updateProviderConfig(id, { apiKey: newKey });
@@ -68,7 +69,7 @@ export const CloudSettings: React.FC<CloudSettingsProps> = ({
         ...prev,
         [cfg.id]: {
           success: true,
-          message: `Connected! Discovered ${result.models.length} models in ${result.latencyMs ?? 180}ms.`,
+          message: `Verified & Connected! Discovered ${result.models.length} models in ${result.latencyMs ?? 180}ms.`,
           latencyMs: result.latencyMs,
           modelsCount: result.models.length,
         },
@@ -81,7 +82,7 @@ export const CloudSettings: React.FC<CloudSettingsProps> = ({
         ...prev,
         [cfg.id]: {
           success: false,
-          message: result.error || 'Connection failed.',
+          message: result.error || `${result.errorCategory || 'Connection failed'}. Verification rejected by endpoint.`,
         },
       }));
     }
@@ -93,15 +94,22 @@ export const CloudSettings: React.FC<CloudSettingsProps> = ({
     setTimeout(() => setSavedProviderId(null), 2000);
   };
 
+  const currentModelsList =
+    activeProviderConfig?.id === 'opencode'
+      ? OPENCODE_ZEN_CATALOG
+      : activeProviderConfig?.discoveredModels && activeProviderConfig.discoveredModels.length > 0
+      ? activeProviderConfig.discoveredModels
+      : [activeProviderConfig?.defaultModel || 'opencode-zen-coder'];
+
   return (
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-250 select-none text-xs">
       {/* Smart Cloud Provider Manager Card */}
       <div className="space-y-4">
         <div className="flex items-center justify-between">
           <label className="text-xs font-bold text-blue-900 flex items-center gap-1.5 uppercase tracking-wider">
-            <Zap className="w-4 h-4 text-blue-600" /> Smart Cloud Provider Manager
+            <Zap className="w-4 h-4 text-blue-600" /> Cloud AI Provider Manager
           </label>
-          <span className="text-[10px] text-zinc-400 font-mono">30-Second Setup</span>
+          <span className="text-[10px] text-zinc-400 font-mono">Real Authentication Verification</span>
         </div>
 
         {/* Command Palette Provider Search Bar */}
@@ -110,7 +118,7 @@ export const CloudSettings: React.FC<CloudSettingsProps> = ({
             <Search className="w-4 h-4 text-zinc-400 absolute left-3 top-2.5" />
             <input
               type="text"
-              placeholder="Search provider (e.g. OpenAI, ChatGPT, Claude, Gemini, Grok, OpenRouter)..."
+              placeholder="Search cloud provider (e.g. OpenCode Zen, OpenAI, Claude, Gemini, Groq)..."
               value={providerSearch}
               onChange={(e) => setProviderSearch(e.target.value)}
               className="w-full pl-9 pr-4 py-2 bg-zinc-50 border border-zinc-200 rounded-xl text-xs text-zinc-900 focus:outline-none focus:border-blue-500 font-medium"
@@ -164,7 +172,11 @@ export const CloudSettings: React.FC<CloudSettingsProps> = ({
                   <span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 font-bold flex items-center gap-1">
                     <Key className="w-3 h-3 text-amber-600" /> Unverified Key
                   </span>
-                ) : null}
+                ) : (
+                  <span className="text-[10px] px-2 py-0.5 rounded-full bg-zinc-100 text-zinc-600 font-medium">
+                    Not Configured
+                  </span>
+                )}
               </div>
 
               <label className="relative inline-flex items-center cursor-pointer gap-2 select-none shrink-0 whitespace-nowrap ml-2">
@@ -207,7 +219,7 @@ export const CloudSettings: React.FC<CloudSettingsProps> = ({
                 </label>
                 <input
                   type="password"
-                  placeholder="sk-..."
+                  placeholder="Enter API key..."
                   value={activeProviderConfig.apiKey || ''}
                   onChange={(e) => handleApiKeyChange(activeProviderConfig.id, e.target.value)}
                   className="w-full bg-white border border-zinc-200 rounded-lg px-2.5 py-1.5 text-xs text-zinc-950 font-mono focus:outline-none focus:border-blue-500"
@@ -215,31 +227,20 @@ export const CloudSettings: React.FC<CloudSettingsProps> = ({
               </div>
 
               <div className="space-y-1">
-                <label className="text-[10px] font-medium text-zinc-600">Discovered Model</label>
-                {activeProviderConfig.discoveredModels && activeProviderConfig.discoveredModels.length > 0 ? (
-                  <select
-                    value={activeProviderConfig.defaultModel}
-                    onChange={(e) =>
-                      updateProviderConfig(activeProviderConfig.id, { defaultModel: e.target.value })
-                    }
-                    className="w-full bg-white border border-zinc-200 rounded-lg px-2.5 py-1.5 text-xs text-zinc-950 font-mono focus:outline-none focus:border-blue-500"
-                  >
-                    {activeProviderConfig.discoveredModels.map((m) => (
-                      <option key={m} value={m}>
-                        {m}
-                      </option>
-                    ))}
-                  </select>
-                ) : (
-                  <input
-                    type="text"
-                    value={activeProviderConfig.defaultModel}
-                    onChange={(e) =>
-                      updateProviderConfig(activeProviderConfig.id, { defaultModel: e.target.value })
-                    }
-                    className="w-full bg-white border border-zinc-200 rounded-lg px-2.5 py-1.5 text-xs text-zinc-950 font-mono focus:outline-none focus:border-blue-500"
-                  />
-                )}
+                <label className="text-[10px] font-medium text-zinc-600">Discovered Model Catalog</label>
+                <select
+                  value={activeProviderConfig.defaultModel}
+                  onChange={(e) =>
+                    updateProviderConfig(activeProviderConfig.id, { defaultModel: e.target.value })
+                  }
+                  className="w-full bg-white border border-zinc-200 rounded-lg px-2.5 py-1.5 text-xs text-zinc-950 font-mono focus:outline-none focus:border-blue-500"
+                >
+                  {currentModelsList.map((m) => (
+                    <option key={m} value={m}>
+                      {m}
+                    </option>
+                  ))}
+                </select>
               </div>
             </div>
 
@@ -260,7 +261,7 @@ export const CloudSettings: React.FC<CloudSettingsProps> = ({
                     />
                   }
                 >
-                  Validate & Connect
+                  Verify Credentials & Endpoint
                 </Button>
                 <Button
                   type="button"
@@ -290,7 +291,7 @@ export const CloudSettings: React.FC<CloudSettingsProps> = ({
                   <p className="font-semibold">{validationResult[activeProviderConfig.id].message}</p>
                   {validationResult[activeProviderConfig.id].latencyMs && (
                     <p className="text-[10px] text-emerald-700 font-mono mt-0.5">
-                      Latency: {validationResult[activeProviderConfig.id].latencyMs}ms | Models:{' '}
+                      Latency: {validationResult[activeProviderConfig.id].latencyMs}ms | Verified Models:{' '}
                       {validationResult[activeProviderConfig.id].modelsCount}
                     </p>
                   )}
@@ -318,7 +319,7 @@ export const CloudSettings: React.FC<CloudSettingsProps> = ({
       <div className="grid grid-cols-2 gap-3 pt-2">
         <div className="p-3 rounded-2xl bg-blue-50/50 border border-blue-100 space-y-1">
           <span className="text-[10px] font-semibold text-blue-600 uppercase flex items-center gap-1">
-            <Cloud className="w-3.5 h-3.5 text-blue-600" /> Connected Cloud Providers
+            <Cloud className="w-3.5 h-3.5 text-blue-600" /> Verified Cloud Providers
           </span>
           <p className="text-base font-bold text-zinc-900 font-mono">
             {providerConfigs.filter((p) => p.apiKeySet && p.enabled).length} Active

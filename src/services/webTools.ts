@@ -178,20 +178,13 @@ export async function webSearch(query: string, limit = 5): Promise<WebToolResult
       }).finally(() => clearTimeout(timeoutId));
       if (resp.ok) rawHtml = await resp.text();
     } else {
-      // Browser mode: Fetch through resilient CORS proxies
+      // Browser dev mode: Fetch through Vite same-origin proxy
       try {
-        const proxyUrl1 = `https://api.allorigins.win/raw?url=${encodeURIComponent(ddgUrl)}`;
-        const resp1 = await fetch(proxyUrl1);
-        if (resp1.ok) rawHtml = await resp1.text();
+        const proxyDdg = `/proxy/ddg/html/?q=${encodeURIComponent(trimmedQuery)}`;
+        const resp = await fetch(proxyDdg);
+        if (resp.ok) rawHtml = await resp.text();
       } catch {
-        // try second proxy
-        try {
-          const proxyUrl2 = `https://corsproxy.io/?url=${encodeURIComponent(ddgUrl)}`;
-          const resp2 = await fetch(proxyUrl2);
-          if (resp2.ok) rawHtml = await resp2.text();
-        } catch {
-          // ignore
-        }
+        // Ignore and proceed to Wikipedia fallback
       }
     }
 

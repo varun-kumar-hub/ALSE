@@ -9,7 +9,6 @@ import {
   BarChart2,
   Download,
   Cpu,
-  Zap,
   Bot,
   Brain,
   Terminal,
@@ -39,19 +38,21 @@ export const SidebarNavHub: React.FC<SidebarNavHubProps> = ({
 
   // Progressive Disclosure Expandable Groups
   const [isWorkspaceOpen, setIsWorkspaceOpen] = useState(true);
+  const [isResearchOpen, setIsResearchOpen] = useState(true);
   const [isAiOpen, setIsAiOpen] = useState(false);
   const [isDevOpen, setIsDevOpen] = useState(false);
   const [isChatsListOpen, setIsChatsListOpen] = useState(true);
 
   return (
     <div className="flex-1 flex flex-col min-h-0 select-none text-xs overflow-y-auto p-2 space-y-3 font-medium text-zinc-700">
-      {/* 📂 WORKSPACE GROUP */}
+      {/* 📂 Tier 1: WORKSPACE & CHATS */}
       <div className="space-y-1">
         <button
+          type="button"
           onClick={() => setIsWorkspaceOpen(!isWorkspaceOpen)}
           className="w-full flex items-center justify-between px-2 py-1 text-[10px] font-bold text-zinc-400 uppercase tracking-wider hover:text-zinc-700 transition-colors"
         >
-          <span>Workspace</span>
+          <span>Workspace & Chats</span>
           {isWorkspaceOpen ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
         </button>
 
@@ -60,6 +61,7 @@ export const SidebarNavHub: React.FC<SidebarNavHubProps> = ({
             {/* Chats Sub-Section */}
             <div className="space-y-0.5">
               <button
+                type="button"
                 onClick={() => {
                   setActiveItem('chats');
                   setIsChatsListOpen(!isChatsListOpen);
@@ -94,6 +96,7 @@ export const SidebarNavHub: React.FC<SidebarNavHubProps> = ({
             </div>
 
             <button
+              type="button"
               onClick={() => setActiveItem('projects')}
               className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded-xl transition-all ${
                 activeItem === 'projects' ? 'bg-amber-50 text-amber-900 font-bold' : 'hover:bg-zinc-100'
@@ -104,8 +107,25 @@ export const SidebarNavHub: React.FC<SidebarNavHubProps> = ({
                 <span>Projects</span>
               </div>
             </button>
+          </div>
+        )}
+      </div>
 
+      {/* 🔬 Tier 2: RESEARCH & HUBS */}
+      <div className="space-y-1 pt-1 border-t border-zinc-100">
+        <button
+          type="button"
+          onClick={() => setIsResearchOpen(!isResearchOpen)}
+          className="w-full flex items-center justify-between px-2 py-1 text-[10px] font-bold text-zinc-400 uppercase tracking-wider hover:text-zinc-700 transition-colors"
+        >
+          <span>Research & Hubs</span>
+          {isResearchOpen ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
+        </button>
+
+        {isResearchOpen && (
+          <div className="space-y-0.5 pl-1 animate-in fade-in duration-150">
             <button
+              type="button"
               onClick={() => setActiveItem('research')}
               className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded-xl transition-all ${
                 activeItem === 'research' ? 'bg-purple-50 text-purple-900 font-bold' : 'hover:bg-zinc-100'
@@ -113,11 +133,12 @@ export const SidebarNavHub: React.FC<SidebarNavHubProps> = ({
             >
               <div className="flex items-center gap-2">
                 <Globe className="w-4 h-4 text-purple-600" />
-                <span>Research</span>
+                <span>Deep Research</span>
               </div>
             </button>
 
             <button
+              type="button"
               onClick={() => setActiveItem('notes')}
               className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded-xl transition-all ${
                 activeItem === 'notes' ? 'bg-blue-50 text-blue-900 font-bold' : 'hover:bg-zinc-100'
@@ -125,11 +146,12 @@ export const SidebarNavHub: React.FC<SidebarNavHubProps> = ({
             >
               <div className="flex items-center gap-2">
                 <BookOpen className="w-4 h-4 text-blue-600" />
-                <span>Notes</span>
+                <span>Knowledge & Notes</span>
               </div>
             </button>
 
             <button
+              type="button"
               onClick={() => setActiveItem('reports')}
               className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded-xl transition-all ${
                 activeItem === 'reports' ? 'bg-emerald-50 text-emerald-900 font-bold' : 'hover:bg-zinc-100'
@@ -137,11 +159,12 @@ export const SidebarNavHub: React.FC<SidebarNavHubProps> = ({
             >
               <div className="flex items-center gap-2">
                 <BarChart2 className="w-4 h-4 text-emerald-600" />
-                <span>Reports</span>
+                <span>Analytics & Reports</span>
               </div>
             </button>
 
             <button
+              type="button"
               onClick={() => setActiveItem('downloads')}
               className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded-xl transition-all ${
                 activeItem === 'downloads' ? 'bg-cyan-50 text-cyan-900 font-bold' : 'hover:bg-zinc-100'
@@ -149,16 +172,17 @@ export const SidebarNavHub: React.FC<SidebarNavHubProps> = ({
             >
               <div className="flex items-center gap-2">
                 <Download className="w-4 h-4 text-cyan-600" />
-                <span>Downloads</span>
+                <span>Downloads & Exports</span>
               </div>
             </button>
           </div>
         )}
       </div>
 
-      {/* 🤖 AI GROUP (Collapsible Dropdown) */}
+      {/* 🤖 Tier 3: AI & INTELLIGENCE */}
       <div className="space-y-1 pt-1 border-t border-zinc-100">
         <button
+          type="button"
           onClick={() => setIsAiOpen(!isAiOpen)}
           className="w-full flex items-center justify-between px-2 py-1 text-[10px] font-bold text-zinc-400 uppercase tracking-wider hover:text-zinc-700 transition-colors"
         >
@@ -169,29 +193,8 @@ export const SidebarNavHub: React.FC<SidebarNavHubProps> = ({
         {isAiOpen && (
           <div className="space-y-0.5 pl-1 animate-in fade-in duration-150">
             <button
-              onClick={() => {
-                const settingsBtn = document.querySelector<HTMLButtonElement>('button[title="Open Settings"]');
-                settingsBtn?.click();
-              }}
-              className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-xl hover:bg-zinc-100 text-zinc-700 transition-colors"
-            >
-              <Cpu className="w-4 h-4 text-purple-600" />
-              <span>Models</span>
-            </button>
-
-            <button
-              onClick={() => {
-                const settingsBtn = document.querySelector<HTMLButtonElement>('button[title="Open Settings"]');
-                settingsBtn?.click();
-              }}
-              className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-xl hover:bg-zinc-100 text-zinc-700 transition-colors"
-            >
-              <Zap className="w-4 h-4 text-amber-500" />
-              <span>Cloud Providers</span>
-            </button>
-
-            <button
-              onClick={() => alert('Agent Orchestrator...')}
+              type="button"
+              onClick={() => alert('Agent Orchestrator: Select and configure active agents.')}
               className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-xl hover:bg-zinc-100 text-zinc-700 transition-colors"
             >
               <Bot className="w-4 h-4 text-indigo-600" />
@@ -199,7 +202,20 @@ export const SidebarNavHub: React.FC<SidebarNavHubProps> = ({
             </button>
 
             <button
-              onClick={() => alert('RAG & Vector Storage...')}
+              type="button"
+              onClick={() => {
+                const settingsBtn = document.querySelector<HTMLButtonElement>('button[title="Open Settings"]');
+                settingsBtn?.click();
+              }}
+              className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-xl hover:bg-zinc-100 text-zinc-700 transition-colors"
+            >
+              <Cpu className="w-4 h-4 text-purple-600" />
+              <span>Models & Providers</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => alert('RAG & Vector Storage: View episodic memory and vector indexes.')}
               className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-xl hover:bg-zinc-100 text-zinc-700 transition-colors"
             >
               <Brain className="w-4 h-4 text-emerald-600" />
@@ -209,19 +225,21 @@ export const SidebarNavHub: React.FC<SidebarNavHubProps> = ({
         )}
       </div>
 
-      {/* 🛠 DEVELOPER GROUP */}
+      {/* 🛠 Tier 4: DEVELOPER & SYSTEM */}
       <div className="space-y-1 pt-1 border-t border-zinc-100">
         <button
+          type="button"
           onClick={() => setIsDevOpen(!isDevOpen)}
           className="w-full flex items-center justify-between px-2 py-1 text-[10px] font-bold text-zinc-400 uppercase tracking-wider hover:text-zinc-700 transition-colors"
         >
-          <span>Developer Tools</span>
+          <span>Developer & System</span>
           {isDevOpen ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
         </button>
 
         {isDevOpen && (
           <div className="space-y-0.5 pl-1 animate-in fade-in duration-150">
             <button
+              type="button"
               onClick={() => {
                 const debugBtn = document.querySelector<HTMLButtonElement>('button[data-debug-toggle]');
                 debugBtn?.click();

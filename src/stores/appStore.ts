@@ -101,7 +101,19 @@ export const useAppStore = create<AppState>((set) => ({
   setCurrentChatId: (id) => set({ currentChatId: id }),
   setSelectedModel: (model) => set({ selectedModel: model }),
   setAssistantName: (name) => set({ assistantName: name }),
-  setAiMode: (mode) => set({ aiMode: mode }),
+  setAiMode: (mode) =>
+    set((state) => {
+      if (mode === 'cloud') {
+        const opencodeConfig = state.providerConfigs.find((p) => p.id === 'opencode');
+        const cloudModel = opencodeConfig?.defaultModel || 'gpt-5.6-sol';
+        return { aiMode: mode, selectedModel: cloudModel };
+      }
+      if (mode === 'local') {
+        const localModel = state.models.length > 0 ? state.models[0].name : 'qwen3:8b';
+        return { aiMode: mode, selectedModel: localModel };
+      }
+      return { aiMode: mode };
+    }),
   setDefaultProvider: (provider) => set({ defaultProvider: provider }),
   setProviderConfigs: (configs) => set({ providerConfigs: configs }),
   setTheme: (theme) => set({ theme }),
@@ -127,14 +139,26 @@ export const useAppStore = create<AppState>((set) => ({
   initApp: async () => {
     // 1. Load settings from SQLite / storage
     const settings = await getAllSettings();
-    const availableModels = await listModels();
+    const isCloudMode = settings.aiMode === 'cloud';
+
+    // 2. Fetch local models ONLY if not strictly in Cloud Mode
+    const availableModels = isCloudMode ? [] : await listModels();
     const inDev = isDevMode();
     const skipDev = settings.skipLauncherInDev ?? true;
+
+    const configuredCloudConfig =
+      settings.providerConfigs.find((p) => p.kind === 'cloud' && Boolean(p.apiKey && p.apiKey.trim().length > 0)) ||
+      settings.providerConfigs.find((p) => p.id === 'opencode');
+    const cloudDefaultModel = configuredCloudConfig?.defaultModel || 'gpt-5.6-sol';
+
+    const initialModel = isCloudMode
+      ? settings.defaultModel || cloudDefaultModel
+      : settings.defaultModel || (availableModels.length > 0 ? availableModels[0].name : 'qwen3:8b');
 
     set({
       assistantName: settings.assistantName,
       theme: settings.theme,
-      selectedModel: settings.defaultModel || (availableModels.length > 0 ? availableModels[0].name : 'qwen3:8b'),
+      selectedModel: initialModel,
       aiMode: settings.aiMode,
       defaultProvider: settings.defaultProvider,
       providerConfigs: settings.providerConfigs,
@@ -150,19 +174,6 @@ export const useAppStore = create<AppState>((set) => ({
     if (inDev && skipDev) {
       // Development Mode: SKIP LAUNCHER COMPLETELY
       set({ activeView: 'chat' });
-
-      // Perform silent background diagnostics for developers
-      if (availableModels.length === 0) {
-        console.warn(
-          '%c[Nexus Agent Dev Mode] Ollama or local models not detected.\nRun: "ollama pull qwen3:8b"',
-          'color: #f59e0b; font-weight: bold;'
-        );
-      } else {
-        console.log(
-          `%c[Nexus Agent Dev Mode] Started with ${availableModels.length} models ready. Launcher skipped.`,
-          'color: #10b981; font-weight: bold;'
-        );
-      }
     } else {
       // Production Mode: Determine if launcher is needed
       if (!settings.onboardingComplete) {
@@ -176,6 +187,11 @@ export const useAppStore = create<AppState>((set) => ({
   },
 
   refreshModels: async () => {
+    const currentMode = useAppStore.getState().aiMode;
+    if (currentMode === 'cloud') {
+      set({ models: [] });
+      return;
+    }
     const availableModels = await listModels();
     set({ models: availableModels });
   },

@@ -16,17 +16,18 @@ import {
   getMessages,
   addMessage,
 } from './services/database';
-import { createProviderManager, getCapabilitiesForIntent } from './services/providers';
+import { createProviderManager, getCapabilitiesForIntent, getProviderIdForModel } from './services/providers';
 import { saveWorkspaceFile } from './services/workspace';
 import { detectQueryIntent } from './lib/intentDetector';
 import { optimizePrompt } from './lib/promptOptimizer';
 import { filterResponseForIntent } from './lib/responseFilter';
 import { buildThinkingTimeline } from './lib/thinkingTimeline';
-import { webSearch, webExtract, webCrawl } from './services/webTools';
+import { webSearch, webExtract, WebSearchResult } from './services/webTools';
 import { getFactGroundedSummary } from './services/wikipediaTool';
 import { createOrUpdateCheckpoint } from './runtime/checkpointManager';
 import { logProviderRequest } from './services/providerLogger';
-import { Chat, ChatMessage as ChatMessageType } from './services/types';
+import { urlIntelligenceEngine } from './services/urlIntelligenceService';
+import { Chat, ChatMessage as ChatMessageType, SourceItem } from './services/types';
 
 function hasActiveTextSelection(): boolean {
   const selection = window.getSelection?.();
@@ -175,20 +176,35 @@ export function App() {
     let webContext = '';
     const urlMatch = userPrompt.match(/https?:\/\/[^\s]+/i);
 
-    const actualSourcesUsed: string[] = [];
+    const actualToolsUsed: string[] = [];
+    const actualSourcesUsed: SourceItem[] = [];
+
     if (urlMatch) {
       const targetUrl = urlMatch[0];
-      if (/\b(crawl|spider|follow links)\b/i.test(userPrompt)) {
-        const crawlRes = await webCrawl(targetUrl, 2);
-        if (crawlRes.ok) {
-          webContext = `\n\n[Web Crawl Results for ${targetUrl}]:\n${crawlRes.content}\n\n`;
-          actualSourcesUsed.push('Web Acquisition Engine');
+      let domain = '';
+      try {
+        domain = new URL(targetUrl).hostname.replace(/^www\./, '');
+      } catch {}
+
+      try {
+        const dataset = await urlIntelligenceEngine.runDeepResearch(targetUrl, { maxPages: 20 });
+        if (dataset && dataset.contextText) {
+          webContext = `\n\n${dataset.contextText}\n\n`;
+          actualToolsUsed.push(...dataset.toolsUsed);
+          actualSourcesUsed.push(...dataset.sources);
         }
-      } else {
+      } catch (err) {
+        console.warn('[URL Intelligence Engine] Deep research fallback to single page extract:', err);
         const extractRes = await webExtract(targetUrl, 4000);
         if (extractRes.ok) {
           webContext = `\n\n[Web Page Content for ${targetUrl}]:\n${extractRes.content}\n\n`;
-          actualSourcesUsed.push('Web Acquisition Engine');
+          actualToolsUsed.push('Web Page Extractor');
+          actualSourcesUsed.push({
+            title: targetUrl,
+            url: targetUrl,
+            domain: domain || 'web',
+            type: 'web',
+          });
         }
       }
     } else {
@@ -206,7 +222,23 @@ export function App() {
         const searchRes = await webSearch(cleanQuery, 5);
         if (searchRes.ok && searchRes.content) {
           webContext += `\n\n[Live Web Search Results]:\n${searchRes.content}\n\n`;
-          actualSourcesUsed.push('Web Search');
+          actualToolsUsed.push('Web Search');
+
+          // Extract individual source items from search results
+          const rawResults = (searchRes.data as { results?: WebSearchResult[] })?.results || [];
+          rawResults.forEach((r) => {
+            let dom = '';
+            try {
+              dom = new URL(r.url).hostname.replace(/^www\./, '');
+            } catch {}
+            actualSourcesUsed.push({
+              title: r.title,
+              url: r.url,
+              domain: dom || 'web',
+              type: dom.includes('wikipedia') ? 'wiki' : dom.includes('rfc-editor') ? 'rfc' : 'web',
+              snippet: r.snippet,
+            });
+          });
         }
       }
 
@@ -215,7 +247,15 @@ export function App() {
         const wikiFact = await getFactGroundedSummary(userPrompt);
         if (wikiFact) {
           webContext += `\n\n${wikiFact}\n\n`;
-          actualSourcesUsed.push('Wikipedia Grounding');
+          actualToolsUsed.push('Wikipedia Search');
+          if (!actualSourcesUsed.some((s) => s.domain === 'wikipedia.org')) {
+            actualSourcesUsed.push({
+              title: `Wikipedia Summary for ${userPrompt.slice(0, 30)}`,
+              url: 'https://en.wikipedia.org',
+              domain: 'wikipedia.org',
+              type: 'wiki',
+            });
+          }
         }
       }
     }
@@ -273,10 +313,19 @@ export function App() {
       updateThinkingTimelinePhase('generate');
     }, 400);
 
+    const configuredCloudConfig =
+      providerConfigs.find((p) => p.kind === 'cloud' && Boolean(p.apiKey && p.apiKey.trim().length > 0)) ||
+      providerConfigs.find((p) => p.id === 'opencode');
+    const activeCloudModel = configuredCloudConfig?.defaultModel || 'gemini-2.5-flash';
+    const effectiveModel =
+      aiMode === 'cloud'
+        ? (getProviderIdForModel(selectedModel) === 'ollama' ? activeCloudModel : selectedModel || activeCloudModel)
+        : selectedModel;
+
     try {
       await providerManager.streamChat(
         { intent, capabilities },
-        selectedModel,
+        effectiveModel,
         historyPayload,
         (chunk) => {
           if (chunk.message?.content) {
@@ -308,19 +357,34 @@ export function App() {
           fullAccumulatedResponse,
           intent
         );
-        assistantMsg.provider_used = aiMode === 'local' ? 'ollama' : 'cloud';
+        const actualProviderId = getProviderIdForModel(selectedModel) || (aiMode === 'local' ? 'ollama' : 'opencode');
+        const isLocal = actualProviderId === 'ollama';
+        const providerName =
+          actualProviderId === 'opencode'
+            ? 'OpenCode Zen'
+            : actualProviderId === 'openai'
+            ? 'OpenAI'
+            : actualProviderId === 'anthropic'
+            ? 'Claude (Anthropic)'
+            : actualProviderId === 'gemini'
+            ? 'Google Gemini'
+            : 'Local Ollama';
+
+        assistantMsg.provider_used = actualProviderId;
         assistantMsg.model_used = selectedModel;
         assistantMsg.user_prompt = userPrompt;
-        assistantMsg.sources_used = actualSourcesUsed.length > 0 ? actualSourcesUsed : ['Local Model Knowledge'];
+        assistantMsg.tools_used = actualToolsUsed;
+        assistantMsg.sources_used = actualSourcesUsed;
+        assistantMsg.generation_time_ms = Date.now() - startTime;
         setMessages((prev) => [...prev, assistantMsg]);
 
         logProviderRequest({
-          providerId: aiMode === 'local' ? 'ollama' : (defaultProvider || 'opencode'),
-          providerName: aiMode === 'local' ? 'Local Ollama' : 'Cloud Provider',
-          model: selectedModel || 'qwen3:8b',
-          endpoint: aiMode === 'local' ? 'http://localhost:11434/api/chat' : 'https://opencode.ai/zen/v1/chat/completions',
+          providerId: actualProviderId,
+          providerName,
+          model: selectedModel || 'opencode-zen-coder',
+          endpoint: isLocal ? 'http://localhost:11434/api/chat' : 'https://opencode.ai/zen/v1/chat/completions',
           durationMs: Date.now() - startTime,
-          success: true,
+          success: !fullAccumulatedResponse.includes('Cloud Request Failed'),
           inputTokens: Math.ceil(userPrompt.length / 4),
           outputTokens: Math.ceil(fullAccumulatedResponse.length / 4),
         });

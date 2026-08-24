@@ -147,7 +147,10 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ onClose }) => {
             <div className="grid grid-cols-3 gap-3">
               <button
                 type="button"
-                onClick={() => setAiMode('local')}
+                onClick={() => {
+                  setAiMode('local');
+                  updateSetting('aiMode', 'local');
+                }}
                 className={`p-3 rounded-xl border text-left flex flex-col justify-between transition-all ${
                   aiMode === 'local'
                     ? 'border-emerald-500 bg-emerald-50/70 shadow-sm ring-2 ring-emerald-500/20'
@@ -166,7 +169,10 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ onClose }) => {
 
               <button
                 type="button"
-                onClick={() => setAiMode('cloud')}
+                onClick={() => {
+                  setAiMode('cloud');
+                  updateSetting('aiMode', 'cloud');
+                }}
                 className={`p-3 rounded-xl border text-left flex flex-col justify-between transition-all ${
                   aiMode === 'cloud'
                     ? 'border-blue-600 bg-blue-50/70 shadow-sm ring-2 ring-blue-500/20'
@@ -185,7 +191,10 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ onClose }) => {
 
               <button
                 type="button"
-                onClick={() => setAiMode('hybrid')}
+                onClick={() => {
+                  setAiMode('hybrid');
+                  updateSetting('aiMode', 'hybrid');
+                }}
                 className={`p-3 rounded-xl border text-left flex flex-col justify-between transition-all ${
                   aiMode === 'hybrid'
                     ? 'border-purple-600 bg-purple-50/70 shadow-sm ring-2 ring-purple-500/20'

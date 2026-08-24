@@ -54,15 +54,22 @@ export function buildDynamicAgentActivities(
     ];
   }
 
-  // 2. Technical / Protocol Explanations
+  // 2. Technical, Networking & Protocol Explanations
   if (
-    /\b(three-way handshake|tcp|http|dns|websocket|protocol|architecture|database index)\b/i.test(lower)
+    /\b(three-way handshake|tcp|udp|ip|http|dns|websocket|protocol|architecture|database index|arq|stop and wait|sliding window|flow control|error control|data link|mac layer|ethernet)\b/i.test(lower)
   ) {
     if (/\b(tcp|handshake)\b/i.test(lower)) {
       return [
         'Breaking down how the connection is established between client and server.',
         'Connecting SYN, SYN-ACK, and ACK packet sequences to the state transitions.',
         'Structuring a clear timeline diagram to make the handshake intuitive.',
+      ];
+    }
+    if (/\b(arq|stop and wait|sliding window|flow control|error control)\b/i.test(lower)) {
+      return [
+        `Analyzing the data link layer mechanisms for "${q.slice(0, 45)}".`,
+        'Deconstructing frame transmission, acknowledgments (ACK/NACK), timeouts, and retransmissions.',
+        'Structuring a clear step-by-step conceptual breakdown and protocol summary.',
       ];
     }
     return [
@@ -104,7 +111,7 @@ export function buildDynamicAgentActivities(
   }
 
   // 5. Mathematical & Algorithmic
-  if (intent === 'mathematics' || /[0-9]\s*[+\-*/^=]/.test(lower) || /\b(solve|derivative|integral|equation)\b/i.test(lower)) {
+  if (intent === 'mathematics' || (/[0-9]\s*[+\-*/^=]\s*[0-9]/.test(lower) && /\b(calculate|compute|solve|derivative|integral)\b/i.test(lower))) {
     return [
       'Dissecting the problem parameters and selecting the right formulas.',
       'Working through the calculation step by step to ensure numerical accuracy.',

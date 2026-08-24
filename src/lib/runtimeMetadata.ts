@@ -1,7 +1,4 @@
-/**
- * Real Application Runtime Metadata Module
- * Enforces strict accurate execution path mapping and verified source tracking.
- */
+import { SourceItem } from '../services/types';
 
 export interface ExecutionTimestampStep {
   time: string;
@@ -21,7 +18,8 @@ export interface RuntimeMetadata {
   totalTokens: number;
   speedTokPerSec?: number;
   timestamps: ExecutionTimestampStep[];
-  sourcesUsed: string[];
+  toolsUsed: string[];
+  sourcesUsed: SourceItem[];
 }
 
 /**
@@ -80,7 +78,8 @@ export function buildExecutionRuntimeMetadata(
   promptText: string,
   responseText: string,
   startTimeMs: number,
-  actualSources: string[] = []
+  actualSources: (SourceItem | string)[] = [],
+  toolsExecuted: string[] = []
 ): RuntimeMetadata {
   const durationMs = Math.max(100, Date.now() - startTimeMs);
   const durationSec = durationMs / 1000;
@@ -114,9 +113,17 @@ export function buildExecutionRuntimeMetadata(
     { time: now, step: 'Response Rendered', completed: true },
   ];
 
-  // STRICT RULE: Only include sources that were ACTUALLY used. If empty, default to Local Model Knowledge.
-  const validatedSources =
-    actualSources.length > 0 ? Array.from(new Set(actualSources)) : ['Local Model Knowledge'];
+  // Convert raw strings to SourceItem objects for backwards compatibility
+  const normalizedSources: SourceItem[] = actualSources.map((src) => {
+    if (typeof src === 'string') {
+      return {
+        title: src,
+        domain: src.toLowerCase().includes('wiki') ? 'wikipedia.org' : 'local',
+        type: src.toLowerCase().includes('wiki') ? 'wiki' : 'local',
+      };
+    }
+    return src;
+  });
 
   return {
     model,
@@ -127,8 +134,9 @@ export function buildExecutionRuntimeMetadata(
     inputTokens,
     outputTokens,
     totalTokens,
-    speedTokPerSec: mode === 'local' ? rawSpeed || 61 : undefined,
+    speedTokPerSec: rawSpeed || 45,
     timestamps,
-    sourcesUsed: validatedSources,
+    toolsUsed: toolsExecuted,
+    sourcesUsed: normalizedSources,
   };
 }

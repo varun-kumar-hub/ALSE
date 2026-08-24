@@ -39,25 +39,30 @@ export function parseThinkingAndContent(
   const thinkOpenTag = '<think>';
   const thinkCloseTag = '</think>';
 
-  const openIndex = rawText.indexOf(thinkOpenTag);
-
   let thinking = '';
   let content = rawText;
   let isThinkingActive = false;
 
+  const openIndex = rawText.indexOf(thinkOpenTag);
+  const closeIndex = rawText.indexOf(thinkCloseTag);
+
   if (openIndex !== -1) {
     const afterOpen = rawText.slice(openIndex + thinkOpenTag.length);
-    const closeIndex = afterOpen.indexOf(thinkCloseTag);
+    const closeInAfter = afterOpen.indexOf(thinkCloseTag);
 
-    if (closeIndex === -1) {
+    if (closeInAfter === -1) {
       thinking = afterOpen.trim();
-      content = '';
+      content = rawText.slice(0, openIndex).trim();
       isThinkingActive = true;
     } else {
-      thinking = afterOpen.slice(0, closeIndex).trim();
-      content = afterOpen.slice(closeIndex + thinkCloseTag.length).trimStart();
+      thinking = afterOpen.slice(0, closeInAfter).trim();
+      content = (rawText.slice(0, openIndex) + ' ' + afterOpen.slice(closeInAfter + thinkCloseTag.length)).trim();
       isThinkingActive = false;
     }
+  } else if (closeIndex !== -1) {
+    thinking = rawText.slice(0, closeIndex).trim();
+    content = rawText.slice(closeIndex + thinkCloseTag.length).trim();
+    isThinkingActive = false;
   }
 
   // Generate dynamic, context-specific activity phrases based on query, tools, and execution
