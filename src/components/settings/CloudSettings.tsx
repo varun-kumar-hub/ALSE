@@ -93,7 +93,10 @@ export const CloudSettings: React.FC<CloudSettingsProps> = ({
     setValidatingId(null);
 
     if (result.connected) {
-      const activeModel = result.models.length > 0 ? result.models[0] : cfg.defaultModel;
+      const activeModel = (cfg.defaultModel && result.models.includes(cfg.defaultModel))
+        ? cfg.defaultModel
+        : (result.models.length > 0 ? result.models[0] : cfg.defaultModel || 'gpt-5.6-sol');
+
       updateProviderConfig(cfg.id, {
         apiKeySet: true,
         enabled: true,

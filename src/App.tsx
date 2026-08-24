@@ -314,14 +314,8 @@ export function App() {
         ? 'gather'
         : 'plan'
     );
-    // Build Episodic Memory from previous sessions & conversation history
+    // Build Memory strictly from the current active chat session only
     const memoryEpisodes: string[] = [];
-    chats.slice(0, 6).forEach((c) => {
-      if (c.id !== targetChatId && c.title && c.title !== 'New Chat') {
-        const epDate = c.created_at ? c.created_at.split('T')[0] : 'recent';
-        memoryEpisodes.push(`- [${epDate}] Memory episode from past session: "${c.title}"`);
-      }
-    });
     currentMsgs
       .filter((m) => m.role === 'user')
       .slice(-3)
@@ -361,14 +355,15 @@ export function App() {
       updateThinkingTimelinePhase('generate');
     }, 400);
 
+    const opencodeConfig = providerConfigs.find((p) => p.id === 'opencode');
     const configuredCloudConfig =
       providerConfigs.find((p) => p.kind === 'cloud' && Boolean(p.apiKey && p.apiKey.trim().length > 0)) ||
-      providerConfigs.find((p) => p.id === 'opencode');
-    const activeCloudModel = configuredCloudConfig?.defaultModel || 'gemini-2.5-flash';
+      opencodeConfig;
+    const activeCloudModel = configuredCloudConfig?.defaultModel || 'gpt-5.6-sol';
     const effectiveModel =
       aiMode === 'cloud'
-        ? (getProviderIdForModel(selectedModel) === 'ollama' ? activeCloudModel : selectedModel || activeCloudModel)
-        : selectedModel;
+        ? (getProviderIdForModel(selectedModel) === 'ollama' || !selectedModel ? activeCloudModel : selectedModel)
+        : (aiMode === 'local' ? (getProviderIdForModel(selectedModel) !== 'ollama' ? 'qwen3:8b' : selectedModel) : selectedModel);
 
     try {
       await providerManager.streamChat(

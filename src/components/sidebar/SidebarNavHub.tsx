@@ -194,8 +194,11 @@ export const SidebarNavHub: React.FC<SidebarNavHubProps> = ({
           <div className="space-y-0.5 pl-1 animate-in fade-in duration-150">
             <button
               type="button"
-              onClick={() => alert('Agent Orchestrator: Select and configure active agents.')}
-              className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-xl hover:bg-zinc-100 text-zinc-700 transition-colors"
+              onClick={() => {
+                const settingsBtn = document.querySelector<HTMLButtonElement>('button[title="Open Settings"]');
+                settingsBtn?.click();
+              }}
+              className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-xl hover:bg-zinc-100 text-zinc-700 transition-colors cursor-pointer"
             >
               <Bot className="w-4 h-4 text-indigo-600" />
               <span>Agents</span>
@@ -207,7 +210,7 @@ export const SidebarNavHub: React.FC<SidebarNavHubProps> = ({
                 const settingsBtn = document.querySelector<HTMLButtonElement>('button[title="Open Settings"]');
                 settingsBtn?.click();
               }}
-              className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-xl hover:bg-zinc-100 text-zinc-700 transition-colors"
+              className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-xl hover:bg-zinc-100 text-zinc-700 transition-colors cursor-pointer"
             >
               <Cpu className="w-4 h-4 text-purple-600" />
               <span>Models & Providers</span>
@@ -215,8 +218,11 @@ export const SidebarNavHub: React.FC<SidebarNavHubProps> = ({
 
             <button
               type="button"
-              onClick={() => alert('RAG & Vector Storage: View episodic memory and vector indexes.')}
-              className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-xl hover:bg-zinc-100 text-zinc-700 transition-colors"
+              onClick={() => {
+                const settingsBtn = document.querySelector<HTMLButtonElement>('button[title="Open Settings"]');
+                settingsBtn?.click();
+              }}
+              className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-xl hover:bg-zinc-100 text-zinc-700 transition-colors cursor-pointer"
             >
               <Brain className="w-4 h-4 text-emerald-600" />
               <span>Memory & RAG</span>

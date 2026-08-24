@@ -10,25 +10,11 @@ interface ChatHeaderProps {
 }
 
 export const ChatHeader: React.FC<ChatHeaderProps> = ({ chatTitle, onExport }) => {
-  const { aiMode, selectedModel, providerConfigs } = useAppStore();
+  const { executionConfig } = useAppStore();
   const [showStatsModal, setShowStatsModal] = useState(false);
 
-  const activeProviderId = getProviderIdForModel(selectedModel) || (aiMode === 'local' ? 'ollama' : 'opencode');
-  const activeConfig = providerConfigs.find((p) => p.id === activeProviderId);
-
-  const displayProviderLabel =
-    activeProviderId === 'opencode'
-      ? 'OpenCode Zen'
-      : activeProviderId === 'openai'
-      ? 'OpenAI'
-      : activeProviderId === 'anthropic'
-      ? 'Claude'
-      : activeProviderId === 'gemini'
-      ? 'Google Gemini'
-      : 'Local Ollama';
-
-  const displayActiveModel =
-    selectedModel || activeConfig?.defaultModel || (aiMode === 'local' ? 'qwen3:8b' : 'opencode-zen-coder');
+  const displayProviderLabel = executionConfig.providerName;
+  const displayActiveModel = executionConfig.modelName;
 
   return (
     <>

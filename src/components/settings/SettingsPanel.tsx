@@ -48,8 +48,27 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ onClose }) => {
     await updateSetting('aiMode', aiMode);
     await updateSetting('providerConfigs', JSON.stringify(providerConfigs));
 
+    // Synchronize Zustand Store runtime state immediately
+    const store = useAppStore.getState();
+    store.setProviderConfigs(providerConfigs);
+    store.setAiMode(aiMode);
+
+    // Sync active connected model
+    const activeProvider =
+      providerConfigs.find(
+        (p) => p.kind === (aiMode === 'local' ? 'local' : 'cloud') && p.enabled && (p.apiKeySet || p.kind === 'local')
+      ) || providerConfigs.find((p) => p.id === 'opencode');
+
+    if (activeProvider && activeProvider.defaultModel) {
+      store.setSelectedModel(activeProvider.defaultModel);
+      await updateSetting('defaultModel', activeProvider.defaultModel);
+    }
+
     setSavedSuccess(true);
-    setTimeout(() => setSavedSuccess(false), 2000);
+    setTimeout(() => {
+      setSavedSuccess(false);
+      onClose();
+    }, 400);
   };
 
   const handleSaveProvider = async () => {

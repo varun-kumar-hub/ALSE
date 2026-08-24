@@ -2,7 +2,7 @@ import React from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import rehypeHighlight from 'rehype-highlight';
-import { User, Bot, BookOpen, GitCompare, Code2, Calendar } from 'lucide-react';
+import { User, Bot, BookOpen, GitCompare, Code2, Calendar, Copy, Check } from 'lucide-react';
 import { ChatMessage as ChatMessageType } from '../../services/types';
 import { ResponseActions } from './ResponseActions';
 import { RuntimeMetadataCard } from './RuntimeMetadataCard';
@@ -70,7 +70,14 @@ export const ChatMessageComponent: React.FC<ChatMessageProps> = ({
   isStreaming = false,
 }) => {
   const { assistantName, selectedModel, aiMode } = useAppStore();
+  const [copiedQuery, setCopiedQuery] = React.useState(false);
   const isUser = message.role === 'user';
+
+  const handleCopyQuery = async () => {
+    await navigator.clipboard.writeText(message.content);
+    setCopiedQuery(true);
+    setTimeout(() => setCopiedQuery(false), 1600);
+  };
 
   // Intent classification for dynamic response layout
   const intent = message.intent ?? detectQueryIntent(message.user_prompt || message.content);
@@ -144,7 +151,17 @@ export const ChatMessageComponent: React.FC<ChatMessageProps> = ({
               </span>
               {!isUser && getIntentBadge()}
             </div>
-            {!isUser && (
+            {isUser ? (
+              <button
+                type="button"
+                onClick={handleCopyQuery}
+                className="opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1 text-[11px] font-medium text-zinc-500 hover:text-zinc-900 bg-zinc-100 hover:bg-zinc-200 px-2 py-0.5 rounded-lg cursor-pointer"
+                title="Copy query text"
+              >
+                {copiedQuery ? <Check className="w-3 h-3 text-emerald-600" /> : <Copy className="w-3 h-3 text-zinc-500" />}
+                <span>{copiedQuery ? 'Copied' : 'Copy'}</span>
+              </button>
+            ) : (
               <ResponseActions
                 content={displayContent || message.content}
                 onRegenerate={onRegenerate}

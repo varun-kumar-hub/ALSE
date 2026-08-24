@@ -106,11 +106,15 @@ export function resolveModelForCapability(
   return selectedModel;
 }
 
+import { validateNetworkCallAuthorization } from './executionConfig';
+
 class OllamaProvider implements AiProvider {
   config: ProviderConfig;
+  private mode: AiExecutionMode = 'local';
 
-  constructor(config: ProviderConfig) {
+  constructor(config: ProviderConfig, mode: AiExecutionMode = 'local') {
     this.config = config;
+    this.mode = mode;
   }
 
   async healthCheck(): Promise<boolean> {
@@ -122,6 +126,10 @@ class OllamaProvider implements AiProvider {
     messages: ChatMessage[],
     onChunk: (chunk: ChatStreamChunk) => void
   ): Promise<void> {
+    const authCheck = validateNetworkCallAuthorization(this.mode, 'http://localhost:11434', 'ollama');
+    if (!authCheck.authorized) {
+      throw new Error(authCheck.reason);
+    }
     await streamOllamaChat(model, messages, onChunk);
   }
 
@@ -133,9 +141,11 @@ class OllamaProvider implements AiProvider {
 class OpenAICompatibleProvider implements AiProvider {
   config: ProviderConfig;
   private endpoint: string;
+  private mode: AiExecutionMode = 'cloud';
 
-  constructor(config: ProviderConfig, endpoint?: string) {
+  constructor(config: ProviderConfig, endpoint?: string, mode: AiExecutionMode = 'cloud') {
     this.config = config;
+    this.mode = mode;
     const reg = PROVIDER_REGISTRY[config.id];
     if (endpoint) {
       this.endpoint = endpoint;
@@ -159,6 +169,18 @@ class OpenAICompatibleProvider implements AiProvider {
     messages: ChatMessage[],
     onChunk: (chunk: ChatStreamChunk) => void
   ): Promise<void> {
+    const authCheck = validateNetworkCallAuthorization(this.mode, this.endpoint, this.config.id);
+    if (!authCheck.authorized) {
+      onChunk({
+        done: true,
+        message: {
+          role: 'assistant',
+          content: authCheck.reason || 'Network call unauthorized for current execution mode.',
+        },
+      });
+      return;
+    }
+
     if (!this.config.apiKey || !this.config.apiKey.trim()) {
       onChunk({
         done: true,

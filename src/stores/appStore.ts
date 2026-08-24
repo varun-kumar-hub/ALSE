@@ -16,11 +16,14 @@ import {
 
 import { isDevMode } from '../lib/env';
 
+import { buildAuthoritativeExecutionConfig, AuthoritativeExecutionConfig } from '../services/executionConfig';
+
 interface AppState {
   sidebarOpen: boolean; 
   activeView: 'welcome' | 'setup' | 'chat' | 'settings';
   currentChatId: string | null;
   selectedModel: string;
+  executionConfig: AuthoritativeExecutionConfig;
   models: OllamaModel[];
   assistantName: string;
   aiMode: AppSettings['aiMode'];
@@ -74,11 +77,12 @@ export const useAppStore = create<AppState>((set) => ({
   sidebarOpen: true,
   activeView: 'chat',
   currentChatId: null,
-  selectedModel: 'llama3.2:latest',
+  selectedModel: 'gpt-5.6-sol',
+  executionConfig: buildAuthoritativeExecutionConfig('cloud', 'gpt-5.6-sol', []),
   models: [],
   assistantName: 'Nexus Agent',
-  aiMode: 'hybrid',
-  defaultProvider: 'ollama',
+  aiMode: 'cloud',
+  defaultProvider: 'opencode',
   providerConfigs: [],
   theme: 'dark',
   isBackendReady: false,
@@ -99,23 +103,48 @@ export const useAppStore = create<AppState>((set) => ({
   toggleSidebar: () => set((state) => ({ sidebarOpen: !state.sidebarOpen })),
   setActiveView: (view) => set({ activeView: view }),
   setCurrentChatId: (id) => set({ currentChatId: id }),
-  setSelectedModel: (model) => set({ selectedModel: model }),
+  setSelectedModel: (model) =>
+    set((state) => ({
+      selectedModel: model,
+      executionConfig: buildAuthoritativeExecutionConfig(
+        state.aiMode,
+        model,
+        state.providerConfigs,
+        state.isBackendReady
+      ),
+    })),
   setAssistantName: (name) => set({ assistantName: name }),
   setAiMode: (mode) =>
     set((state) => {
+      let targetModel = state.selectedModel;
       if (mode === 'cloud') {
         const opencodeConfig = state.providerConfigs.find((p) => p.id === 'opencode');
-        const cloudModel = opencodeConfig?.defaultModel || 'gpt-5.6-sol';
-        return { aiMode: mode, selectedModel: cloudModel };
+        targetModel = opencodeConfig?.defaultModel || 'gpt-5.6-sol';
+      } else if (mode === 'local') {
+        targetModel = state.models.length > 0 ? state.models[0].name : 'qwen3:8b';
       }
-      if (mode === 'local') {
-        const localModel = state.models.length > 0 ? state.models[0].name : 'qwen3:8b';
-        return { aiMode: mode, selectedModel: localModel };
-      }
-      return { aiMode: mode };
+      return {
+        aiMode: mode,
+        selectedModel: targetModel,
+        executionConfig: buildAuthoritativeExecutionConfig(
+          mode,
+          targetModel,
+          state.providerConfigs,
+          state.isBackendReady
+        ),
+      };
     }),
   setDefaultProvider: (provider) => set({ defaultProvider: provider }),
-  setProviderConfigs: (configs) => set({ providerConfigs: configs }),
+  setProviderConfigs: (configs) =>
+    set((state) => ({
+      providerConfigs: configs,
+      executionConfig: buildAuthoritativeExecutionConfig(
+        state.aiMode,
+        state.selectedModel,
+        configs,
+        state.isBackendReady
+      ),
+    })),
   setTheme: (theme) => set({ theme }),
   setIsStreaming: (streaming) => set({ isStreaming: streaming }),
   setStreamingContent: (content) =>
@@ -172,6 +201,12 @@ export const useAppStore = create<AppState>((set) => ({
       onboardingComplete: settings.onboardingComplete,
       skipLauncherInDev: skipDev,
       models: availableModels,
+      executionConfig: buildAuthoritativeExecutionConfig(
+        settings.aiMode,
+        initialModel,
+        settings.providerConfigs,
+        availableModels.length > 0
+      ),
     });
 
     if (inDev && skipDev) {

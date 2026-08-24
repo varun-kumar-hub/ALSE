@@ -75,7 +75,7 @@ export const OSDashboard: React.FC<OSDashboardProps> = ({ onNewChat, onOpenSetti
         </div>
 
         <div
-          onClick={() => alert('Launching Deep Research Engine...')}
+          onClick={onNewChat}
           className="p-4 rounded-2xl bg-white border border-zinc-200/80 hover:border-purple-300 hover:shadow-md transition-all cursor-pointer space-y-3 group"
         >
           <div className="w-10 h-10 rounded-xl bg-purple-50 border border-purple-100 flex items-center justify-center text-purple-600 group-hover:scale-105 transition-transform">
@@ -88,7 +88,7 @@ export const OSDashboard: React.FC<OSDashboardProps> = ({ onNewChat, onOpenSetti
         </div>
 
         <div
-          onClick={() => alert('Opening Workspace Project Manager...')}
+          onClick={onNewChat}
           className="p-4 rounded-2xl bg-white border border-zinc-200/80 hover:border-amber-300 hover:shadow-md transition-all cursor-pointer space-y-3 group"
         >
           <div className="w-10 h-10 rounded-xl bg-amber-50 border border-amber-100 flex items-center justify-center text-amber-600 group-hover:scale-105 transition-transform">
@@ -101,7 +101,11 @@ export const OSDashboard: React.FC<OSDashboardProps> = ({ onNewChat, onOpenSetti
         </div>
 
         <div
-          onClick={() => alert('Opening Document Parser...')}
+          onClick={() => {
+            const attachBtn = document.querySelector<HTMLButtonElement>('button[title*="Attach"]');
+            if (attachBtn) attachBtn.click();
+            else onNewChat();
+          }}
           className="p-4 rounded-2xl bg-white border border-zinc-200/80 hover:border-emerald-300 hover:shadow-md transition-all cursor-pointer space-y-3 group"
         >
           <div className="w-10 h-10 rounded-xl bg-emerald-50 border border-emerald-100 flex items-center justify-center text-emerald-600 group-hover:scale-105 transition-transform">

@@ -202,9 +202,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
       <div className="p-2 border-b border-zinc-100">
         <QuickActionsBar
           onNewChat={onNewChat}
-          onNewResearch={() => alert('Launching Deep Research Engine...')}
-          onNewProject={() => alert('Creating New Workspace Project...')}
-          onUploadFile={() => alert('Opening File Parser...')}
+          onNewResearch={onNewChat}
+          onNewProject={onNewChat}
+          onUploadFile={() => {
+            const attachBtn = document.querySelector<HTMLButtonElement>('button[title="Attach files"]');
+            attachBtn?.click();
+          }}
           compact={isCompact}
         />
       </div>

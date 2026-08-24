@@ -18,7 +18,7 @@ interface ChatInputProps {
 }
 
 export const ChatInput: React.FC<ChatInputProps> = ({ onSend, onStop }) => {
-  const { isStreaming, selectedModel, assistantName } = useAppStore();
+  const { isStreaming, executionConfig, assistantName } = useAppStore();
   const [input, setInput] = useState('');
   const [isExpanded, setIsExpanded] = useState(false);
   const [effort, setEffort] = useState<'Low' | 'Balanced' | 'Deep'>('Balanced');
@@ -211,7 +211,9 @@ export const ChatInput: React.FC<ChatInputProps> = ({ onSend, onStop }) => {
               {/* Model Badge */}
               <div className="hidden md:inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-zinc-50 border border-zinc-200/60 text-xs font-mono text-zinc-600">
                 <Sparkles className="w-3 h-3 text-purple-600" />
-                <span className="truncate max-w-[120px]">{selectedModel}</span>
+                <span className="truncate max-w-[140px] font-bold" title={executionConfig.modelName}>
+                  {executionConfig.modelName}
+                </span>
               </div>
             </div>
 
