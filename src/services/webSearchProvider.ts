@@ -26,13 +26,34 @@ export interface WebSearchProvider {
   search(query: string, limit?: number): Promise<WebSearchResult[]>;
 }
 
+export function unwrapDdgRedirect(url: string): string {
+  if (!url) return url;
+  if (/duckduckgo\.com\/l\/\?/i.test(url) || url.includes('/l/?uddg=')) {
+    try {
+      const parsedUrl = new URL(url.startsWith('//') ? `https:${url}` : url);
+      const uddg = parsedUrl.searchParams.get('uddg');
+      if (uddg) return decodeURIComponent(uddg);
+    } catch {}
+  }
+  return url;
+}
+
 export class DuckDuckGoSearchProvider implements WebSearchProvider {
   id = 'duckduckgo';
   name = 'DuckDuckGo';
 
   async search(query: string, limit = 5): Promise<WebSearchResult[]> {
-    const trimmedQuery = query.trim();
-    if (!trimmedQuery) return [];
+    let trimmedQuery = query
+      .replace(/[?#$&*!]+/g, ' ')
+      .replace(/\b(can you|try again|please|list all|what is|tell me|explain this|show me)\b/gi, '')
+      .replace(/\s+/g, ' ')
+      .trim();
+
+    if (!trimmedQuery || trimmedQuery.length < 3) return [];
+
+    if (trimmedQuery.startsWith('site:')) {
+      trimmedQuery = trimmedQuery.replace(/^site:/i, '').replace(/[\/:]+/g, ' ') + ' portal endpoints';
+    }
 
     const isBrowser = typeof window !== 'undefined' && !('__TAURI_INTERNALS__' in window);
     const results: WebSearchResult[] = [];
@@ -82,6 +103,7 @@ export class DuckDuckGoSearchProvider implements WebSearchProvider {
       while ((match = reg.exec(rawHtml)) !== null && results.length < limit) {
         let rawHref = match[1];
         if (rawHref.startsWith('//')) rawHref = `https:${rawHref}`;
+        rawHref = unwrapDdgRedirect(rawHref);
         const title = match[2].replace(/<[^>]+>/g, '').trim();
         const snippet = snippets[idx] || '';
 

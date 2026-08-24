@@ -186,12 +186,60 @@ export function App() {
         domain = new URL(targetUrl).hostname.replace(/^www\./, '');
       } catch {}
 
+      updateThinkingTimelinePhase('gather');
+      setThinkingTimeline((prev: ThinkingTimelineStep[]) =>
+        prev.map((step) =>
+          step.phase === 'gather'
+            ? {
+                ...step,
+                status: 'in_progress',
+                detail: `Crawling & analyzing ${domain || targetUrl}...`,
+                subSteps: [
+                  `Target Domain: ${domain || targetUrl}`,
+                  `Fetching sitemaps & crawling endpoints`,
+                  `Extracting page contents, projects & skills`,
+                ],
+              }
+            : step
+        )
+      );
+
       try {
-        const dataset = await urlIntelligenceEngine.runDeepResearch(targetUrl, { maxPages: 20 });
+        const dataset = await urlIntelligenceEngine.runDeepResearch(
+          targetUrl,
+          { maxPages: 50, maxDepth: 5 },
+          (progressMsg) => {
+            setThinkingTimeline((prev: ThinkingTimelineStep[]) =>
+              prev.map((step) =>
+                step.phase === 'gather'
+                  ? {
+                      ...step,
+                      status: 'in_progress',
+                      detail: progressMsg,
+                      subSteps: Array.from(new Set([...(step.subSteps || []), progressMsg])).slice(-4),
+                    }
+                  : step
+              )
+            );
+          }
+        );
+
         if (dataset && dataset.contextText) {
           webContext = `\n\n${dataset.contextText}\n\n`;
           actualToolsUsed.push(...dataset.toolsUsed);
           actualSourcesUsed.push(...dataset.sources);
+
+          setThinkingTimeline((prev: ThinkingTimelineStep[]) =>
+            prev.map((step) =>
+              step.phase === 'gather'
+                ? {
+                    ...step,
+                    status: 'completed',
+                    detail: `Extracted ${dataset.stats.resourcesDiscovered} resources across ${dataset.stats.pagesScanned} pages in ${(dataset.stats.durationMs / 1000).toFixed(1)}s`,
+                  }
+                : step
+            )
+          );
         }
       } catch (err) {
         console.warn('[URL Intelligence Engine] Deep research fallback to single page extract:', err);

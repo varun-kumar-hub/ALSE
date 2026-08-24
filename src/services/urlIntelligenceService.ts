@@ -119,102 +119,111 @@ export class URLIntelligenceEngine {
     onProgress?.(`✦ Checking public API specifications...`);
     await this.discoverApiEndpoints(origin, resources);
 
-    // 4. Crawl Same-Origin Queue
-    onProgress?.(`✦ Crawling website structure (max ${maxPages} pages)...`);
+    // 4. Crawl Same-Origin Queue with parallel batching
+    onProgress?.(`✦ Crawling website structure...`);
+
+    const concurrency = 6;
+    const deadline = Date.now() + 6000;
     
-    while (queue.length > 0 && visited.size < maxPages) {
-      const current = queue.shift()!;
-      if (visited.has(current.url)) continue;
-      visited.add(current.url);
+    while (queue.length > 0 && visited.size < maxPages && Date.now() < deadline) {
+      const batch = queue.splice(0, concurrency);
+      await Promise.all(
+        batch.map(async (current) => {
+          if (visited.has(current.url)) return;
+          visited.add(current.url);
 
-      onProgress?.(`✦ Processing page (${visited.size}/${maxPages}): ${current.url}`);
+          onProgress?.(`✦ Scanning page (${visited.size}/${maxPages}): ${current.url}`);
 
-      try {
-        const isExternal = !current.url.startsWith(origin);
-        if (isExternal) {
-          resources.push({
-            url: current.url,
-            parentUrl: current.parent,
-            depth: current.depth,
-            type: 'External Reference',
-            httpStatus: 200,
-            title: current.url,
-          });
-          continue;
-        }
-
-        const pageContent = await acquireWebPage(current.url);
-        const title = pageContent.title || current.url;
-
-        const links = pageContent.links && pageContent.links.length > 0
-          ? pageContent.links
-          : htmlToTextAndLinks(pageContent.markdown, current.url).links;
-
-        resources.push({
-          url: current.url,
-          parentUrl: current.parent,
-          depth: current.depth,
-          type: this.classifyResource(current.url, 'text/html'),
-          httpStatus: 200,
-          title,
-          snippet: pageContent.metadata?.description || pageContent.markdown.slice(0, 250),
-        });
-
-        if (!sources.some((s) => s.url === current.url)) {
-          sources.push({
-            title,
-            url: current.url,
-            domain,
-          });
-        }
-
-        // Extract API & App Routes declared in scripts or page content
-        const apiRouteMatches = pageContent.markdown.matchAll(/["'](\/(?:api|v1|v2|auth|student|faculty|portal|courses|results|attendance|fees|registration)[^"'\s>]+)["']/gi);
-        for (const m of apiRouteMatches) {
-          const route = m[1];
           try {
-            const fullUrl = new URL(route, origin).toString();
-            if (!resources.some((r) => r.url === fullUrl)) {
+            const isExternal = !current.url.startsWith(origin);
+            if (isExternal) {
               resources.push({
-                url: fullUrl,
-                depth: current.depth + 1,
-                type: route.includes('/api/') ? 'API' : 'Web Page',
+                url: current.url,
+                parentUrl: current.parent,
+                depth: current.depth,
+                type: 'External Reference',
                 httpStatus: 200,
-                title: `Discovered Route: ${route}`,
-                discoveredFrom: current.url,
+                title: current.url,
               });
-              if (!visited.has(fullUrl)) {
-                queue.push({ url: fullUrl, depth: current.depth + 1, parent: current.url });
+              return;
+            }
+
+            const pageContent = await acquireWebPage(current.url);
+            const title = pageContent.title || current.url;
+
+            const links = pageContent.links && pageContent.links.length > 0
+              ? pageContent.links
+              : htmlToTextAndLinks(pageContent.markdown, current.url).links;
+
+            resources.push({
+              url: current.url,
+              parentUrl: current.parent,
+              depth: current.depth,
+              type: this.classifyResource(current.url, 'text/html'),
+              httpStatus: 200,
+              title,
+              snippet: pageContent.markdown.slice(0, 2000),
+            });
+
+            if (!sources.some((s) => s.url === current.url)) {
+              sources.push({
+                title,
+                url: current.url,
+                domain,
+              });
+            }
+
+            // Extract API & App Routes declared in scripts or page content
+            const apiRouteMatches = pageContent.markdown.matchAll(
+              /["'](\/(?:api|v1|v2|auth|student|faculty|portal|courses|results|attendance|fees|registration|components|docs|blog)[^"'\s>]+)["']/gi
+            );
+            for (const m of apiRouteMatches) {
+              const route = m[1];
+              try {
+                const fullUrl = new URL(route, origin).toString();
+                if (!resources.some((r) => r.url === fullUrl)) {
+                  resources.push({
+                    url: fullUrl,
+                    depth: current.depth + 1,
+                    type: route.includes('/api/') ? 'API' : 'Web Page',
+                    httpStatus: 200,
+                    title: `Discovered Route: ${route}`,
+                    discoveredFrom: current.url,
+                  });
+                  if (!visited.has(fullUrl)) {
+                    queue.push({ url: fullUrl, depth: current.depth + 1, parent: current.url });
+                  }
+                }
+              } catch {}
+            }
+
+            // Record child links for site map
+            siteMapTree[current.url] = links;
+
+            if (current.depth < maxDepth) {
+              for (const link of links) {
+                if (!visited.has(link) && link.startsWith(origin)) {
+                  queue.push({ url: link, depth: current.depth + 1, parent: current.url });
+                }
               }
             }
-          } catch {}
-        }
+          } catch (err: unknown) {
+            const errMsg = String(err);
+            const isProtected = errMsg.includes('401') || errMsg.includes('403');
+            const resType: ResourceType = isProtected ? 'Protected Resource' : 'Failed Resource';
 
-        // Record child links for site map
-        siteMapTree[current.url] = links;
-
-        if (current.depth < maxDepth) {
-          for (const link of links) {
-            if (!visited.has(link) && link.startsWith(origin)) {
-              queue.push({ url: link, depth: current.depth + 1, parent: current.url });
-            }
+            resources.push({
+              url: current.url,
+              parentUrl: current.parent,
+              depth: current.depth,
+              type: resType,
+              httpStatus: isProtected ? 403 : 500,
+              title: `[${resType}] ${current.url}`,
+              snippet: errMsg,
+            });
           }
-        }
-      } catch (err: unknown) {
-        const errMsg = String(err);
-        const isProtected = errMsg.includes('401') || errMsg.includes('403');
-        const resType: ResourceType = isProtected ? 'Protected Resource' : 'Failed Resource';
-
-        resources.push({
-          url: current.url,
-          parentUrl: current.parent,
-          depth: current.depth,
-          type: resType,
-          httpStatus: isProtected ? 403 : 500,
-          title: `[${resType}] ${current.url}`,
-          snippet: errMsg,
-        });
-      }
+        })
+      );
     }
 
     const durationMs = Date.now() - startTime;
@@ -324,14 +333,17 @@ export class URLIntelligenceEngine {
       `[URL Intelligence Dataset for ${targetUrl}]`,
       `Domain: ${domain}`,
       `Scan Statistics: ${stats.pagesScanned} pages scanned, ${stats.resourcesDiscovered} resources discovered, ${stats.apisDiscovered} APIs, ${stats.protectedCount} protected resources.`,
-      `Duration: ${(stats.durationMs / 1000).toFixed(1)}s`,
-      `\n--- DISCOVERED PUBLIC RESOURCES ---`,
+      `Scan Duration: ${(stats.durationMs / 1000).toFixed(1)}s`,
+      `\n=== DISCOVERED PAGES, ENDPOINTS & EXTRACTED CONTENT ===`,
     ];
 
     resources.forEach((r, idx) => {
-      lines.push(`${idx + 1}. [${r.type}] ${r.title || r.url}`);
-      lines.push(`   URL: ${r.url}`);
-      if (r.snippet) lines.push(`   Summary: ${r.snippet.slice(0, 150)}`);
+      lines.push(`\n--- [Resource ${idx + 1}/${resources.length}] ${r.type}: ${r.title || r.url} ---`);
+      lines.push(`URL: ${r.url}`);
+      if (r.parentUrl) lines.push(`Discovered From: ${r.parentUrl}`);
+      if (r.snippet) {
+        lines.push(`Extracted Content:\n${r.snippet.slice(0, 1500)}`);
+      }
     });
 
     return lines.join('\n');

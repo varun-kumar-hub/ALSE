@@ -47,7 +47,23 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const [isWorkspaceMenuOpen, setIsWorkspaceMenuOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [isCompact, setIsCompact] = useState(false);
-  const [isPinned, setIsPinned] = useState(true);
+  const [isPinned, setIsPinned] = useState<boolean>(() => {
+    try {
+      return localStorage.getItem('sidebar_pinned') !== 'false';
+    } catch {
+      return true;
+    }
+  });
+
+  const togglePinState = () => {
+    setIsPinned((prev) => {
+      const next = !prev;
+      try {
+        localStorage.setItem('sidebar_pinned', String(next));
+      } catch {}
+      return next;
+    });
+  };
 
   const hoverTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -133,13 +149,13 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
             <div className="flex items-center gap-1">
               <button
-                onClick={() => setIsPinned(!isPinned)}
+                onClick={togglePinState}
                 className={`p-1.5 rounded-lg transition-colors cursor-pointer ${
                   isPinned ? 'text-blue-600 bg-blue-50' : 'text-zinc-400 hover:text-zinc-700 hover:bg-zinc-100'
                 }`}
                 title={isPinned ? 'Unpin Sidebar (Enable Auto-Collapse)' : 'Pin Sidebar (Lock Open)'}
               >
-                <Pin className="w-3.5 h-3.5" />
+                <Pin className={`w-3.5 h-3.5 ${isPinned ? 'fill-blue-600' : ''}`} />
               </button>
 
               <button

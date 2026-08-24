@@ -13,33 +13,45 @@ export default defineConfig(async () => ({
     {
       name: 'cors-bypass-proxy',
       configureServer(server) {
-        server.middlewares.use('/proxy/fetch', async (req, res) => {
-          const urlParam = new URL(req.url!, `http://${req.headers.host}`).searchParams.get('url');
-          if (!urlParam) {
+        server.middlewares.use((req, res, next) => {
+          if (!req.url || !req.url.startsWith('/proxy/fetch')) {
+            return next();
+          }
+          let targetUrl = '';
+          try {
+            const parsedUrl = new URL(req.url, `http://${req.headers.host || 'localhost'}`);
+            targetUrl = parsedUrl.searchParams.get('url') || '';
+          } catch {}
+
+          if (!targetUrl) {
             res.statusCode = 400;
             res.end('Missing url query parameter');
             return;
           }
-          try {
-            const controller = new AbortController();
-            const timeoutId = setTimeout(() => controller.abort(), 12000);
-            const fetchResp = await fetch(urlParam, {
-              headers: {
-                'User-Agent':
-                  'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
-                'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-              },
-              signal: controller.signal,
-            }).finally(() => clearTimeout(timeoutId));
 
-            const body = await fetchResp.text();
-            res.statusCode = fetchResp.status;
-            res.setHeader('Content-Type', fetchResp.headers.get('content-type') || 'text/html; charset=utf-8');
-            res.end(body);
-          } catch (err) {
-            res.statusCode = 500;
-            res.end(String(err));
-          }
+          (async () => {
+            try {
+              const controller = new AbortController();
+              const timeoutId = setTimeout(() => controller.abort(), 12000);
+              const fetchResp = await fetch(targetUrl, {
+                headers: {
+                  'User-Agent':
+                    'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+                  'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+                },
+                signal: controller.signal,
+              }).finally(() => clearTimeout(timeoutId));
+
+              const body = await fetchResp.text();
+              res.statusCode = fetchResp.status;
+              res.setHeader('Content-Type', fetchResp.headers.get('content-type') || 'text/html; charset=utf-8');
+              res.setHeader('Access-Control-Allow-Origin', '*');
+              res.end(body);
+            } catch (err) {
+              res.statusCode = 500;
+              res.end(String(err));
+            }
+          })();
         });
       },
     },

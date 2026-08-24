@@ -55,7 +55,7 @@ interface AppState {
   setIsStreaming: (streaming: boolean) => void;
   setStreamingContent: (content: string | ((prev: string) => string)) => void;
   setGenerationStage: (stage: AppState['generationStage']) => void;
-  setThinkingTimeline: (steps: ThinkingTimelineStep[]) => void;
+  setThinkingTimeline: (steps: ThinkingTimelineStep[] | ((prev: ThinkingTimelineStep[]) => ThinkingTimelineStep[])) => void;
   updateThinkingTimelinePhase: (phase: TimelinePhase) => void;
   completeThinkingTimeline: () => void;
   failThinkingTimelinePhase: (phase: TimelinePhase) => void;
@@ -124,7 +124,10 @@ export const useAppStore = create<AppState>((set) => ({
         typeof content === 'function' ? content(state.streamingContent) : content,
     })),
   setGenerationStage: (stage) => set({ generationStage: stage }),
-  setThinkingTimeline: (steps) => set({ thinkingTimeline: steps }),
+  setThinkingTimeline: (steps) =>
+    set((state) => ({
+      thinkingTimeline: typeof steps === 'function' ? steps(state.thinkingTimeline) : steps,
+    })),
   updateThinkingTimelinePhase: (phase) =>
     set((state) => ({ thinkingTimeline: updateTimelinePhase(state.thinkingTimeline, phase) })),
   completeThinkingTimeline: () =>

@@ -70,7 +70,23 @@ export function extractCleanContent(
     }
   });
 
-  // Strip noise elements (ads, cookie banners, nav, footer, sidebar)
+  // Extract Next.js / JSON-LD / Hydration data BEFORE noise removal
+  let nextJsHydratedData = '';
+  doc.querySelectorAll('script[id="__NEXT_DATA__"], script[type="application/ld+json"]').forEach((el) => {
+    const raw = el.textContent?.trim();
+    if (raw) {
+      try {
+        const parsed = JSON.parse(raw);
+        const pageProps = parsed.props?.pageProps || parsed;
+        const jsonStr = JSON.stringify(pageProps, null, 2);
+        if (jsonStr.length > 20) {
+          nextJsHydratedData += `\n\n[Hydrated Page Props / Structured Data]:\n${jsonStr.slice(0, 8000)}`;
+        }
+      } catch {}
+    }
+  });
+
+  // Strip noise elements (ads, cookie banners, script tags, style, etc)
   const noiseSelectors = [
     'script',
     'style',
@@ -116,19 +132,29 @@ export function extractCleanContent(
     if (rows.length > 0) tables.push(rows.join('\n'));
   });
 
-  // Extract Main Body Content
+  // Extract Main Body Content preserving layout structure
   const mainEl = doc.querySelector('main, article, #content, .content') || doc.body;
-  let textContent = mainEl.textContent || '';
+  
+  // Convert block elements into structured text with newlines
+  const textLines: string[] = [];
+  mainEl.querySelectorAll('h1, h2, h3, h4, p, li, section, div, article').forEach((el) => {
+    const directText = el.childNodes.length === 1 && el.childNodes[0].nodeType === 3
+      ? el.textContent?.trim()
+      : null;
+    if (directText && directText.length > 1) {
+      textLines.push(directText);
+    }
+  });
 
-  // Clean whitespace & paragraph breaks
-  const cleanedMarkdown = textContent
-    .replace(/\s+/g, ' ')
-    .replace(/\n\s*\n/g, '\n\n')
-    .trim();
+  let rawBodyText = textLines.length > 5 
+    ? textLines.join('\n') 
+    : (mainEl.textContent || '').replace(/[ \t]+/g, ' ').replace(/\n\s*\n/g, '\n\n');
+
+  const fullCleanedContent = (rawBodyText + nextJsHydratedData).trim();
 
   return {
     title,
-    markdown: cleanedMarkdown.slice(0, 15000), // Cap at 15k chars
+    markdown: fullCleanedContent.slice(0, 15000), // Cap at 15k chars
     links,
     headings: headings.slice(0, 15),
     codeBlocks: codeBlocks.slice(0, 10),

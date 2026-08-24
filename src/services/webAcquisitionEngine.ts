@@ -121,6 +121,8 @@ async function executeEngineFetch(
         rawHtml = await proxyResp.text();
       } else if (proxyResp.status === 401 || proxyResp.status === 403) {
         rawHtml = `<title>Protected Resource (HTTP ${proxyResp.status})</title><p>Access Restricted on ${url}</p>`;
+      } else if (proxyResp.status === 404) {
+        rawHtml = `<title>404 Not Found</title><p>Resource Not Found on ${url}</p>`;
       }
     } catch {
       // Continue to direct fetch fallback

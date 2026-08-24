@@ -30,15 +30,24 @@ export const CloudSettings: React.FC<CloudSettingsProps> = ({
   updateProviderConfig,
   onSaveProvider,
 }) => {
+  const selectedModel = useAppStore((state) => state.selectedModel);
   const [providerSearch, setProviderSearch] = useState('');
+
+  const isProviderActive = (cfg?: ProviderConfig) => {
+    if (!cfg || !cfg.enabled) return false;
+    if (cfg.defaultModel === selectedModel) return true;
+    if (cfg.discoveredModels?.includes(selectedModel)) return true;
+    return false;
+  };
+
   const initialProviderId = React.useMemo(() => {
-    const selectedModel = useAppStore.getState().selectedModel;
-    const providerForModel = providerConfigs.find(
+    const activeProvider = providerConfigs.find(
       (p) =>
         p.kind === 'cloud' &&
+        p.enabled &&
         (p.defaultModel === selectedModel || p.discoveredModels?.includes(selectedModel))
     );
-    if (providerForModel) return providerForModel.id;
+    if (activeProvider) return activeProvider.id;
 
     const configured = providerConfigs.find(
       (p) => p.kind === 'cloud' && Boolean(p.apiKey && p.apiKey.trim().length > 0)
@@ -46,7 +55,7 @@ export const CloudSettings: React.FC<CloudSettingsProps> = ({
     if (configured) return configured.id;
 
     return 'gemini';
-  }, [providerConfigs]);
+  }, [providerConfigs, selectedModel]);
 
   const [activeProviderId, setActiveProviderId] = useState(initialProviderId);
   const [detectedPatternBadge, setDetectedPatternBadge] = useState<string | null>(null);
@@ -71,23 +80,35 @@ export const CloudSettings: React.FC<CloudSettingsProps> = ({
     }
   };
 
+  const handleMakeActiveModel = (cfg: ProviderConfig, targetModel?: string) => {
+    const modelToActivate = targetModel || cfg.defaultModel;
+    updateProviderConfig(cfg.id, { enabled: true });
+    useAppStore.getState().setSelectedModel(modelToActivate);
+    useAppStore.getState().updateSetting('defaultModel', modelToActivate);
+  };
+
   const handleValidateProvider = async (cfg: ProviderConfig) => {
     setValidatingId(cfg.id);
     const result = await validateAndDiscoverProvider(cfg.id, cfg.apiKey || '', cfg.baseUrl);
     setValidatingId(null);
 
     if (result.connected) {
+      const activeModel = result.models.length > 0 ? result.models[0] : cfg.defaultModel;
       updateProviderConfig(cfg.id, {
         apiKeySet: true,
+        enabled: true,
         discoveredModels: result.models,
         capabilities: result.capabilities,
-        defaultModel: result.models.length > 0 ? result.models[0] : cfg.defaultModel,
+        defaultModel: activeModel,
       });
+      useAppStore.getState().setSelectedModel(activeModel);
+      useAppStore.getState().updateSetting('defaultModel', activeModel);
+
       setValidationResult((prev) => ({
         ...prev,
         [cfg.id]: {
           success: true,
-          message: `Verified & Connected! Discovered ${result.models.length} models in ${result.latencyMs ?? 180}ms.`,
+          message: `Verified & Connected! Discovered ${result.models.length} models in ${result.latencyMs ?? 180}ms. Set as Active Model!`,
           latencyMs: result.latencyMs,
           modelsCount: result.models.length,
         },
@@ -119,6 +140,9 @@ export const CloudSettings: React.FC<CloudSettingsProps> = ({
       ? activeProviderConfig.discoveredModels
       : [activeProviderConfig?.defaultModel || 'gemini-2.5-flash'];
 
+  const isActiveCurrent = isProviderActive(activeProviderConfig);
+  const hasKeyCurrent = activeProviderConfig?.apiKeySet || Boolean(activeProviderConfig?.apiKey && activeProviderConfig.apiKey.trim().length > 0);
+
   return (
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-250 select-none text-xs">
       {/* Smart Cloud Provider Manager Card */}
@@ -147,6 +171,8 @@ export const CloudSettings: React.FC<CloudSettingsProps> = ({
             {filteredProviders.map((p) => {
               const cfg = providerConfigs.find((item) => item.id === p.id);
               const isConfigured = Boolean(cfg?.apiKey && cfg.apiKey.trim().length > 0);
+              const isActive = isProviderActive(cfg);
+
               return (
                 <button
                   key={p.id}
@@ -155,15 +181,19 @@ export const CloudSettings: React.FC<CloudSettingsProps> = ({
                   className={`px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition-all flex items-center gap-1.5 ${
                     activeProviderId === p.id
                       ? 'bg-blue-600 text-white shadow-sm'
+                      : isActive
+                      ? 'bg-emerald-50 text-emerald-800 border border-emerald-300 font-bold'
                       : isConfigured
-                      ? 'bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-100'
+                      ? 'bg-blue-50 text-blue-700 border border-blue-200 hover:bg-blue-100'
                       : 'bg-zinc-100 text-zinc-600 hover:bg-zinc-200'
                   }`}
                 >
                   {p.name}
-                  {isConfigured && (
-                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 inline-block" />
-                  )}
+                  {isActive ? (
+                    <span className="w-2 h-2 rounded-full bg-emerald-500 ring-2 ring-emerald-300 inline-block animate-pulse" title="Active Connected Model" />
+                  ) : isConfigured ? (
+                    <span className="w-1.5 h-1.5 rounded-full bg-blue-500 inline-block" title="Key Configured" />
+                  ) : null}
                 </button>
               );
             })}
@@ -175,7 +205,7 @@ export const CloudSettings: React.FC<CloudSettingsProps> = ({
           <div className="p-4 rounded-2xl border border-zinc-200 bg-white space-y-4 shadow-sm">
             <div className="flex items-center justify-between border-b border-zinc-100 pb-3">
               <div className="flex items-center gap-2">
-                <span className="font-bold text-sm text-zinc-950">{activeProviderConfig.name}</span>
+                <span className="font-bold text-sm text-zinc-900">{activeProviderConfig.name}</span>
                 {detectedPatternBadge && (
                   <span className="text-[10px] px-2 py-0.5 rounded-full bg-purple-100 text-purple-800 font-bold animate-pulse">
                     {detectedPatternBadge}
@@ -184,16 +214,20 @@ export const CloudSettings: React.FC<CloudSettingsProps> = ({
                 {validationResult[activeProviderConfig.id] ? (
                   validationResult[activeProviderConfig.id].success ? (
                     <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 font-bold flex items-center gap-1">
-                      <CheckCircle2 className="w-3 h-3 text-emerald-600" /> Connected
+                      <CheckCircle2 className="w-3 h-3 text-emerald-600" /> Connected & Active
                     </span>
                   ) : (
                     <span className="text-[10px] px-2 py-0.5 rounded-full bg-rose-100 text-rose-800 font-bold flex items-center gap-1">
                       <AlertCircle className="w-3 h-3 text-rose-600" /> Auth Failed
                     </span>
                   )
-                ) : activeProviderConfig.apiKeySet || Boolean(activeProviderConfig.apiKey && activeProviderConfig.apiKey.trim().length > 0) ? (
-                  <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 font-bold flex items-center gap-1">
-                    <CheckCircle2 className="w-3 h-3 text-emerald-600" /> Connected Key
+                ) : isActiveCurrent ? (
+                  <span className="text-[10px] px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800 font-bold flex items-center gap-1 border border-emerald-300">
+                    <Zap className="w-3 h-3 text-emerald-600" /> Active Model Provider
+                  </span>
+                ) : hasKeyCurrent ? (
+                  <span className="text-[10px] px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 font-semibold flex items-center gap-1 border border-blue-200">
+                    <CheckCircle2 className="w-3 h-3 text-blue-500" /> Key Configured (Ready)
                   </span>
                 ) : (
                   <span className="text-[10px] px-2 py-0.5 rounded-full bg-zinc-100 text-zinc-600 font-medium">
@@ -202,20 +236,34 @@ export const CloudSettings: React.FC<CloudSettingsProps> = ({
                 )}
               </div>
 
-              <label className="relative inline-flex items-center cursor-pointer gap-2 select-none shrink-0 whitespace-nowrap ml-2">
+              <button
+                type="button"
+                role="switch"
+                aria-checked={activeProviderConfig.enabled}
+                onClick={() => {
+                  const nextState = !activeProviderConfig.enabled;
+                  updateProviderConfig(activeProviderConfig.id, { enabled: nextState });
+                  if (nextState) {
+                    handleMakeActiveModel(activeProviderConfig);
+                  }
+                }}
+                className="inline-flex items-center gap-2 cursor-pointer select-none shrink-0 whitespace-nowrap ml-auto"
+              >
                 <span className="text-[10px] font-semibold text-zinc-600 shrink-0 whitespace-nowrap">
                   {activeProviderConfig.enabled ? 'Provider Enabled' : 'Provider Disabled'}
                 </span>
-                <input
-                  type="checkbox"
-                  checked={activeProviderConfig.enabled}
-                  onChange={(e) =>
-                    updateProviderConfig(activeProviderConfig.id, { enabled: e.target.checked })
-                  }
-                  className="sr-only peer"
-                />
-                <div className="w-9 h-5 bg-zinc-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-zinc-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-blue-600"></div>
-              </label>
+                <div
+                  className={`relative inline-flex h-5 w-9 shrink-0 items-center rounded-full p-0.5 transition-colors duration-200 ease-in-out focus:outline-none ${
+                    activeProviderConfig.enabled ? 'bg-blue-600' : 'bg-zinc-300'
+                  }`}
+                >
+                  <span
+                    className={`inline-block h-4 w-4 transform rounded-full bg-white shadow-sm ring-0 transition duration-200 ease-in-out ${
+                      activeProviderConfig.enabled ? 'translate-x-4' : 'translate-x-0'
+                    }`}
+                  />
+                </div>
+              </button>
             </div>
 
             {/* Base URL (Only for Custom Provider) */}
@@ -252,25 +300,31 @@ export const CloudSettings: React.FC<CloudSettingsProps> = ({
               <div className="space-y-1">
                 <div className="flex items-center justify-between">
                   <label className="text-[10px] font-medium text-zinc-600">Connected Cloud Model</label>
-                  {activeProviderConfig.apiKeySet && (
-                    <span className="text-[9px] font-semibold text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200 flex items-center gap-1">
+                  {isActiveCurrent ? (
+                    <span className="text-[9px] font-bold text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded border border-emerald-300 flex items-center gap-1">
                       <Zap className="w-2.5 h-2.5 text-emerald-600" /> Active Model
                     </span>
-                  )}
+                  ) : hasKeyCurrent ? (
+                    <button
+                      type="button"
+                      onClick={() => handleMakeActiveModel(activeProviderConfig)}
+                      className="text-[9px] font-bold text-blue-600 bg-blue-50 hover:bg-blue-100 px-2 py-0.5 rounded border border-blue-200 flex items-center gap-1 transition-all"
+                    >
+                      <Zap className="w-2.5 h-2.5 text-blue-600" /> Set as Active Model
+                    </button>
+                  ) : null}
                 </div>
                 <select
                   value={activeProviderConfig.defaultModel}
                   onChange={(e) => {
                     const newModel = e.target.value;
-                    updateProviderConfig(activeProviderConfig.id, { defaultModel: newModel });
-                    useAppStore.getState().setSelectedModel(newModel);
-                    useAppStore.getState().updateSetting('defaultModel', newModel);
+                    handleMakeActiveModel(activeProviderConfig, newModel);
                   }}
                   className="w-full bg-white border border-zinc-200 rounded-lg px-2.5 py-1.5 text-xs text-zinc-950 font-mono focus:outline-none focus:border-blue-500 font-semibold"
                 >
                   {currentModelsList.map((m) => (
                     <option key={m} value={m}>
-                      ⚡ {m} {m === activeProviderConfig.defaultModel ? '(Connected)' : ''}
+                      {m} {m === selectedModel ? '★ (Active Model)' : ''}
                     </option>
                   ))}
                 </select>
