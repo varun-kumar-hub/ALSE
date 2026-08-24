@@ -6,7 +6,10 @@ import { SetupWizard } from './components/setup/SetupWizard';
 import { SettingsPanel } from './components/settings/SettingsPanel';
 import { DebugPanel } from './components/debug/DebugPanel';
 import { CommandPaletteModal } from './components/palette/CommandPaletteModal';
+import { ProjectDashboard } from './components/projects/ProjectDashboard';
+import { ProjectModal } from './components/projects/ProjectModal';
 import { useAppStore } from './stores/appStore';
+import { useProjectStore } from './stores/projectStore';
 import {
   getChats,
   createChat,
@@ -105,14 +108,29 @@ export function App() {
   const loadChats = async () => {
     const list = await getChats();
     setChats(list);
-    if (list.length > 0 && !currentChatId) {
+    
+    const savedChatId = localStorage.getItem('ai_os_active_chat_id');
+    const savedProjectId = localStorage.getItem('ai_os_active_project_id');
+    
+    if (savedProjectId) {
+      useProjectStore.getState().setActiveProjectId(savedProjectId);
+    }
+    if (savedChatId && list.some((c) => c.id === savedChatId)) {
+      setCurrentChatId(savedChatId);
+    } else if (list.length > 0 && !currentChatId) {
       setCurrentChatId(list[0].id);
     }
+    useProjectStore.getState().loadProjects();
   };
 
-  const handleNewChat = async () => {
-    const chat = await createChat('New Chat', selectedModel);
+  const handleNewChat = async (projectId?: string) => {
+    const chat = await createChat('New Chat', selectedModel, projectId);
     await loadChats();
+    if (projectId) {
+      useProjectStore.getState().setActiveProjectId(projectId);
+    } else {
+      useProjectStore.getState().setActiveProjectId(null);
+    }
     setCurrentChatId(chat.id);
     setMessages([]);
   };
@@ -314,8 +332,16 @@ export function App() {
         ? 'gather'
         : 'plan'
     );
-    // Build Memory strictly from the current active chat session only
+    // Build Memory strictly from the current active chat session and project context
     const memoryEpisodes: string[] = [];
+    const activeProject = currentChat?.project_id
+      ? useProjectStore.getState().projects.find((p) => p.id === currentChat.project_id)
+      : null;
+
+    if (activeProject && activeProject.instructions) {
+      memoryEpisodes.push(`- [Project Custom Instructions for "${activeProject.name}"]: ${activeProject.instructions}`);
+    }
+
     currentMsgs
       .filter((m) => m.role === 'user')
       .slice(-3)
@@ -492,9 +518,11 @@ export function App() {
   }
 
   const activeChat = chats.find((c) => c.id === currentChatId);
+  const { activeProjectId } = useProjectStore();
 
   const [isCmdPaletteOpen, setIsCmdPaletteOpen] = useState(false);
   const [isDebugOpen, setIsDebugOpen] = useState(false);
+  const [isProjectModalOpen, setIsProjectModalOpen] = useState(false);
 
   return (
     <div className="flex h-screen w-screen overflow-hidden bg-[#f6f5f2] text-zinc-950 font-sans">
@@ -508,26 +536,60 @@ export function App() {
         onClick={() => setIsDebugOpen(!isDebugOpen)}
         className="hidden"
       />
+      <button
+        data-new-project
+        onClick={() => setIsProjectModalOpen(true)}
+        className="hidden"
+      />
 
       <Sidebar
         chats={chats}
         activeChatId={currentChatId}
         onNewChat={handleNewChat}
-        onSelectChat={handleSelectChat}
+        onSelectChat={(id) => {
+          const selectedChat = chats.find((c) => c.id === id);
+          if (selectedChat?.project_id) {
+            useProjectStore.getState().setActiveProjectId(selectedChat.project_id);
+          } else {
+            useProjectStore.getState().setActiveProjectId(null);
+          }
+          handleSelectChat(id);
+        }}
         onRenameChat={handleRenameChat}
         onTogglePin={handleTogglePin}
         onDeleteChat={handleDeleteChat}
         onOpenSettings={() => setShowSettings(true)}
       />
 
-      <ChatArea
-        chatTitle={activeChat?.title || 'Nexus Agent'}
-        messages={messages}
-        onSendMessage={handleSendMessage}
-        onStopStreaming={handleStopStreaming}
-        onRegenerate={handleRegenerate}
-        onExport={handleExportChat}
-      />
+      {activeProjectId ? (
+        <ProjectDashboard
+          projectId={activeProjectId}
+          onNewProjectChat={(projId) => handleNewChat(projId)}
+          onSelectChat={(chatId) => {
+            if (chatId) {
+              handleSelectChat(chatId);
+            } else {
+              setCurrentChatId(null);
+            }
+          }}
+          chats={chats}
+          activeChatId={currentChatId}
+          messages={messages}
+          onSendMessage={handleSendMessage}
+          onStopStreaming={handleStopStreaming}
+          onRegenerate={handleRegenerate}
+          onExport={handleExportChat}
+        />
+      ) : (
+        <ChatArea
+          chatTitle={activeChat?.title || 'Nexus Agent'}
+          messages={messages}
+          onSendMessage={handleSendMessage}
+          onStopStreaming={handleStopStreaming}
+          onRegenerate={handleRegenerate}
+          onExport={handleExportChat}
+        />
+      )}
 
       <CommandPaletteModal
         isOpen={isCmdPaletteOpen}
@@ -537,6 +599,7 @@ export function App() {
       />
 
       <DebugPanel isOpen={isDebugOpen} onClose={() => setIsDebugOpen(false)} />
+      <ProjectModal isOpen={isProjectModalOpen} onClose={() => setIsProjectModalOpen(false)} />
 
       {showSettings && <SettingsPanel onClose={() => setShowSettings(false)} />}
     </div>

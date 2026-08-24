@@ -143,12 +143,22 @@ export async function getChats(): Promise<Chat[]> {
   }
 
   const rows = await db.select<Chat[]>(
-    `SELECT id, title, created_at, updated_at, pinned = 1 as pinned, model, context_summary FROM chats ORDER BY pinned DESC, updated_at DESC`
+    `SELECT id, title, created_at, updated_at, pinned = 1 as pinned, model, project_id, context_summary FROM chats ORDER BY pinned DESC, updated_at DESC`
   );
   return rows;
 }
 
-export async function createChat(title = 'New Chat', model?: string): Promise<Chat> {
+export async function getGlobalChats(): Promise<Chat[]> {
+  const all = await getChats();
+  return all.filter((c) => !c.project_id);
+}
+
+export async function getProjectChats(projectId: string): Promise<Chat[]> {
+  const all = await getChats();
+  return all.filter((c) => c.project_id === projectId);
+}
+
+export async function createChat(title = 'New Chat', model?: string, projectId?: string): Promise<Chat> {
   const id = crypto.randomUUID();
   const now = new Date().toISOString();
   const newChat: Chat = {
@@ -158,6 +168,7 @@ export async function createChat(title = 'New Chat', model?: string): Promise<Ch
     updated_at: now,
     pinned: false,
     model,
+    project_id: projectId,
   };
 
   const db = await initDatabase();
@@ -169,8 +180,8 @@ export async function createChat(title = 'New Chat', model?: string): Promise<Ch
   }
 
   await db.execute(
-    `INSERT INTO chats (id, title, created_at, updated_at, pinned, model) VALUES ($1, $2, $3, $4, $5, $6)`,
-    [id, title, now, now, 0, model ?? null]
+    `INSERT INTO chats (id, title, created_at, updated_at, pinned, model, project_id) VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+    [id, title, now, now, 0, model ?? null, projectId ?? null]
   );
 
   return newChat;
@@ -375,7 +386,11 @@ export interface ProjectItem {
   id: string;
   name: string;
   description?: string;
+  icon?: string;
+  color?: string;
+  instructions?: string;
   created_at: string;
+  updated_at?: string;
 }
 
 export interface NoteItem {
@@ -395,10 +410,10 @@ export async function getProjects(): Promise<ProjectItem[]> {
   return db.select<ProjectItem[]>(`SELECT id, name, description, created_at FROM workspace_projects ORDER BY created_at DESC`);
 }
 
-export async function createProject(name: string, description?: string): Promise<ProjectItem> {
+export async function createProject(name: string, description?: string, instructions?: string): Promise<ProjectItem> {
   const id = String(Date.now());
   const created_at = new Date().toISOString();
-  const project: ProjectItem = { id, name, description, created_at };
+  const project: ProjectItem = { id, name, description, instructions, created_at };
   const db = await initDatabase();
   if (isFallbackMode || !db) {
     const existing = await getProjects();
@@ -407,6 +422,18 @@ export async function createProject(name: string, description?: string): Promise
   }
   await db.execute(`INSERT INTO workspace_projects (id, name, description, created_at) VALUES ($1, $2, $3, $4)`, [id, name, description || '', created_at]);
   return project;
+}
+
+export async function updateProject(id: string, updates: Partial<ProjectItem>): Promise<void> {
+  const existing = await getProjects();
+  const updated = existing.map((p) => (p.id === id ? { ...p, ...updates, updated_at: new Date().toISOString() } : p));
+  localStorage.setItem('ai_os_projects', JSON.stringify(updated));
+}
+
+export async function deleteProject(id: string): Promise<void> {
+  const existing = await getProjects();
+  const filtered = existing.filter((p) => p.id !== id);
+  localStorage.setItem('ai_os_projects', JSON.stringify(filtered));
 }
 
 export async function getNotebookNotes(): Promise<NoteItem[]> {

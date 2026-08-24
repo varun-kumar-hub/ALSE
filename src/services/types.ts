@@ -58,6 +58,28 @@ export interface ChatMessage {
   user_prompt?: string;
 }
 
+export interface Project {
+  id: string;
+  name: string;
+  description?: string;
+  icon?: string;
+  color?: string;
+  instructions?: string;
+  created_at: string;
+  updated_at: string;
+  is_archived?: boolean;
+}
+
+export interface ProjectFile {
+  id: string;
+  project_id: string;
+  name: string;
+  size: number;
+  type: string;
+  path?: string;
+  uploaded_at: string;
+}
+
 export interface Chat {
   id: string;
   title: string;
@@ -65,6 +87,7 @@ export interface Chat {
   updated_at: string;
   pinned: boolean;
   model?: string;
+  project_id?: string;
   context_summary?: string;
 }
 

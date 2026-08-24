@@ -12,9 +12,11 @@ import {
   Bot,
   Brain,
   Terminal,
+  Plus,
 } from 'lucide-react';
 import { Chat } from '../../services/types';
 import { ChatList } from './ChatList';
+import { useProjectStore } from '../../stores/projectStore';
 
 interface SidebarNavHubProps {
   chats: Chat[];
@@ -75,16 +77,18 @@ export const SidebarNavHub: React.FC<SidebarNavHubProps> = ({
                   <span>Chats</span>
                 </div>
                 <div className="flex items-center gap-1">
-                  <span className="text-[10px] font-mono text-zinc-400 font-bold">{chats.length}</span>
+                  <span className="text-[10px] font-mono text-zinc-400 font-bold">
+                    {chats.filter((c) => !c.project_id).length}
+                  </span>
                   {isChatsListOpen ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
                 </div>
               </button>
 
-              {/* Collapsible Chat History List */}
+              {/* Collapsible Global Chat History List */}
               {isChatsListOpen && activeItem === 'chats' && (
                 <div className="pl-2 pt-1 border-l-2 border-zinc-100 space-y-1">
                   <ChatList
-                    chats={chats}
+                    chats={chats.filter((c) => !c.project_id)}
                     activeChatId={activeChatId}
                     onSelectChat={onSelectChat}
                     onRenameChat={onRenameChat}
@@ -95,18 +99,94 @@ export const SidebarNavHub: React.FC<SidebarNavHubProps> = ({
               )}
             </div>
 
-            <button
-              type="button"
-              onClick={() => setActiveItem('projects')}
-              className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded-xl transition-all ${
-                activeItem === 'projects' ? 'bg-amber-50 text-amber-900 font-bold' : 'hover:bg-zinc-100'
-              }`}
-            >
-              <div className="flex items-center gap-2">
-                <Folder className="w-4 h-4 text-amber-600" />
-                <span>Projects</span>
+            {/* Projects Sub-Section */}
+            <div className="space-y-0.5">
+              <div
+                className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded-xl transition-all ${
+                  activeItem === 'projects' ? 'bg-amber-50 text-amber-900 font-bold' : 'hover:bg-zinc-100'
+                }`}
+              >
+                <button
+                  type="button"
+                  onClick={() => setActiveItem('projects')}
+                  className="flex items-center gap-2 flex-1 text-left"
+                >
+                  <Folder className="w-4 h-4 text-amber-600" />
+                  <span>Projects</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    const modalBtn = document.querySelector<HTMLButtonElement>('button[data-new-project]');
+                    if (modalBtn) modalBtn.click();
+                  }}
+                  className="p-0.5 text-zinc-400 hover:text-amber-700 hover:bg-amber-100 rounded-md"
+                  title="Create New Project"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                </button>
               </div>
-            </button>
+
+              {/* Project List with Nested Chats */}
+              {activeItem === 'projects' && (
+                <div className="pl-1 pt-1 space-y-2">
+                  {useProjectStore.getState().projects.map((p) => {
+                    const projChats = chats.filter((c) => c.project_id === p.id);
+                    const isCurrentActiveProj = useProjectStore.getState().activeProjectId === p.id;
+
+                    return (
+                      <div key={p.id} className="space-y-1">
+                        {/* Folder Header Pill */}
+                        <div
+                          onClick={() => useProjectStore.getState().setActiveProjectId(p.id)}
+                          className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded-xl cursor-pointer transition-all ${
+                            isCurrentActiveProj
+                              ? 'bg-zinc-800 text-white font-extrabold shadow-xs'
+                              : 'bg-zinc-100 hover:bg-zinc-200 text-zinc-800 font-bold'
+                          }`}
+                        >
+                          <div className="flex items-center gap-2 truncate">
+                            <Folder className={`w-4 h-4 shrink-0 ${isCurrentActiveProj ? 'text-amber-400' : 'text-amber-600'}`} />
+                            <span className="truncate text-xs">{p.name}</span>
+                          </div>
+                          <div className="flex items-center gap-1 opacity-70 hover:opacity-100">
+                            <span className="text-[10px] font-mono">{projChats.length}</span>
+                          </div>
+                        </div>
+
+                        {/* Nested Chats Under Project */}
+                        <div className="pl-3 space-y-0.5 border-l border-zinc-200/80 ml-3">
+                          {projChats.slice(0, 6).map((c) => (
+                            <button
+                              key={c.id}
+                              type="button"
+                              onClick={() => {
+                                useProjectStore.getState().setActiveProjectId(p.id);
+                                onSelectChat(c.id);
+                              }}
+                              className={`w-full flex items-center gap-1.5 px-2 py-1 rounded-lg text-[11px] font-medium transition-all text-left truncate ${
+                                activeChatId === c.id
+                                  ? 'bg-amber-100/90 text-amber-950 font-bold'
+                                  : 'text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900'
+                              }`}
+                            >
+                              <span className="truncate">{c.title}</span>
+                            </button>
+                          ))}
+                          {projChats.length === 0 && (
+                            <p className="text-[10px] text-zinc-400 py-0.5 italic">No chats yet</p>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                  {useProjectStore.getState().projects.length === 0 && (
+                    <p className="text-[10px] text-zinc-400 px-2 py-1 italic">No projects created yet</p>
+                  )}
+                </div>
+              )}
+            </div>
           </div>
         )}
       </div>
