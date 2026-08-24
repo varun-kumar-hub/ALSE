@@ -7,6 +7,7 @@
 export interface ExtractedPageContent {
   title: string;
   markdown: string;
+  links: string[];
   headings: string[];
   codeBlocks: string[];
   tables: string[];
@@ -47,15 +48,32 @@ export function extractCleanContent(
   const dateMeta = doc.querySelector('meta[property="article:published_time"], meta[name="date"]');
   if (dateMeta) metadata.publishedDate = dateMeta.getAttribute('content') || undefined;
 
+  // Extract all links & form endpoints BEFORE noise removal
+  const links: string[] = [];
+  doc.querySelectorAll('a[href]').forEach((a) => {
+    const href = a.getAttribute('href')?.trim();
+    if (href && !href.startsWith('#') && !href.startsWith('javascript:') && !href.startsWith('mailto:')) {
+      try {
+        const absolute = new URL(href, url).toString();
+        if (!links.includes(absolute)) links.push(absolute);
+      } catch {}
+    }
+  });
+
+  doc.querySelectorAll('form[action]').forEach((f) => {
+    const action = f.getAttribute('action')?.trim();
+    if (action) {
+      try {
+        const absolute = new URL(action, url).toString();
+        if (!links.includes(absolute)) links.push(absolute);
+      } catch {}
+    }
+  });
+
   // Strip noise elements (ads, cookie banners, nav, footer, sidebar)
   const noiseSelectors = [
     'script',
     'style',
-    'nav',
-    'footer',
-    'header',
-    'aside',
-    'form',
     'iframe',
     'noscript',
     '.ad',
@@ -111,6 +129,7 @@ export function extractCleanContent(
   return {
     title,
     markdown: cleanedMarkdown.slice(0, 15000), // Cap at 15k chars
+    links,
     headings: headings.slice(0, 15),
     codeBlocks: codeBlocks.slice(0, 10),
     tables: tables.slice(0, 5),

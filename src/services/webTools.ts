@@ -44,7 +44,7 @@ const SKIP_TAGS = new Set([
 /**
  * Converts raw HTML string into clean plain text and extracts link URLs.
  */
-export function htmlToTextAndLinks(rawHtml: string): { text: string; links: string[] } {
+export function htmlToTextAndLinks(rawHtml: string, baseUrl?: string): { text: string; links: string[] } {
   const links: string[] = [];
 
   // Remove skip tags along with their content
@@ -54,10 +54,25 @@ export function htmlToTextAndLinks(rawHtml: string): { text: string; links: stri
     cleanedHtml = cleanedHtml.replace(reg, ' ');
   });
 
-  // Extract href links from remaining HTML
-  const linkMatches = cleanedHtml.matchAll(/<a\s+[^>]*href=["'](https?:\/\/[^"']+)["']/gi);
+  // Extract href links (both relative and absolute)
+  const linkMatches = cleanedHtml.matchAll(/<a\s+[^>]*href=["']([^"']+)["']/gi);
   for (const match of linkMatches) {
-    if (match[1]) links.push(match[1]);
+    let href = match[1].trim();
+    if (href.startsWith('#') || href.startsWith('javascript:') || href.startsWith('mailto:') || href.startsWith('tel:')) {
+      continue;
+    }
+    if (baseUrl && !href.startsWith('http://') && !href.startsWith('https://')) {
+      try {
+        href = new URL(href, baseUrl).toString();
+      } catch {
+        continue;
+      }
+    }
+    if (href.startsWith('http://') || href.startsWith('https://')) {
+      if (!links.includes(href)) {
+        links.push(href);
+      }
+    }
   }
 
   // Strip remaining HTML tags

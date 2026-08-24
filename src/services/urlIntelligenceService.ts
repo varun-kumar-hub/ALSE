@@ -1,5 +1,6 @@
 import { validateAndNormalizeUrl } from './urlValidator';
 import { acquireWebPage } from './webAcquisitionEngine';
+import { htmlToTextAndLinks } from './webTools';
 
 export type ResourceType =
   | 'Web Page'
@@ -119,11 +120,9 @@ export class URLIntelligenceEngine {
         const pageContent = await acquireWebPage(current.url);
         const title = pageContent.title || current.url;
 
-        const links: string[] = [];
-        const linkMatches = pageContent.markdown.matchAll(/\((https?:\/\/[^\s)]+)\)/gi);
-        for (const m of linkMatches) {
-          if (m[1]) links.push(m[1]);
-        }
+        const links = pageContent.links && pageContent.links.length > 0
+          ? pageContent.links
+          : htmlToTextAndLinks(pageContent.markdown, current.url).links;
 
         resources.push({
           url: current.url,

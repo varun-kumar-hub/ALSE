@@ -17,6 +17,7 @@ import {
   OPENCODE_ZEN_CATALOG,
 } from '../../services/providerRegistry';
 import { ProviderConfig } from '../../services/types';
+import { useAppStore } from '../../stores/appStore';
 
 interface CloudSettingsProps {
   providerConfigs: ProviderConfig[];
@@ -227,17 +228,27 @@ export const CloudSettings: React.FC<CloudSettingsProps> = ({
               </div>
 
               <div className="space-y-1">
-                <label className="text-[10px] font-medium text-zinc-600">Discovered Model Catalog</label>
+                <div className="flex items-center justify-between">
+                  <label className="text-[10px] font-medium text-zinc-600">Connected Cloud Model</label>
+                  {activeProviderConfig.apiKeySet && (
+                    <span className="text-[9px] font-semibold text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200 flex items-center gap-1">
+                      <Zap className="w-2.5 h-2.5 text-emerald-600" /> Active Model
+                    </span>
+                  )}
+                </div>
                 <select
                   value={activeProviderConfig.defaultModel}
-                  onChange={(e) =>
-                    updateProviderConfig(activeProviderConfig.id, { defaultModel: e.target.value })
-                  }
-                  className="w-full bg-white border border-zinc-200 rounded-lg px-2.5 py-1.5 text-xs text-zinc-950 font-mono focus:outline-none focus:border-blue-500"
+                  onChange={(e) => {
+                    const newModel = e.target.value;
+                    updateProviderConfig(activeProviderConfig.id, { defaultModel: newModel });
+                    useAppStore.getState().setSelectedModel(newModel);
+                    useAppStore.getState().updateSetting('defaultModel', newModel);
+                  }}
+                  className="w-full bg-white border border-zinc-200 rounded-lg px-2.5 py-1.5 text-xs text-zinc-950 font-mono focus:outline-none focus:border-blue-500 font-semibold"
                 >
                   {currentModelsList.map((m) => (
                     <option key={m} value={m}>
-                      {m}
+                      ⚡ {m} {m === activeProviderConfig.defaultModel ? '(Connected)' : ''}
                     </option>
                   ))}
                 </select>

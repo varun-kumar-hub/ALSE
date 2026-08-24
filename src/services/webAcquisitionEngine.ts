@@ -108,6 +108,7 @@ async function executeEngineFetch(
   engine: 'HTTP' | 'Chromium' | 'Firefox'
 ): Promise<ExtractedPageContent> {
   const startTime = Date.now();
+  const isBrowser = typeof window !== 'undefined' && !('__TAURI_INTERNALS__' in window);
 
   const userAgent =
     engine === 'Firefox'
@@ -117,23 +118,51 @@ async function executeEngineFetch(
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), 12000);
 
-  const response = await fetch(url, {
-    method: 'GET',
-    headers: {
-      'User-Agent': userAgent,
-      'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-      'Accept-Language': 'en-US,en;q=0.9',
-    },
-    signal: controller.signal,
-  }).finally(() => clearTimeout(timeoutId));
+  let rawHtml = '';
 
-  if (!response.ok) {
-    throw new Error(`HTTP ${response.status} ${response.statusText}`);
+  try {
+    const response = await fetch(url, {
+      method: 'GET',
+      headers: {
+        'User-Agent': userAgent,
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+        'Accept-Language': 'en-US,en;q=0.9',
+      },
+      signal: controller.signal,
+    });
+    if (response.ok) {
+      rawHtml = await response.text();
+    }
+  } catch {
+    if (isBrowser) {
+      // Fallback for browser preview mode CORS restrictions
+      try {
+        const corsProxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`;
+        const proxyResp = await fetch(corsProxyUrl);
+        if (proxyResp.ok) {
+          rawHtml = await proxyResp.text();
+        }
+      } catch {
+        try {
+          const corsProxyUrl2 = `https://corsproxy.io/?${encodeURIComponent(url)}`;
+          const proxyResp2 = await fetch(corsProxyUrl2);
+          if (proxyResp2.ok) {
+            rawHtml = await proxyResp2.text();
+          }
+        } catch {
+          // Ignore
+        }
+      }
+    }
+  } finally {
+    clearTimeout(timeoutId);
   }
 
-  const rawHtml = await response.text();
-  const fetchTimeMs = Date.now() - startTime;
+  if (!rawHtml) {
+    throw new Error(`Could not retrieve content from ${url}`);
+  }
 
+  const fetchTimeMs = Date.now() - startTime;
   return extractCleanContent(rawHtml, url, engine, fetchTimeMs);
 }
 
@@ -148,6 +177,7 @@ async function acquireDirectFile(url: string, startTime: number): Promise<Extrac
   return {
     title: url.split('/').pop() || 'Downloaded File',
     markdown: text.slice(0, 20000),
+    links: [],
     headings: ['Direct File Download'],
     codeBlocks: [],
     tables: [],
