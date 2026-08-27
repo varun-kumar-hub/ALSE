@@ -195,8 +195,14 @@ export async function webSearch(query: string, limit = 5): Promise<WebToolResult
     } else {
       // Browser dev mode: Fetch through Vite same-origin proxy
       try {
-        const proxyDdg = `/proxy/ddg/html/?q=${encodeURIComponent(trimmedQuery)}`;
-        const resp = await fetch(proxyDdg);
+        const proxyDdg = `/proxy/ddg/html/`;
+        const resp = await fetch(proxyDdg, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+          },
+          body: `q=${encodeURIComponent(trimmedQuery)}`,
+        });
         if (resp.ok) rawHtml = await resp.text();
       } catch {
         // Ignore and proceed to Wikipedia fallback

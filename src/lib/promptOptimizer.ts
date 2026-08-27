@@ -294,13 +294,16 @@ IMPORTANT: Place your entire internal reasoning between <think> and </think>. Af
   const systemMessage = `You are ${assistantName}, a local-first AI assistant.
 ${runtimeContext}
 
-${retrievedContext ? `[VERIFIED RETRIEVED GROUNDING CONTEXT]\n${retrievedContext.trim()}\n` : ''}
+${retrievedContext ? `[RETRIEVED REFERENCE CONTEXT]\n${retrievedContext.trim()}\n` : ''}
 ${thinkingProcessRules.trim()}
 ${formatGuidance.trim()}
 ${visualFormattingRules.trim()}
 ${noExtraCodeRule.trim()}
 ${antiHallucinationRules.trim()}
-CRITICAL: You MUST ground your answer 100% in the VERIFIED RETRIEVED GROUNDING CONTEXT provided above whenever available. State ONLY verified factual details from the context. Do not invent facts, movie names, dates, or titles.`;
+CRITICAL FACTUAL & CONTEXT GUIDANCE:
+- Use the RETRIEVED REFERENCE CONTEXT provided above as helpful background information when relevant to the user's query.
+- If the retrieved context is incomplete, empty, or unrelated to the user's prompt, rely on your conversation history, project context, document contents, and internal reasoning to provide a direct, helpful, and comprehensive answer.
+- DO NOT apologize or decline to answer based on missing search results unless the user explicitly requested a web search that returned no findings.`;
 
   return `${systemMessage}\n\nUser Question:\n${userPrompt}`;
 }

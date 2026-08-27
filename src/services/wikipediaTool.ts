@@ -63,11 +63,47 @@ export async function fetchWikipediaSummary(title: string): Promise<WikipediaPag
 }
 
 /**
- * Full Fact-Grounding Tool: Search + Fetch Exact Summary
+ * Fetch full plain-text extract of a Wikipedia page (includes sections like Filmography, Career, etc.)
+ */
+export async function fetchWikipediaFullExtract(title: string, maxChars = 8000): Promise<string> {
+  const url = `https://en.wikipedia.org/w/api.php?action=query&prop=extracts&explaintext=1&titles=${encodeURIComponent(
+    title
+  )}&format=json&origin=*`;
+
+  try {
+    const response = await fetch(url);
+    if (!response.ok) return '';
+
+    const data = await response.json();
+    const pages = data.query?.pages || {};
+    const pageId = Object.keys(pages)[0];
+    if (!pageId || pageId === '-1') return '';
+
+    const extract: string = pages[pageId].extract || '';
+    if (!extract) return '';
+
+    if (extract.length > maxChars) {
+      const filmoMatch = extract.match(/==\s*(Filmography|Career|Discography|Works|Selected filmography|Films)\s*==[\s\S]*/i);
+      if (filmoMatch) {
+        const lead = extract.slice(0, 2000);
+        const section = filmoMatch[0].slice(0, maxChars - 2000);
+        return `${lead}\n\n${section}`;
+      }
+      return extract.slice(0, maxChars);
+    }
+    return extract;
+  } catch (err) {
+    console.warn(`Wikipedia full extract error for ${title}:`, err);
+    return '';
+  }
+}
+
+/**
+ * Full Fact-Grounding Tool: Search + Fetch Exact Summary & Extended Context
  */
 export async function getFactGroundedSummary(query: string): Promise<string> {
   try {
-    const searchResults = await searchWikipedia(query, 2);
+    const searchResults = await searchWikipedia(query, 3);
     if (searchResults.length === 0) return '';
 
     const primaryTitle = searchResults[0].title;
@@ -80,6 +116,33 @@ export async function getFactGroundedSummary(query: string): Promise<string> {
       resultMarkdown += `*${summary.description}*\n\n`;
     }
     resultMarkdown += `${summary.extract}\n\n`;
+
+    const isListOrFilmographyRequest = /\b(movie|movies|film|films|filmography|acted|actor|actress|discography|songs|albums|works|list|roles)\b/i.test(query);
+
+    if (isListOrFilmographyRequest) {
+      // 1. Search for a dedicated filmography or works page (e.g. "N. T. Rama Rao Jr. filmography")
+      const filmoSearch = await searchWikipedia(`${primaryTitle} filmography`, 3);
+      const filmoPage = filmoSearch.find(
+        (r) =>
+          r.title.toLowerCase().includes('filmography') ||
+          r.title.toLowerCase().includes('discography') ||
+          r.title.toLowerCase().includes('works')
+      );
+
+      if (filmoPage && filmoPage.title !== primaryTitle) {
+        const filmoExtract = await fetchWikipediaFullExtract(filmoPage.title, 6000);
+        if (filmoExtract) {
+          resultMarkdown += `### Detailed Filmography Context (${filmoPage.title}):\n${filmoExtract}\n\n`;
+        }
+      } else {
+        // 2. Fetch full text extract of primary page to capture Filmography/Career sections
+        const fullExtract = await fetchWikipediaFullExtract(primaryTitle, 6000);
+        if (fullExtract && fullExtract.length > summary.extract.length) {
+          resultMarkdown += `### Detailed Career & Works Context:\n${fullExtract}\n\n`;
+        }
+      }
+    }
+
     if (summary.contentUrl) {
       resultMarkdown += `**Source**: [${summary.title}](${summary.contentUrl})`;
     }
@@ -90,3 +153,4 @@ export async function getFactGroundedSummary(query: string): Promise<string> {
     return '';
   }
 }
+

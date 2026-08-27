@@ -2,7 +2,6 @@ import React, { useState } from 'react';
 import { Cpu, Download, BarChart2, X, Activity } from 'lucide-react';
 import { Button } from '../ui/Button';
 import { useAppStore } from '../../stores/appStore';
-import { getProviderIdForModel } from '../../services/providers';
 
 interface ChatHeaderProps {
   chatTitle: string;
@@ -10,7 +9,7 @@ interface ChatHeaderProps {
 }
 
 export const ChatHeader: React.FC<ChatHeaderProps> = ({ chatTitle, onExport }) => {
-  const { executionConfig } = useAppStore();
+  const { executionConfig, aiMode } = useAppStore();
   const [showStatsModal, setShowStatsModal] = useState(false);
 
   const displayProviderLabel = executionConfig.providerName;

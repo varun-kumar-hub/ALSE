@@ -55,11 +55,11 @@ export class TextAndMarkdownParser implements IFileParser {
 
   async parse(file: File | { name: string; size: number; type: string; content: string | ArrayBuffer }): Promise<ParsedFileResult> {
     let contentText = '';
-    if (typeof file.content === 'string') {
+    if ('content' in file && typeof file.content === 'string') {
       contentText = file.content;
     } else if (file instanceof File) {
       contentText = await file.text();
-    } else if (file.content instanceof ArrayBuffer) {
+    } else if ('content' in file && file.content instanceof ArrayBuffer) {
       contentText = new TextDecoder('utf-8').decode(file.content);
     }
 
@@ -102,11 +102,11 @@ export class CodeFileParser implements IFileParser {
 
   async parse(file: File | { name: string; size: number; type: string; content: string | ArrayBuffer }): Promise<ParsedFileResult> {
     let codeText = '';
-    if (typeof file.content === 'string') {
+    if ('content' in file && typeof file.content === 'string') {
       codeText = file.content;
     } else if (file instanceof File) {
       codeText = await file.text();
-    } else if (file.content instanceof ArrayBuffer) {
+    } else if ('content' in file && file.content instanceof ArrayBuffer) {
       codeText = new TextDecoder('utf-8').decode(file.content);
     }
 

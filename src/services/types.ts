@@ -28,6 +28,28 @@ export interface SourceItem {
   relevance?: number;
 }
 
+export type ModelConnectionState = 'CONNECTED' | 'ACTIVE' | 'INACTIVE' | 'UNAVAILABLE' | 'ERROR' | 'DISCONNECTED';
+
+export type ModelSwitchActionType =
+  | 'add_inactive_or_active'
+  | 'switch_active_model'
+  | 'switch_execution_mode'
+  | 'switch_chat_model';
+
+export interface ModelSwitchModalOptions {
+  isOpen: boolean;
+  actionType: ModelSwitchActionType;
+  providerId: string;
+  providerName: string;
+  targetModel: string;
+  currentActiveModel: string;
+  currentActiveProvider: string;
+  targetMode?: 'cloud' | 'local';
+  currentMode?: 'cloud' | 'local';
+  chatId?: string;
+  chatTitle?: string;
+}
+
 export interface ChatMessage {
   id?: string;
   chat_id?: string;
@@ -50,6 +72,9 @@ export interface ChatMessage {
   cost_estimate?: string;
   provider_used?: string;
   model_used?: string;
+  model_id?: string;
+  model_name?: string;
+  mode_used?: 'cloud' | 'local';
   timestamp_iso?: string;
   timezone?: string;
   sources_used?: (SourceItem | string)[];
@@ -184,6 +209,7 @@ export interface ThinkingTimelineStep {
   detail?: string;
   phase: TimelinePhase;
   status: TimelineStepStatus;
+  subSteps?: string[];
   timestamp?: string;
 }
 

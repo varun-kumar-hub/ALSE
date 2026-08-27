@@ -186,7 +186,7 @@ export const ChatMessageComponent: React.FC<ChatMessageProps> = ({
                 toolsCount={message.tools_used?.length || 0}
                 generationTimeMs={message.generation_time_ms || 1800}
                 provider={message.provider_used || (aiMode === 'local' ? 'ollama' : 'cloud')}
-                model={message.model_used || selectedModel}
+                model={message.model_name || message.model_used || selectedModel}
                 activities={parsed.activities}
                 thinking={parsed.thinking}
               />
@@ -206,9 +206,9 @@ export const ChatMessageComponent: React.FC<ChatMessageProps> = ({
               {!isStreaming && (
                 <RuntimeMetadataCard
                   metadata={buildExecutionRuntimeMetadata(
-                    message.model_used || selectedModel || 'qwen3:8b',
+                    message.model_name || message.model_used || selectedModel || 'gpt-5.6-sol',
                     message.provider_used || (aiMode === 'local' ? 'ollama' : 'opencode'),
-                    aiMode,
+                    message.mode_used || aiMode,
                     intent,
                     message.user_prompt || '',
                     displayContent || message.content,

@@ -82,7 +82,23 @@ export const CloudSettings: React.FC<CloudSettingsProps> = ({
 
   const handleMakeActiveModel = (cfg: ProviderConfig, targetModel?: string) => {
     const modelToActivate = targetModel || cfg.defaultModel;
-    updateProviderConfig(cfg.id, { enabled: true });
+    const currentActiveModel = useAppStore.getState().selectedModel;
+    const currentActiveProvider = useAppStore.getState().defaultProvider;
+
+    if (currentActiveModel && currentActiveModel !== modelToActivate) {
+      useAppStore.getState().openModelSwitchModal({
+        isOpen: true,
+        actionType: 'switch_active_model',
+        providerId: cfg.id,
+        providerName: cfg.name,
+        targetModel: modelToActivate,
+        currentActiveModel,
+        currentActiveProvider,
+      });
+      return;
+    }
+
+    updateProviderConfig(cfg.id, { enabled: true, defaultModel: modelToActivate });
     useAppStore.getState().setSelectedModel(modelToActivate);
     useAppStore.getState().updateSetting('defaultModel', modelToActivate);
   };
@@ -321,6 +337,7 @@ export const CloudSettings: React.FC<CloudSettingsProps> = ({
                   value={activeProviderConfig.defaultModel}
                   onChange={(e) => {
                     const newModel = e.target.value;
+                    updateProviderConfig(activeProviderConfig.id, { defaultModel: newModel });
                     handleMakeActiveModel(activeProviderConfig, newModel);
                   }}
                   className="w-full bg-white border border-zinc-200 rounded-lg px-2.5 py-1.5 text-xs text-zinc-950 font-mono focus:outline-none focus:border-blue-500 font-semibold"

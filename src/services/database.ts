@@ -83,6 +83,21 @@ async function runMigrations(db: Database) {
   `);
 
   await addColumnIfMissing(db, 'messages', 'intent', 'TEXT');
+  await addColumnIfMissing(db, 'messages', 'model_id', 'TEXT');
+  await addColumnIfMissing(db, 'messages', 'model_name', 'TEXT');
+  await addColumnIfMissing(db, 'messages', 'provider', 'TEXT');
+  await addColumnIfMissing(db, 'messages', 'mode', 'TEXT');
+
+  await db.execute(`
+    CREATE TABLE IF NOT EXISTS chat_model_config (
+      chat_id TEXT PRIMARY KEY,
+      model_id TEXT NOT NULL,
+      provider TEXT NOT NULL,
+      mode TEXT NOT NULL,
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+  `);
 
   await db.execute(`
     CREATE TABLE IF NOT EXISTS settings (
@@ -244,7 +259,7 @@ export async function getMessages(chatId: string): Promise<ChatMessage[]> {
   }
 
   return await db.select<ChatMessage[]>(
-    `SELECT id, chat_id, role, content, intent, created_at, tokens_used, generation_time_ms FROM messages WHERE chat_id = $1 ORDER BY created_at ASC`,
+    `SELECT id, chat_id, role, content, intent, model_id, model_name, provider as provider_used, mode as mode_used, created_at, tokens_used, generation_time_ms FROM messages WHERE chat_id = $1 ORDER BY created_at ASC`,
     [chatId]
   );
 }
@@ -270,7 +285,8 @@ export async function addMessage(
   chatId: string,
   role: 'user' | 'assistant' | 'system',
   content: string,
-  intent?: ChatMessage['intent']
+  intent?: ChatMessage['intent'],
+  modelMeta?: { model_id?: string; model_name?: string; provider?: string; mode?: 'cloud' | 'local' }
 ): Promise<ChatMessage> {
   const id = crypto.randomUUID();
   const now = new Date().toISOString();
@@ -280,6 +296,10 @@ export async function addMessage(
     role,
     content,
     intent,
+    model_id: modelMeta?.model_id,
+    model_name: modelMeta?.model_name,
+    provider_used: modelMeta?.provider,
+    mode_used: modelMeta?.mode,
     created_at: now,
   };
 
@@ -299,8 +319,19 @@ export async function addMessage(
   }
 
   await db.execute(
-    `INSERT INTO messages (id, chat_id, role, content, intent, created_at) VALUES ($1, $2, $3, $4, $5, $6)`,
-    [id, chatId, role, content, intent ?? null, now]
+    `INSERT INTO messages (id, chat_id, role, content, intent, model_id, model_name, provider, mode, created_at) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
+    [
+      id,
+      chatId,
+      role,
+      content,
+      intent ?? null,
+      modelMeta?.model_id ?? null,
+      modelMeta?.model_name ?? null,
+      modelMeta?.provider ?? null,
+      modelMeta?.mode ?? null,
+      now,
+    ]
   );
 
   await db.execute(`UPDATE chats SET updated_at = $1 WHERE id = $2`, [now, chatId]);

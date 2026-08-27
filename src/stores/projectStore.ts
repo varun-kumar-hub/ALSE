@@ -18,7 +18,7 @@ interface ProjectState {
   removeProjectFileItem: (projectId: string, fileId: string) => void;
 }
 
-export const useProjectStore = create<ProjectState>((set, get) => ({
+export const useProjectStore = create<ProjectState>((set) => ({
   projects: [],
   activeProjectId: null,
   projectFiles: new Map(),

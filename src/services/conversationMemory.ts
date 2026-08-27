@@ -51,12 +51,12 @@ export class ConversationMemoryManager {
     for (const msg of messages) {
       if (!msg.content || msg.content.trim().length === 0) continue;
       items.push({
-        id: msg.id,
+        id: msg.id || crypto.randomUUID(),
         chatId,
         chatTitle,
         content: msg.content.trim(),
-        role: msg.role,
-        timestamp: msg.timestamp || new Date().toISOString(),
+        role: msg.role === 'system' ? 'assistant' : msg.role,
+        timestamp: msg.created_at || new Date().toISOString(),
         tokens: this.tokenize(msg.content),
       });
     }

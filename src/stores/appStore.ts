@@ -3,6 +3,7 @@ import {
   OllamaModel,
   StartupResult,
   AppSettings,
+  ModelSwitchModalOptions,
   ThinkingTimelineStep,
   TimelinePhase,
 } from '../services/types';
@@ -44,6 +45,9 @@ interface AppState {
   onboardingComplete: boolean;
   skipLauncherInDev: boolean;
 
+  // Multi-Model Management Confirmation State
+  modelSwitchModalOptions: ModelSwitchModalOptions | null;
+
   // Actions
   setSidebarOpen: (open: boolean) => void;
   toggleSidebar: () => void;
@@ -66,6 +70,11 @@ interface AppState {
   setSearchQuery: (query: string) => void;
   setOnboardingComplete: (complete: boolean) => void;
   setRuntimeReady: (ready: boolean) => void;
+  
+  // Model Management Actions
+  openModelSwitchModal: (options: ModelSwitchModalOptions) => void;
+  closeModelSwitchModal: () => void;
+  activateModelAtomically: (providerId: string, targetModel: string, targetMode?: 'cloud' | 'local') => void;
   
   // Async loaders
   initApp: () => Promise<void>;
@@ -99,10 +108,46 @@ export const useAppStore = create<AppState>((set) => ({
   onboardingComplete: false,
   skipLauncherInDev: true,
 
+  modelSwitchModalOptions: null,
+
+  openModelSwitchModal: (options) => set({ modelSwitchModalOptions: options }),
+  closeModelSwitchModal: () => set({ modelSwitchModalOptions: null }),
+  activateModelAtomically: (providerId, targetModel, targetMode) =>
+    set((state) => {
+      const modeToSet = targetMode || state.aiMode;
+      const updatedConfigs = state.providerConfigs.map((p) => {
+        if (p.id === providerId) {
+          return { ...p, enabled: true, defaultModel: targetModel };
+        }
+        return p;
+      });
+
+      return {
+        aiMode: modeToSet,
+        selectedModel: targetModel,
+        defaultProvider: providerId,
+        providerConfigs: updatedConfigs,
+        modelSwitchModalOptions: null,
+        executionConfig: buildAuthoritativeExecutionConfig(
+          modeToSet,
+          targetModel,
+          updatedConfigs,
+          state.isBackendReady
+        ),
+      };
+    }),
+
   setSidebarOpen: (open) => set({ sidebarOpen: open }),
   toggleSidebar: () => set((state) => ({ sidebarOpen: !state.sidebarOpen })),
   setActiveView: (view) => set({ activeView: view }),
-  setCurrentChatId: (id) => set({ currentChatId: id }),
+  setCurrentChatId: (id) => {
+    if (id) {
+      localStorage.setItem('ai_os_active_chat_id', id);
+    } else {
+      localStorage.removeItem('ai_os_active_chat_id');
+    }
+    set({ currentChatId: id });
+  },
   setSelectedModel: (model) =>
     set((state) => ({
       selectedModel: model,

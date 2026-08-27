@@ -2,16 +2,10 @@ import React, { useState, useEffect, useRef } from 'react';
 import {
   Search,
   MessageSquare,
-  FileText,
   Settings,
-  FolderKanban,
   Zap,
   Plus,
-  Trash2,
   X,
-  Bot,
-  Brain,
-  Globe,
 } from 'lucide-react';
 import { useAppStore } from '../stores/appStore';
 import { Chat } from '../services/types';
@@ -68,7 +62,7 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({
   const trimmed = query.trim().toLowerCase();
 
   const filteredChats = chats.filter(
-    (c) => c.title.toLowerCase().includes(trimmed) || c.model.toLowerCase().includes(trimmed)
+    (c) => c.title.toLowerCase().includes(trimmed) || (c.model || '').toLowerCase().includes(trimmed)
   );
 
   return (

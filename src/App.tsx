@@ -8,6 +8,7 @@ import { DebugPanel } from './components/debug/DebugPanel';
 import { CommandPaletteModal } from './components/palette/CommandPaletteModal';
 import { ProjectDashboard } from './components/projects/ProjectDashboard';
 import { ProjectModal } from './components/projects/ProjectModal';
+import { ModelSwitchModal } from './components/modals/ModelSwitchModal';
 import { useAppStore } from './stores/appStore';
 import { useProjectStore } from './stores/projectStore';
 import {
@@ -30,7 +31,7 @@ import { getFactGroundedSummary } from './services/wikipediaTool';
 import { createOrUpdateCheckpoint } from './runtime/checkpointManager';
 import { logProviderRequest } from './services/providerLogger';
 import { urlIntelligenceEngine } from './services/urlIntelligenceService';
-import { Chat, ChatMessage as ChatMessageType, SourceItem } from './services/types';
+import { Chat, ChatMessage as ChatMessageType, SourceItem, ThinkingTimelineStep } from './services/types';
 
 function hasActiveTextSelection(): boolean {
   const selection = window.getSelection?.();
@@ -105,27 +106,38 @@ export function App() {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, []);
 
-  const loadChats = async () => {
+  const loadChats = async (explicitChatId?: string | null) => {
     const list = await getChats();
     setChats(list);
-    
+    useProjectStore.getState().loadProjects();
+
+    if (explicitChatId !== undefined) {
+      setCurrentChatId(explicitChatId);
+      return;
+    }
+
     const savedChatId = localStorage.getItem('ai_os_active_chat_id');
     const savedProjectId = localStorage.getItem('ai_os_active_project_id');
-    
+
     if (savedProjectId) {
       useProjectStore.getState().setActiveProjectId(savedProjectId);
     }
+
+    if (currentChatId && list.some((c) => c.id === currentChatId)) {
+      return;
+    }
+
     if (savedChatId && list.some((c) => c.id === savedChatId)) {
       setCurrentChatId(savedChatId);
-    } else if (list.length > 0 && !currentChatId) {
+    } else if (list.length > 0) {
       setCurrentChatId(list[0].id);
+    } else {
+      setCurrentChatId(null);
     }
-    useProjectStore.getState().loadProjects();
   };
 
   const handleNewChat = async (projectId?: string) => {
     const chat = await createChat('New Chat', selectedModel, projectId);
-    await loadChats();
     if (projectId) {
       useProjectStore.getState().setActiveProjectId(projectId);
     } else {
@@ -133,6 +145,7 @@ export function App() {
     }
     setCurrentChatId(chat.id);
     setMessages([]);
+    await loadChats(chat.id);
   };
 
   const handleSelectChat = (id: string) => {
@@ -141,21 +154,36 @@ export function App() {
 
   const handleRenameChat = async (id: string, newTitle: string) => {
     await updateChatTitle(id, newTitle);
-    await loadChats();
+    await loadChats(currentChatId);
   };
 
   const handleTogglePin = async (id: string, currentPin: boolean) => {
     await togglePinChat(id, !currentPin);
-    await loadChats();
+    await loadChats(currentChatId);
   };
 
   const handleDeleteChat = async (id: string) => {
     await dbDeleteChat(id);
+    const remaining = chats.filter((c) => c.id !== id);
+    setChats(remaining);
+
+    let nextActiveId: string | null = currentChatId;
+
     if (currentChatId === id) {
-      const remaining = chats.filter((c) => c.id !== id);
-      setCurrentChatId(remaining.length > 0 ? remaining[0].id : null);
+      if (remaining.length > 0) {
+        const nextChat = remaining[0];
+        nextActiveId = nextChat.id;
+        setCurrentChatId(nextChat.id);
+        if (nextChat.project_id) {
+          useProjectStore.getState().setActiveProjectId(nextChat.project_id);
+        }
+      } else {
+        nextActiveId = null;
+        setCurrentChatId(null);
+        setMessages([]);
+      }
     }
-    await loadChats();
+    await loadChats(nextActiveId);
   };
 
   // Main streaming chat completion logic
@@ -168,7 +196,7 @@ export function App() {
       const newChat = await createChat('New Chat', selectedModel);
       targetChatId = newChat.id;
       setCurrentChatId(targetChatId);
-      await loadChats();
+      await loadChats(targetChatId);
     }
 
     // 1. Add User Message
@@ -178,15 +206,16 @@ export function App() {
 
     setThinkingTimeline(buildThinkingTimeline(intent, userPrompt, selectedModel));
     updateThinkingTimelinePhase('analyze');
-    const userMsg = await addMessage(targetChatId, 'user', userPrompt, intent);
-    setMessages((prev) => [...prev, userMsg]);
 
-    // 2. Generate title if it's the first message
+    await addMessage(targetChatId, 'user', userPrompt, intent);
+
     const currentMsgs = await getMessages(targetChatId);
-    if (currentMsgs.length <= 1) {
-      providerManager.generateTitle(userPrompt, selectedModel).then((title) => {
-        if (targetChatId) handleRenameChat(targetChatId, title);
-      });
+    setMessages(currentMsgs);
+
+    if (currentMsgs.length <= 2) {
+      const autoTitle = userPrompt.trim().slice(0, 42) || 'New Chat';
+      await updateChatTitle(targetChatId, autoTitle);
+      await loadChats(targetChatId);
     }
 
     // 3. Fact Grounding & Web Tools Auto-Routing (Wikipedia, web_search, web_extract, web_crawl)
@@ -210,7 +239,7 @@ export function App() {
           step.phase === 'gather'
             ? {
                 ...step,
-                status: 'in_progress',
+                status: 'running',
                 detail: `Crawling & analyzing ${domain || targetUrl}...`,
                 subSteps: [
                   `Target Domain: ${domain || targetUrl}`,
@@ -232,7 +261,7 @@ export function App() {
                 step.phase === 'gather'
                   ? {
                       ...step,
-                      status: 'in_progress',
+                      status: 'running',
                       detail: progressMsg,
                       subSteps: Array.from(new Set([...(step.subSteps || []), progressMsg])).slice(-4),
                     }
@@ -274,23 +303,44 @@ export function App() {
         }
       }
     } else {
-      // 1. Live Web Search: Auto-fetch live web results for real-time questions, movies, release dates, news, people
+      // 1. Live Web Search: Run when web search pill is active & query relates to news/entities/movies/updates
+      const isNoSearch = userPrompt.includes('--no-web-search');
       const isSearchWorthy =
-        intent === 'research' ||
-        intent === 'biography' ||
-        intent === 'general' ||
-        /\b(when|who|what|where|release date|movie|film|news|latest|upcoming|update|cast|director|box office)\b/i.test(userPrompt);
+        !isNoSearch &&
+        (intent === 'research' ||
+          intent === 'biography' ||
+          intent === 'general' ||
+          /\b(search|lookup|look up|news|latest|upcoming|update|updates|talk|social media|movie|movies|film|films|release date|box office|who|what|when|where)\b/i.test(
+            userPrompt
+          ));
 
       if (isSearchWorthy) {
-        const cleanQuery = userPrompt
+        // Resolve entity/pronouns from active chat title & context (e.g., "his upcoming movies" -> "Prabhas upcoming movies")
+        const activeChat = chats.find((c) => c.id === targetChatId);
+        let entityName = '';
+        if (activeChat?.title && !/new chat/i.test(activeChat.title)) {
+          entityName = activeChat.title
+            .replace(/^(who is|who was|what is|tell me about|biography of)\s+/i, '')
+            .split(/\?|\!|list/i)[0]
+            .trim();
+        }
+
+        let cleanQuery = userPrompt
+          .replace(/--no-web-search/g, '')
           .replace(/\b(search for|search|lookup|look up|find latest|what is the latest|news about|tell me about)\b/gi, '')
           .trim() || userPrompt;
-        const searchRes = await webSearch(cleanQuery, 5);
+
+        if (entityName && /\b(his|her|he|she|this|that|their|the actor|the movie)\b/i.test(cleanQuery)) {
+          cleanQuery = cleanQuery.replace(/\b(his|her|their|this|that|the actor|the movie)\b/gi, entityName);
+        } else if (entityName && !cleanQuery.toLowerCase().includes(entityName.toLowerCase()) && cleanQuery.length < 50) {
+          cleanQuery = `${entityName} ${cleanQuery}`;
+        }
+
+        const searchRes = await webSearch(cleanQuery, 6);
         if (searchRes.ok && searchRes.content) {
           webContext += `\n\n[Live Web Search Results]:\n${searchRes.content}\n\n`;
           actualToolsUsed.push('Web Search');
 
-          // Extract individual source items from search results
           const rawResults = (searchRes.data as { results?: WebSearchResult[] })?.results || [];
           rawResults.forEach((r) => {
             let dom = '';
@@ -308,8 +358,13 @@ export function App() {
         }
       }
 
-      // 2. Wikipedia Grounding for encyclopedic biographies & entities
-      if (intent === 'biography' || /\b(who is|who was|biography of|bio of|history of)\b/i.test(userPrompt)) {
+      // 2. Wikipedia Grounding for encyclopedic biographies, entities & filmographies
+      if (
+        intent === 'biography' ||
+        /\b(who is|who was|biography of|bio of|history of|filmography|movies of|movies he|movies she|acted in|films of|list all movies)\b/i.test(
+          userPrompt
+        )
+      ) {
         const wikiFact = await getFactGroundedSummary(userPrompt);
         if (wikiFact) {
           webContext += `\n\n${wikiFact}\n\n`;
@@ -334,8 +389,9 @@ export function App() {
     );
     // Build Memory strictly from the current active chat session and project context
     const memoryEpisodes: string[] = [];
-    const activeProject = currentChat?.project_id
-      ? useProjectStore.getState().projects.find((p) => p.id === currentChat.project_id)
+    const activeChat = chats.find((c) => c.id === targetChatId);
+    const activeProject = activeChat?.project_id
+      ? useProjectStore.getState().projects.find((p) => p.id === activeChat.project_id)
       : null;
 
     if (activeProject && activeProject.instructions) {
@@ -424,7 +480,13 @@ export function App() {
           targetChatId,
           'assistant',
           fullAccumulatedResponse,
-          intent
+          intent,
+          {
+            model_id: effectiveModel,
+            model_name: effectiveModel,
+            provider: getProviderIdForModel(effectiveModel) || (aiMode === 'local' ? 'ollama' : 'opencode'),
+            mode: aiMode === 'local' ? 'local' : 'cloud',
+          }
         );
         const actualProviderId = getProviderIdForModel(selectedModel) || (aiMode === 'local' ? 'ollama' : 'opencode');
         const isLocal = actualProviderId === 'ollama';
@@ -602,6 +664,7 @@ export function App() {
       <ProjectModal isOpen={isProjectModalOpen} onClose={() => setIsProjectModalOpen(false)} />
 
       {showSettings && <SettingsPanel onClose={() => setShowSettings(false)} />}
+      <ModelSwitchModal />
     </div>
   );
 }
