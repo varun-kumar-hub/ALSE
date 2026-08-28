@@ -233,7 +233,13 @@ class OpenAICompatibleProvider implements AiProvider {
 
     // Browser Mode fallback fetch
     try {
-      const selectedModel = model || this.config.defaultModel;
+      let selectedModel = model || this.config.defaultModel;
+      if (this.config.id === 'nvidia') {
+        if (!selectedModel || selectedModel.includes('01-ai') || !selectedModel.includes('/')) {
+          selectedModel = 'nvidia/nemotron-3-super-120b-a12b';
+        }
+      }
+
       const requestPayload: any = {
         model: selectedModel,
         messages: messages.map((m) => ({ role: m.role, content: m.content })),

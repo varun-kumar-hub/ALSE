@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { ps6Db } from '../../services/ps6Database';
 import { ConceptMastery, Misconception } from '../../services/ps6Types';
-import { Network, Database, CheckCircle2, AlertTriangle, HelpCircle } from 'lucide-react';
+import { Network, Database, AlertTriangle } from 'lucide-react';
 
 export const KnowledgeView: React.FC = () => {
   const [masteries, setMasteries] = useState<ConceptMastery[]>([]);

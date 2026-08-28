@@ -92,6 +92,12 @@ export default defineConfig(async () => ({
         secure: false,
         rewrite: (path) => path.replace(/^\/proxy\/gemini/, ''),
       },
+      '/proxy/nvidia': {
+        target: 'https://integrate.api.nvidia.com',
+        changeOrigin: true,
+        secure: false,
+        rewrite: (path) => path.replace(/^\/proxy\/nvidia/, ''),
+      },
       '/proxy/ddg': {
         target: 'https://html.duckduckgo.com',
         changeOrigin: true,

@@ -70,11 +70,11 @@ export const ChatInput: React.FC<ChatInputProps> = ({ onSend }) => {
   };
 
   return (
-    <div className="w-full shrink-0 px-4 pb-6 pt-2 select-none bg-slate-50 dark:bg-zinc-950 transition-colors">
+    <div className="p-4 md:p-6 select-none bg-transparent transition-colors">
       <div className="mx-auto max-w-3xl">
         <div
-          className={`relative w-full bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 transition-all rounded-2xl p-2 ${
-            isExpanded || hasValue ? 'shadow-lg border-blue-500/30' : ''
+          className={`relative w-full bg-white dark:bg-[#151922] border border-zinc-200 dark:border-zinc-800/90 shadow-md hover:shadow-lg transition-all rounded-2xl p-3 ${
+            isExpanded || hasValue ? 'shadow-xl border-blue-500/40' : ''
           }`}
           onClick={() => textareaRef.current?.focus()}
         >

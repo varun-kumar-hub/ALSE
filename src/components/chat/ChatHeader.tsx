@@ -1,5 +1,5 @@
 import React from 'react';
-import { Cpu, Download, Folder, MessageSquare, Sun, Moon } from 'lucide-react';
+import { Cpu, Download, Folder, MessageSquare, Sun, Moon, Menu } from 'lucide-react';
 import { Button } from '../ui/Button';
 import { useAppStore } from '../../stores/appStore';
 
@@ -7,18 +7,28 @@ interface ChatHeaderProps {
   chatTitle: string;
   projectName?: string | null;
   onExport: () => void;
+  onToggleSidebar?: () => void;
 }
 
-export const ChatHeader: React.FC<ChatHeaderProps> = ({ chatTitle, projectName, onExport }) => {
+export const ChatHeader: React.FC<ChatHeaderProps> = ({ chatTitle, projectName, onExport, onToggleSidebar }) => {
   const { executionConfig, aiMode, selectedModel, theme, setTheme } = useAppStore();
 
   const displayActiveModel = selectedModel || executionConfig.modelName;
   const modeLabel = aiMode === 'local' ? 'Local' : 'Cloud';
 
   return (
-    <header className="h-14 w-full flex items-center justify-between px-6 border-b border-zinc-200 dark:border-zinc-850 bg-white dark:bg-zinc-950 text-zinc-900 dark:text-white shrink-0 z-10 select-none transition-colors">
+    <header className="h-14 w-full flex items-center justify-between px-4 sm:px-6 border-b border-zinc-200 dark:border-zinc-800/80 bg-white dark:bg-[#151922] text-zinc-900 dark:text-white shrink-0 z-10 select-none shadow-2xs transition-colors">
       {/* Title & Context Badge */}
-      <div className="flex items-center gap-3 min-w-0">
+      <div className="flex items-center gap-2.5 min-w-0">
+        {onToggleSidebar && (
+          <button
+            onClick={onToggleSidebar}
+            className="md:hidden p-1.5 rounded-lg bg-zinc-100 dark:bg-zinc-850 border border-zinc-200 dark:border-zinc-750 text-zinc-700 dark:text-zinc-300 hover:text-blue-500 transition cursor-pointer"
+            title="Toggle Navigation Menu"
+          >
+            <Menu className="w-4 h-4" />
+          </button>
+        )}
         <div className="flex items-center gap-2 px-2.5 py-1 rounded-xl bg-zinc-100 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-xs text-zinc-700 dark:text-zinc-300 font-mono">
           {projectName ? (
             <>

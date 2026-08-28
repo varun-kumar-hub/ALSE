@@ -47,6 +47,10 @@ interface SidebarProps {
   onDeleteProject: (id: string) => void;
   onOpenSettings: () => void;
   onRefreshData?: () => void;
+  isOpen?: boolean;
+  onClose?: () => void;
+  isPinned?: boolean;
+  onTogglePinSidebar?: () => void;
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({
@@ -66,6 +70,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onDeleteProject,
   onOpenSettings,
   onRefreshData,
+  isOpen = true,
+  onClose,
+  isPinned = true,
+  onTogglePinSidebar,
 }) => {
   const { theme, setTheme } = useAppStore();
   const [isGeneralExpanded, setIsGeneralExpanded] = useState(true);
@@ -350,25 +358,50 @@ export const Sidebar: React.FC<SidebarProps> = ({
   };
 
   return (
-    <aside className="h-screen w-64 bg-white dark:bg-zinc-950 border-r border-zinc-200 dark:border-zinc-850 flex flex-col shrink-0 select-none z-20 font-sans text-zinc-900 dark:text-zinc-100 transition-colors">
-      {/* Product Title Header */}
-      <div className="p-4 border-b border-zinc-200 dark:border-zinc-850 flex items-center justify-between">
-        <div>
-          <h2 className="text-base font-bold text-zinc-950 dark:text-white tracking-tight flex items-center gap-2">
-            <span className="w-2.5 h-2.5 rounded-full bg-blue-500 inline-block"></span>
-            LearnForge
-          </h2>
-          <span className="text-[10px] text-zinc-500 dark:text-zinc-400 font-mono block mt-0.5">
-            {activeProject ? `Subject: ${activeProject.name}` : 'General Workspace'}
-          </span>
-        </div>
-      </div>
+    <>
+      {/* Mobile Drawer Overlay Backdrop */}
+      {isOpen && (
+        <div
+          onClick={onClose}
+          className="fixed inset-0 bg-black/50 z-40 md:hidden animate-in fade-in duration-150"
+        />
+      )}
 
-      {/* New Chat Action Button */}
-      <div className="p-3 border-b border-zinc-200 dark:border-zinc-850">
+      <aside
+        className={`h-screen w-64 bg-white dark:bg-[#101318] border-r border-zinc-200 dark:border-zinc-800/80 flex flex-col shrink-0 select-none z-50 font-sans text-zinc-900 dark:text-zinc-100 shadow-xs transition-all duration-200 ${
+          isOpen ? 'fixed inset-y-0 left-0 md:static' : 'hidden md:flex'
+        }`}
+      >
+        {/* Product Title Header */}
+        <div className="p-4 border-b border-zinc-200 dark:border-zinc-800/80 flex items-center justify-between">
+          <div>
+            <h2 className="text-base font-extrabold text-zinc-950 dark:text-white tracking-tight flex items-center gap-2">
+              <span className="w-2.5 h-2.5 rounded-full bg-blue-500 inline-block shadow-xs"></span>
+              LearnForge
+            </h2>
+            <span className="text-[10px] text-zinc-500 dark:text-zinc-400 font-mono block mt-0.5">
+              {activeProject ? `Subject: ${activeProject.name}` : 'General Workspace'}
+            </span>
+          </div>
+
+          <div className="flex items-center gap-1">
+            {onTogglePinSidebar && (
+              <button
+                onClick={onTogglePinSidebar}
+                className="p-1 rounded-lg text-zinc-400 hover:text-blue-500 transition cursor-pointer"
+                title={isPinned ? 'Unpin Sidebar (Collapsible)' : 'Pin Sidebar'}
+              >
+                {isPinned ? <Pin className="w-3.5 h-3.5 text-blue-500" /> : <PinOff className="w-3.5 h-3.5 text-zinc-400" />}
+              </button>
+            )}
+          </div>
+        </div>
+
+      {/* New Chat Primary Action Button */}
+      <div className="p-3 border-b border-zinc-200 dark:border-zinc-800/80">
         <button
           onClick={onNewChat}
-          className="w-full py-2.5 px-3 bg-zinc-900 dark:bg-white text-white dark:text-zinc-950 font-semibold rounded-xl hover:bg-zinc-800 dark:hover:bg-zinc-200 transition text-xs flex items-center justify-center gap-2 shadow-xs cursor-pointer"
+          className="w-full py-2.5 px-3 bg-blue-600 dark:bg-white text-white dark:text-zinc-950 font-bold rounded-xl hover:bg-blue-500 dark:hover:bg-zinc-200 transition text-xs flex items-center justify-center gap-2 shadow-sm cursor-pointer"
         >
           <Plus className="w-4 h-4" />
           <span>{activeProject ? `New Chat in ${activeProject.name}` : 'New General Chat'}</span>
@@ -384,7 +417,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
             placeholder="Search chats & subjects..."
             value={sidebarSearch}
             onChange={(e) => setSidebarSearch(e.target.value)}
-            className="w-full bg-zinc-100 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl pl-8 pr-3 py-1.5 text-xs text-zinc-900 dark:text-white placeholder-zinc-500 focus:outline-none focus:border-blue-500 transition"
+            className="w-full bg-zinc-50 dark:bg-[#11151b] border border-zinc-200 dark:border-zinc-800/80 rounded-xl pl-8 pr-3 py-1.5 text-xs text-zinc-900 dark:text-white placeholder-zinc-400 focus:outline-none focus:border-blue-500 transition"
           />
         </div>
       </div>
@@ -401,8 +434,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
             onClick={() => onSelectView('projects')}
             className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-medium transition cursor-pointer ${
               activeView === 'projects'
-                ? 'bg-zinc-100 dark:bg-zinc-850 text-zinc-950 dark:text-white font-semibold'
-                : 'text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-900'
+                ? 'bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400 font-semibold border-l-2 border-blue-500 shadow-2xs'
+                : 'text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-900/60'
             }`}
           >
             <BookOpen className="w-4 h-4 text-blue-500" />
@@ -640,5 +673,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
         </button>
       </div>
     </aside>
-  );
+  </>
+);
 };

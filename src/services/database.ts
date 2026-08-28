@@ -538,7 +538,12 @@ export async function getProjects(): Promise<ProjectItem[]> {
       localStorage.setItem('ai_os_projects', JSON.stringify(DEFAULT_PROJECTS));
       return DEFAULT_PROJECTS;
     }
-    return JSON.parse(raw);
+    const parsed: ProjectItem[] = JSON.parse(raw);
+    const cleaned = parsed.filter((p) => !['data-structures', 'agririsk', 'adaptive-learning'].includes(p.id));
+    if (cleaned.length !== parsed.length) {
+      localStorage.setItem('ai_os_projects', JSON.stringify(cleaned));
+    }
+    return cleaned;
   }
   const rows = await db.select<ProjectItem[]>(`SELECT id, name, description, created_at FROM workspace_projects ORDER BY created_at DESC`);
   if (rows.length === 0) {

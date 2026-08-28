@@ -24,6 +24,9 @@ export function getProxiedUrl(url: string): string {
   if (url.startsWith('https://generativelanguage.googleapis.com')) {
     return url.replace('https://generativelanguage.googleapis.com', '/proxy/gemini');
   }
+  if (url.startsWith('https://integrate.api.nvidia.com')) {
+    return url.replace('https://integrate.api.nvidia.com', '/proxy/nvidia');
+  }
 
   return url;
 }

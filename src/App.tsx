@@ -78,6 +78,8 @@ export function App() {
   const [messages, setMessages] = useState<ChatMessageType[]>([]);
   const [showSettings, setShowSettings] = useState(false);
   const [showNewProjectModal, setShowNewProjectModal] = useState(false);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [isSidebarPinned, setIsSidebarPinned] = useState(true);
 
   // Initialize app settings, projects, and local persistence.
   useEffect(() => {
@@ -398,34 +400,44 @@ export function App() {
   const projectChats = chats.filter((c) => c.project_id === activeProjectId);
 
   return (
-    <div className="flex h-screen w-screen overflow-hidden bg-white dark:bg-zinc-950 text-zinc-900 dark:text-zinc-100 font-sans transition-colors">
+    <div className="flex h-screen w-screen overflow-hidden bg-[#f6f8fb] dark:bg-[#0b0d10] text-zinc-900 dark:text-zinc-100 font-sans transition-colors">
       <Sidebar
         chats={chats}
         projects={projects}
         activeProjectId={activeProjectId}
         activeChatId={currentChatId}
         activeView={activeWorkspaceView}
-        onSelectView={(v) => setActiveWorkspaceView(v)}
+        isOpen={isSidebarOpen}
+        onClose={() => setIsSidebarOpen(false)}
+        isPinned={isSidebarPinned}
+        onTogglePinSidebar={() => setIsSidebarPinned(!isSidebarPinned)}
+        onSelectView={(v) => {
+          setActiveWorkspaceView(v);
+          if (!isSidebarPinned) setIsSidebarOpen(false);
+        }}
         onSelectProject={(projId) => {
           handleSelectProject(projId);
           if (projId) setActiveWorkspaceView('project_dashboard');
+          if (!isSidebarPinned) setIsSidebarOpen(false);
         }}
-        onNewChat={() => handleNewChat()}
+        onNewChat={() => {
+          handleNewChat();
+          if (!isSidebarPinned) setIsSidebarOpen(false);
+        }}
         onOpenNewProject={() => setShowNewProjectModal(true)}
-        onSelectChat={handleSelectChat}
+        onSelectChat={(id) => {
+          handleSelectChat(id);
+          if (!isSidebarPinned) setIsSidebarOpen(false);
+        }}
         onRenameChat={handleRenameChat}
         onTogglePin={handleTogglePin}
         onDeleteChat={handleDeleteChat}
         onDeleteProject={handleDeleteProject}
         onOpenSettings={() => setShowSettings(true)}
-        onRefreshData={() => {
-          loadChats();
-          loadProjects();
-        }}
       />
 
       {/* Main Workspace Area */}
-      <main className="flex-1 h-screen flex flex-col overflow-hidden bg-slate-50 dark:bg-zinc-950 text-zinc-900 dark:text-zinc-100 relative transition-colors">
+      <main className="flex-1 h-screen flex flex-col overflow-hidden bg-[#f6f8fb] dark:bg-[#0b0d10] text-zinc-900 dark:text-zinc-100 relative transition-colors">
         {activeWorkspaceView !== 'project_dashboard' && activeWorkspaceView !== 'projects' && (
           <ChatHeader
             chatTitle={
@@ -435,6 +447,7 @@ export function App() {
             }
             projectName={activeProject ? activeProject.name : null}
             onExport={handleExportChat}
+            onToggleSidebar={() => setIsSidebarOpen(!isSidebarOpen)}
           />
         )}
 

@@ -366,15 +366,6 @@ export async function validateAndDiscoverProvider(
     const latencyMs = Date.now() - startTime;
 
     if (!resp.ok) {
-      if (providerId === 'nvidia' && apiKey.trim().startsWith('nvapi-')) {
-        return {
-          connected: true,
-          models: registry.supportedModels,
-          capabilities: registry.capabilities,
-          latencyMs: 120,
-        };
-      }
-
       const errText = await resp.text().catch(() => '');
       const category = resp.status === 401 || resp.status === 403 ? 'Authentication Failed' : 'Endpoint Failed';
       return {
@@ -404,23 +395,14 @@ export async function validateAndDiscoverProvider(
       latencyMs,
     };
   } catch (err) {
-    if (providerId === 'nvidia' && apiKey.trim().startsWith('nvapi-')) {
-      return {
-        connected: true,
-        models: registry.supportedModels,
-        capabilities: registry.capabilities,
-        latencyMs: 150,
-      };
-    }
-
     const errorMsg = err instanceof Error ? err.message : String(err);
 
     return {
       connected: false,
-      models: [], // DO NOT populate with Ollama models on failure!
+      models: [],
       capabilities: registry.capabilities,
-      errorCategory: 'Network Error',
-      error: `Network verification error: ${errorMsg}`,
+      errorCategory: 'Connection Timeout',
+      error: `Could not connect to ${registry.name}: ${errorMsg}`,
     };
   }
 }

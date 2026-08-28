@@ -21,12 +21,12 @@ export const OSDashboard: React.FC<OSDashboardProps> = ({ onNewChat, onOpenSetti
   } = useAppStore();
 
   return (
-    <div className="flex-1 h-full overflow-y-auto bg-slate-50 dark:bg-zinc-950 p-8 select-none space-y-8 animate-in fade-in duration-200 text-zinc-900 dark:text-zinc-100 font-sans transition-colors">
-      {/* Top Welcome Header Card */}
-      <div className="max-w-4xl mx-auto rounded-2xl bg-white dark:bg-zinc-900/80 p-8 border border-zinc-200 dark:border-zinc-850 shadow-sm flex flex-col md:flex-row items-start md:items-center justify-between gap-6 transition-colors">
+    <div className="flex-1 h-full overflow-y-auto bg-[#f6f8fb] dark:bg-[#0b0d10] p-8 select-none space-y-8 animate-in fade-in duration-200 text-zinc-900 dark:text-zinc-100 font-sans transition-colors">
+      {/* Top Welcome Header Card (Hero Primary Feature Surface) */}
+      <div className="max-w-4xl mx-auto rounded-2xl bg-gradient-to-br from-white via-white to-blue-50/50 dark:from-[#151922] dark:via-[#151922] dark:to-[#1b2029] p-8 border border-blue-100 dark:border-zinc-800 shadow-sm flex flex-col md:flex-row items-start md:items-center justify-between gap-6 transition-colors">
         <div className="space-y-3 max-w-lg">
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 font-bold text-xs border border-zinc-200 dark:border-zinc-750 font-mono">
-            <Brain className="w-4 h-4 text-blue-500" />
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-50 dark:bg-zinc-800 text-blue-700 dark:text-zinc-300 font-bold text-xs border border-blue-100 dark:border-zinc-700 font-mono">
+            <Brain className="w-4 h-4 text-blue-600 dark:text-blue-400" />
             <span>LearnForge Adaptive Learning Agent</span>
           </div>
           <h1 className="text-2xl md:text-3xl font-extrabold text-zinc-950 dark:text-white tracking-tight">
@@ -52,9 +52,9 @@ export const OSDashboard: React.FC<OSDashboardProps> = ({ onNewChat, onOpenSetti
       <div className="max-w-4xl mx-auto grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
         <div
           onClick={onNewChat}
-          className="p-5 rounded-2xl bg-white dark:bg-zinc-900/60 border border-zinc-200 dark:border-zinc-850 hover:border-blue-500/40 dark:hover:border-zinc-700 shadow-xs transition cursor-pointer space-y-3 group"
+          className="p-5 rounded-2xl bg-white dark:bg-[#151922] border border-zinc-200 dark:border-zinc-800/80 hover:border-blue-500/40 shadow-xs hover:shadow-md hover:-translate-y-0.5 transition-all cursor-pointer space-y-3 group"
         >
-          <div className="w-10 h-10 rounded-xl bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-750 flex items-center justify-center text-blue-500 dark:text-white group-hover:scale-105 transition-transform">
+          <div className="w-10 h-10 rounded-xl bg-blue-50 dark:bg-zinc-800 border border-blue-100 dark:border-zinc-700 flex items-center justify-center text-blue-600 dark:text-white group-hover:scale-105 transition-transform">
             <Brain className="w-5 h-5" />
           </div>
           <div>

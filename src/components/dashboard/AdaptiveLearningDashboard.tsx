@@ -63,7 +63,7 @@ export const AdaptiveLearningDashboard: React.FC<AdaptiveLearningDashboardProps>
   };
 
   return (
-    <div className="flex-1 h-full overflow-y-auto bg-slate-50 dark:bg-zinc-950 text-zinc-900 dark:text-zinc-100 p-6 md:p-8 space-y-8 font-sans transition-colors select-none">
+    <div className="flex-1 h-full overflow-y-auto bg-[#f6f8fb] dark:bg-[#0b0d10] text-zinc-900 dark:text-zinc-100 p-6 md:p-8 space-y-8 font-sans transition-colors select-none">
       {/* ──────── HEADER & WORKSPACE CONTEXT ──────── */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-zinc-200 dark:border-zinc-850 pb-6">
         <div>
@@ -437,7 +437,7 @@ export const AdaptiveLearningDashboard: React.FC<AdaptiveLearningDashboardProps>
           </div>
 
           <div className="relative pl-6 border-l-2 border-zinc-200 dark:border-zinc-800 space-y-5 my-2">
-            {trajectory.map((step, idx) => (
+            {trajectory.map((step) => (
               <div key={step.conceptId} className="relative group">
                 {/* Node Bullet */}
                 <div
@@ -583,7 +583,9 @@ export const AdaptiveLearningDashboard: React.FC<AdaptiveLearningDashboardProps>
                   {dp.difficulty}
                 </span>
               </div>
-              <div className="text-xs font-bold text-zinc-950 dark:text-white">{dp.concept}</div>
+              <div className="text-xs font-bold text-zinc-950 dark:text-white font-mono">
+                {'concept' in dp ? dp.concept : 'General Learning'}
+              </div>
               <p className="text-[11px] text-zinc-500 font-sans line-clamp-2 leading-relaxed">
                 {dp.reason}
               </p>

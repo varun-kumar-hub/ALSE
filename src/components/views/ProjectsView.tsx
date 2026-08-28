@@ -41,7 +41,7 @@ export const ProjectsView: React.FC<ProjectsViewProps> = ({
   });
 
   return (
-    <div className="flex-1 h-full overflow-y-auto bg-slate-50 dark:bg-zinc-950 text-zinc-900 dark:text-zinc-100 p-6 md:p-8 space-y-6 transition-colors">
+    <div className="flex-1 h-full overflow-y-auto bg-[#f6f8fb] dark:bg-[#0b0d10] text-zinc-900 dark:text-zinc-100 p-6 md:p-8 space-y-6 transition-colors">
       {/* Top Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-zinc-200 dark:border-zinc-850 pb-6">
         <div>
