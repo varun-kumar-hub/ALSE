@@ -80,11 +80,25 @@ if (!canBuildDesktop && hasCommand('cargo')) {
   console.log(`Starting Nexus Agent in ${canBuildDesktop ? 'Desktop (Tauri)' : 'Web (Vite)'} mode...`);
 }
 
+// Start PS6 FastAPI Backend if Python is present
+let fastApiProcess = null;
+if (hasCommand('python')) {
+  console.log('⚡ Starting LearnForge PS6 FastAPI Backend on http://127.0.0.1:8000 ...');
+  fastApiProcess = spawn('python', ['server/main.py'], {
+    stdio: 'inherit',
+    shell: isWindows,
+  });
+}
+
 const child = spawn(npmCommand, ['run', targetScript], {
   stdio: 'inherit',
   shell: isWindows,
 });
 
 child.on('exit', (code) => {
+  if (fastApiProcess) {
+    fastApiProcess.kill();
+  }
   process.exit(code ?? 0);
 });
+

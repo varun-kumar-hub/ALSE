@@ -1,15 +1,11 @@
 import React, { useState } from 'react';
 import {
-  Cloud,
   Search,
-  Key,
   RefreshCw,
   CheckCircle2,
   AlertCircle,
   Zap,
-  BarChart3,
 } from 'lucide-react';
-import { Button } from '../ui/Button';
 import {
   validateAndDiscoverProvider,
   searchProviders,
@@ -140,7 +136,7 @@ export const CloudSettings: React.FC<CloudSettingsProps> = ({
         ...prev,
         [cfg.id]: {
           success: false,
-          message: result.error || `${result.errorCategory || 'Connection failed'}. Verification rejected by endpoint.`,
+          message: `Connection test failed for ${cfg.name}. Check your API Key & endpoint configuration.`,
         },
       }));
     }
@@ -163,26 +159,26 @@ export const CloudSettings: React.FC<CloudSettingsProps> = ({
   const hasKeyCurrent = activeProviderConfig?.apiKeySet || Boolean(activeProviderConfig?.apiKey && activeProviderConfig.apiKey.trim().length > 0);
 
   return (
-    <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-250 select-none text-xs">
-      {/* Smart Cloud Provider Manager Card */}
+    <div className="space-y-6 animate-in fade-in duration-200 select-none text-xs text-zinc-100">
+      {/* Smart Cloud Provider Manager Header */}
       <div className="space-y-4">
         <div className="flex items-center justify-between">
-          <label className="text-xs font-bold text-blue-900 flex items-center gap-1.5 uppercase tracking-wider">
-            <Zap className="w-4 h-4 text-blue-600" /> Cloud AI Provider Manager
+          <label className="text-xs font-bold text-blue-400 flex items-center gap-1.5 uppercase tracking-wider font-mono">
+            <Zap className="w-4 h-4 text-blue-400" /> Cloud AI Provider Manager
           </label>
-          <span className="text-[10px] text-zinc-400 font-mono">Real Authentication Verification</span>
+          <span className="text-[10px] text-zinc-500 font-mono">Real Authentication Verification</span>
         </div>
 
         {/* Provider Selector Tabs */}
-        <div className="space-y-2">
+        <div className="space-y-3">
           <div className="relative">
-            <Search className="w-3.5 h-3.5 absolute left-3 top-2.5 text-zinc-400" />
+            <Search className="w-3.5 h-3.5 absolute left-3 top-2.5 text-zinc-500" />
             <input
               type="text"
               placeholder="Search cloud provider (e.g. OpenCode Zen, OpenAI, Claude, Gemini, Groq)..."
               value={providerSearch}
               onChange={(e) => setProviderSearch(e.target.value)}
-              className="w-full pl-9 pr-3 py-1.5 bg-zinc-50 border border-zinc-200 rounded-xl text-xs text-zinc-900 focus:outline-none focus:border-blue-500 focus:bg-white transition-all"
+              className="w-full pl-9 pr-3 py-2 bg-zinc-950 border border-zinc-800 rounded-xl text-xs text-zinc-100 placeholder-zinc-500 focus:outline-none focus:border-zinc-700 transition"
             />
           </div>
 
@@ -197,21 +193,21 @@ export const CloudSettings: React.FC<CloudSettingsProps> = ({
                   key={p.id}
                   type="button"
                   onClick={() => setActiveProviderId(p.id)}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition-all flex items-center gap-1.5 ${
+                  className={`px-3.5 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap transition flex items-center gap-1.5 ${
                     activeProviderId === p.id
-                      ? 'bg-blue-600 text-white shadow-sm'
+                      ? 'bg-blue-600 text-white font-bold shadow-xs'
                       : isActive
-                      ? 'bg-emerald-50 text-emerald-800 border border-emerald-300 font-bold'
+                      ? 'bg-emerald-500/10 text-emerald-300 border border-emerald-500/30'
                       : isConfigured
-                      ? 'bg-blue-50 text-blue-700 border border-blue-200 hover:bg-blue-100'
-                      : 'bg-zinc-100 text-zinc-600 hover:bg-zinc-200'
+                      ? 'bg-blue-500/10 text-blue-300 border border-blue-500/30 hover:bg-blue-500/20'
+                      : 'bg-zinc-900 text-zinc-400 border border-zinc-800 hover:bg-zinc-850 hover:text-zinc-200'
                   }`}
                 >
                   {p.name}
                   {isActive ? (
-                    <span className="w-2 h-2 rounded-full bg-emerald-500 ring-2 ring-emerald-300 inline-block animate-pulse" title="Active Connected Model" />
+                    <span className="w-2 h-2 rounded-full bg-emerald-400 ring-2 ring-emerald-400/40 inline-block animate-pulse" title="Active Connected Model" />
                   ) : isConfigured ? (
-                    <span className="w-1.5 h-1.5 rounded-full bg-blue-500 inline-block" title="Key Configured" />
+                    <span className="w-1.5 h-1.5 rounded-full bg-blue-400 inline-block" title="Key Configured" />
                   ) : null}
                 </button>
               );
@@ -219,37 +215,37 @@ export const CloudSettings: React.FC<CloudSettingsProps> = ({
           </div>
         </div>
 
-        {/* Unified Single-Form Configuration Card */}
+        {/* Unified Configuration Card */}
         {activeProviderConfig && (
-          <div className="p-4 rounded-2xl border border-zinc-200 bg-white space-y-4 shadow-sm">
-            <div className="flex items-center justify-between border-b border-zinc-100 pb-3">
+          <div className="p-5 rounded-2xl border border-zinc-800 bg-zinc-950/80 space-y-4">
+            <div className="flex items-center justify-between border-b border-zinc-850 pb-3">
               <div className="flex items-center gap-2">
-                <span className="font-bold text-sm text-zinc-900">{activeProviderConfig.name}</span>
+                <span className="font-bold text-sm text-white">{activeProviderConfig.name}</span>
                 {detectedPatternBadge && (
-                  <span className="text-[10px] px-2 py-0.5 rounded-full bg-purple-100 text-purple-800 font-bold animate-pulse">
+                  <span className="text-[10px] px-2.5 py-0.5 rounded-full bg-purple-500/10 border border-purple-500/30 text-purple-300 font-mono font-bold">
                     {detectedPatternBadge}
                   </span>
                 )}
                 {validationResult[activeProviderConfig.id] ? (
                   validationResult[activeProviderConfig.id].success ? (
-                    <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 font-bold flex items-center gap-1">
-                      <CheckCircle2 className="w-3 h-3 text-emerald-600" /> Connected & Active
+                    <span className="text-[10px] px-2.5 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 font-mono font-bold flex items-center gap-1">
+                      <CheckCircle2 className="w-3 h-3 text-emerald-400" /> Connected & Active
                     </span>
                   ) : (
-                    <span className="text-[10px] px-2 py-0.5 rounded-full bg-rose-100 text-rose-800 font-bold flex items-center gap-1">
-                      <AlertCircle className="w-3 h-3 text-rose-600" /> Auth Failed
+                    <span className="text-[10px] px-2.5 py-0.5 rounded-full bg-rose-500/10 border border-rose-500/30 text-rose-400 font-mono font-bold flex items-center gap-1">
+                      <AlertCircle className="w-3 h-3 text-rose-400" /> Auth Failed
                     </span>
                   )
                 ) : isActiveCurrent ? (
-                  <span className="text-[10px] px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800 font-bold flex items-center gap-1 border border-emerald-300">
-                    <Zap className="w-3 h-3 text-emerald-600" /> Active Model Provider
+                  <span className="text-[10px] px-2.5 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 font-mono font-bold flex items-center gap-1">
+                    <Zap className="w-3 h-3 text-emerald-400" /> Active Model Provider
                   </span>
                 ) : hasKeyCurrent ? (
-                  <span className="text-[10px] px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 font-semibold flex items-center gap-1 border border-blue-200">
-                    <CheckCircle2 className="w-3 h-3 text-blue-500" /> Key Configured (Ready)
+                  <span className="text-[10px] px-2.5 py-0.5 rounded-full bg-blue-500/10 border border-blue-500/30 text-blue-300 font-mono font-semibold flex items-center gap-1">
+                    <CheckCircle2 className="w-3 h-3 text-blue-400" /> Key Configured (Ready)
                   </span>
                 ) : (
-                  <span className="text-[10px] px-2 py-0.5 rounded-full bg-zinc-100 text-zinc-600 font-medium">
+                  <span className="text-[10px] px-2.5 py-0.5 rounded-full bg-zinc-900 border border-zinc-800 text-zinc-500 font-mono">
                     Not Configured
                   </span>
                 )}
@@ -268,12 +264,12 @@ export const CloudSettings: React.FC<CloudSettingsProps> = ({
                 }}
                 className="inline-flex items-center gap-2 cursor-pointer select-none shrink-0 whitespace-nowrap ml-auto"
               >
-                <span className="text-[10px] font-semibold text-zinc-600 shrink-0 whitespace-nowrap">
+                <span className="text-[10px] font-mono font-semibold text-zinc-400 shrink-0 whitespace-nowrap">
                   {activeProviderConfig.enabled ? 'Provider Enabled' : 'Provider Disabled'}
                 </span>
                 <div
                   className={`relative inline-flex h-5 w-9 shrink-0 items-center rounded-full p-0.5 transition-colors duration-200 ease-in-out focus:outline-none ${
-                    activeProviderConfig.enabled ? 'bg-blue-600' : 'bg-zinc-300'
+                    activeProviderConfig.enabled ? 'bg-blue-600' : 'bg-zinc-800'
                   }`}
                 >
                   <span
@@ -288,7 +284,7 @@ export const CloudSettings: React.FC<CloudSettingsProps> = ({
             {/* Base URL (Only for Custom Provider) */}
             {(activeProviderConfig.id === 'custom' || activeProviderConfig.isCustom) && (
               <div className="space-y-1">
-                <label className="text-[10px] font-medium text-zinc-600">Custom Base URL</label>
+                <label className="text-[10px] font-mono text-zinc-400">Custom Base URL</label>
                 <input
                   type="text"
                   placeholder="http://localhost:8000/v1"
@@ -296,155 +292,86 @@ export const CloudSettings: React.FC<CloudSettingsProps> = ({
                   onChange={(e) =>
                     updateProviderConfig(activeProviderConfig.id, { baseUrl: e.target.value })
                   }
-                  className="w-full bg-white border border-zinc-200 rounded-lg px-2.5 py-1.5 text-xs text-zinc-950 font-mono focus:outline-none focus:border-blue-500"
+                  className="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-2 text-xs text-white font-mono focus:outline-none focus:border-zinc-700 transition"
                 />
               </div>
             )}
 
-            {/* API Key & Model Input Grid */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            {/* API Key Input Row */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-1">
-                <label className="text-[10px] font-medium text-zinc-600 flex items-center gap-1">
-                  <Key className="w-3 h-3 text-zinc-400" /> API Key
+                <label className="text-[10px] font-mono text-zinc-400 flex items-center justify-between">
+                  <span>API Key</span>
+                  <a
+                    href={(activeProviderConfig as any).apiKeyDocsUrl || '#'}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="text-blue-400 hover:underline"
+                  >
+                    Get Key
+                  </a>
                 </label>
                 <input
                   type="password"
                   placeholder="Enter API key..."
                   value={activeProviderConfig.apiKey || ''}
                   onChange={(e) => handleApiKeyChange(activeProviderConfig.id, e.target.value)}
-                  className="w-full bg-white border border-zinc-200 rounded-lg px-2.5 py-1.5 text-xs text-zinc-950 font-mono focus:outline-none focus:border-blue-500"
+                  className="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-2 text-xs text-white placeholder-zinc-600 font-mono focus:outline-none focus:border-zinc-700 transition"
                 />
               </div>
 
+              {/* Model Select */}
               <div className="space-y-1">
-                <div className="flex items-center justify-between">
-                  <label className="text-[10px] font-medium text-zinc-600">Connected Cloud Model</label>
-                  {isActiveCurrent ? (
-                    <span className="text-[9px] font-bold text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded border border-emerald-300 flex items-center gap-1">
-                      <Zap className="w-2.5 h-2.5 text-emerald-600" /> Active Model
-                    </span>
-                  ) : hasKeyCurrent ? (
-                    <button
-                      type="button"
-                      onClick={() => handleMakeActiveModel(activeProviderConfig)}
-                      className="text-[9px] font-bold text-blue-600 bg-blue-50 hover:bg-blue-100 px-2 py-0.5 rounded border border-blue-200 flex items-center gap-1 transition-all"
-                    >
-                      <Zap className="w-2.5 h-2.5 text-blue-600" /> Set as Active Model
-                    </button>
-                  ) : null}
-                </div>
+                <label className="text-[10px] font-mono text-zinc-400">Connected Cloud Model</label>
                 <select
-                  value={activeProviderConfig.defaultModel}
-                  onChange={(e) => {
-                    const newModel = e.target.value;
-                    updateProviderConfig(activeProviderConfig.id, { defaultModel: newModel });
-                    handleMakeActiveModel(activeProviderConfig, newModel);
-                  }}
-                  className="w-full bg-white border border-zinc-200 rounded-lg px-2.5 py-1.5 text-xs text-zinc-950 font-mono focus:outline-none focus:border-blue-500 font-semibold"
+                  value={activeProviderConfig.defaultModel || currentModelsList[0]}
+                  onChange={(e) => handleMakeActiveModel(activeProviderConfig, e.target.value)}
+                  className="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-2 text-xs text-white font-mono focus:outline-none focus:border-zinc-700 transition"
                 >
                   {currentModelsList.map((m) => (
-                    <option key={m} value={m}>
-                      {m} {m === selectedModel ? '★ (Active Model)' : ''}
+                    <option key={m} value={m} className="bg-zinc-900 text-white">
+                      {m}
                     </option>
                   ))}
                 </select>
               </div>
             </div>
 
-            {/* Actions & Live Validation Banner */}
-            <div className="flex items-center justify-between pt-1">
-              <div className="flex items-center gap-2">
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="primary"
-                  onClick={() => handleValidateProvider(activeProviderConfig)}
-                  isLoading={validatingId === activeProviderConfig.id}
-                  leftIcon={
-                    <RefreshCw
-                      className={`w-3.5 h-3.5 ${
-                        validatingId === activeProviderConfig.id ? 'animate-spin' : ''
-                      }`}
-                    />
-                  }
-                >
-                  Verify Credentials & Endpoint
-                </Button>
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="secondary"
-                  onClick={() => handleSave(activeProviderConfig.id)}
-                >
-                  {savedProviderId === activeProviderConfig.id ? 'Saved!' : 'Save Config'}
-                </Button>
-              </div>
+            {/* Action Buttons */}
+            <div className="flex items-center gap-2 pt-2">
+              <button
+                type="button"
+                onClick={() => handleValidateProvider(activeProviderConfig)}
+                disabled={validatingId === activeProviderConfig.id}
+                className="px-4 py-2 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white font-bold text-xs rounded-xl shadow-xs transition flex items-center gap-1.5"
+              >
+                <RefreshCw className={`w-3.5 h-3.5 ${validatingId === activeProviderConfig.id ? 'animate-spin' : ''}`} />
+                <span>{validatingId === activeProviderConfig.id ? 'Testing...' : 'Verify Credentials & Endpoint'}</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => handleSave(activeProviderConfig.id)}
+                className="px-4 py-2 bg-zinc-900 hover:bg-zinc-850 text-zinc-200 border border-zinc-800 font-semibold text-xs rounded-xl transition"
+              >
+                {savedProviderId === activeProviderConfig.id ? 'Saved!' : 'Save Config'}
+              </button>
             </div>
 
+            {/* Validation Feedback Banner */}
             {validationResult[activeProviderConfig.id] && (
               <div
-                className={`p-3 rounded-xl text-xs flex items-start gap-2.5 ${
+                className={`p-3 rounded-xl text-xs font-mono border ${
                   validationResult[activeProviderConfig.id].success
-                    ? 'bg-emerald-50 border border-emerald-200 text-emerald-900'
-                    : 'bg-rose-50 border border-rose-200 text-rose-900'
+                    ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-300'
+                    : 'bg-rose-500/10 border-rose-500/20 text-rose-300'
                 }`}
               >
-                {validationResult[activeProviderConfig.id].success ? (
-                  <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
-                ) : (
-                  <AlertCircle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
-                )}
-                <div>
-                  <p className="font-semibold">{validationResult[activeProviderConfig.id].message}</p>
-                  {validationResult[activeProviderConfig.id].latencyMs && (
-                    <p className="text-[10px] text-emerald-700 font-mono mt-0.5">
-                      Latency: {validationResult[activeProviderConfig.id].latencyMs}ms | Verified Models:{' '}
-                      {validationResult[activeProviderConfig.id].modelsCount}
-                    </p>
-                  )}
-                </div>
+                {validationResult[activeProviderConfig.id].message}
               </div>
             )}
-
-            {/* Capabilities Badges */}
-            <div className="flex flex-wrap gap-1 pt-1 border-t border-zinc-100">
-              <span className="text-[10px] font-semibold text-zinc-500 mr-1 self-center">Capabilities:</span>
-              {activeProviderConfig.capabilities.map((cap) => (
-                <span
-                  key={cap}
-                  className="text-[9px] px-2 py-0.5 rounded bg-blue-50 text-blue-700 font-mono"
-                >
-                  ✓ {cap}
-                </span>
-              ))}
-            </div>
           </div>
         )}
-      </div>
-
-      {/* Real-time Cloud Metrics Dashboard */}
-      <div className="grid grid-cols-2 gap-3 pt-2">
-        <div className="p-3 rounded-2xl bg-blue-50/50 border border-blue-100 space-y-1">
-          <span className="text-[10px] font-semibold text-blue-600 uppercase flex items-center gap-1">
-            <Cloud className="w-3.5 h-3.5 text-blue-600" /> Verified Cloud Providers
-          </span>
-          <p className="text-base font-bold text-zinc-900 font-mono">
-            {providerConfigs.filter((p) => p.apiKeySet && p.enabled).length} Active
-          </p>
-        </div>
-
-        <div className="p-3 rounded-2xl bg-purple-50/50 border border-purple-100 space-y-1">
-          <span className="text-[10px] font-semibold text-purple-600 uppercase flex items-center gap-1">
-            <BarChart3 className="w-3.5 h-3.5 text-purple-600" /> Discovered Cloud Models
-          </span>
-          <p className="text-base font-bold text-purple-900 font-mono">
-            {providerConfigs.reduce(
-              (acc, p) => acc + (p.discoveredModels?.length || (p.apiKeySet ? 1 : 0)),
-              0
-            )}{' '}
-            Models Available
-          </p>
-        </div>
       </div>
     </div>
   );

@@ -2,15 +2,9 @@ import React from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import rehypeHighlight from 'rehype-highlight';
-import { User, Bot, BookOpen, GitCompare, Code2, Calendar, Copy, Check } from 'lucide-react';
+import { User, Bot, Copy, Check } from 'lucide-react';
 import { ChatMessage as ChatMessageType } from '../../services/types';
 import { ResponseActions } from './ResponseActions';
-import { RuntimeMetadataCard } from './RuntimeMetadataCard';
-import { ThinkingCard } from './ThinkingCard';
-import { parseThinkingAndContent } from '../../lib/thoughtExtractor';
-import { buildExecutionRuntimeMetadata } from '../../lib/runtimeMetadata';
-import { detectQueryIntent } from '../../lib/intentDetector';
-import { useAppStore } from '../../stores/appStore';
 
 interface ChatMessageProps {
   message: ChatMessageType;
@@ -39,16 +33,18 @@ const CodeBlock: React.FC<React.HTMLAttributes<HTMLPreElement>> = ({ children, .
   };
 
   return (
-    <div className="group/code relative select-text">
+    <div className="group/code relative select-text my-3 font-mono text-xs">
       <button
         type="button"
         onClick={handleCopy}
-        className="absolute right-2 top-2 z-10 rounded-md border border-zinc-700 bg-zinc-950/90 px-2 py-1 text-[11px] font-semibold text-zinc-200 opacity-0 shadow-sm transition-opacity hover:bg-zinc-900 group-hover/code:opacity-100"
+        className="absolute right-2 top-2 z-10 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-zinc-100 dark:bg-zinc-900 px-2 py-1 text-[10px] font-semibold text-zinc-700 dark:text-zinc-300 opacity-0 transition-opacity hover:bg-zinc-200 dark:hover:bg-zinc-800 group-hover/code:opacity-100"
         title="Copy code block"
       >
         {copied ? 'Copied' : 'Copy Code'}
       </button>
-      <pre {...props}>{children}</pre>
+      <pre className="p-4 rounded-xl bg-zinc-900 text-zinc-100 border border-zinc-800 overflow-x-auto" {...props}>
+        {children}
+      </pre>
     </div>
   );
 };
@@ -69,7 +65,6 @@ export const ChatMessageComponent: React.FC<ChatMessageProps> = ({
   onExport,
   isStreaming = false,
 }) => {
-  const { assistantName, selectedModel, aiMode } = useAppStore();
   const [copiedQuery, setCopiedQuery] = React.useState(false);
   const isUser = message.role === 'user';
 
@@ -79,63 +74,21 @@ export const ChatMessageComponent: React.FC<ChatMessageProps> = ({
     setTimeout(() => setCopiedQuery(false), 1600);
   };
 
-  // Intent classification for dynamic response layout
-  const intent = message.intent ?? detectQueryIntent(message.user_prompt || message.content);
-
-  // Extract thinking / reasoning blocks with context-specific dynamic activity sentences
-  const sourceTitles: string[] = (message.sources_used || []).map((s) => (typeof s === 'string' ? s : s.title));
-  const parsed = parseThinkingAndContent(
-    message.content,
-    message.user_prompt,
-    intent,
-    sourceTitles
-  );
-  const displayContent = parsed.content || (parsed.thinking ? '' : message.content);
-
-  const getIntentBadge = () => {
-    switch (intent) {
-      case 'research':
-        return (
-          <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-sky-700 bg-sky-50 px-2 py-0.5 rounded-md border border-sky-100">
-            <BookOpen className="w-3 h-3" /> Research Report
-          </span>
-        );
-      case 'comparison':
-        return (
-          <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-violet-700 bg-violet-50 px-2 py-0.5 rounded-md border border-violet-100">
-            <GitCompare className="w-3 h-3" /> Comparison Matrix
-          </span>
-        );
-      case 'coding':
-        return (
-          <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-100">
-            <Code2 className="w-3 h-3" /> Code Solution
-          </span>
-        );
-      case 'planning':
-        return (
-          <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-amber-700 bg-amber-50 px-2 py-0.5 rounded-md border border-amber-100">
-            <Calendar className="w-3 h-3" /> Project Roadmap
-          </span>
-        );
-      default:
-        return null;
-    }
-  };
-
   return (
     <div
-      className={`group w-full py-6 px-4 md:px-8 transition-colors ${
-        isUser ? 'bg-transparent' : 'bg-white/55 border-y border-zinc-200/80'
+      className={`group w-full py-6 px-4 md:px-8 transition-colors border-b border-zinc-200/80 dark:border-zinc-850/60 ${
+        isUser
+          ? 'bg-zinc-50 dark:bg-zinc-950 text-zinc-900 dark:text-white'
+          : 'bg-white dark:bg-zinc-900/40 text-zinc-900 dark:text-zinc-100'
       }`}
     >
       <div className="max-w-4xl mx-auto flex gap-4 items-start">
         {/* Avatar */}
         <div
-          className={`w-8 h-8 rounded-xl flex items-center justify-center shrink-0 shadow-sm select-none ${
+          className={`w-8 h-8 rounded-xl flex items-center justify-center shrink-0 border select-none ${
             isUser
-              ? 'bg-zinc-100 border border-zinc-200 text-zinc-600'
-              : 'bg-blue-50 border border-blue-100 text-blue-600'
+              ? 'bg-zinc-200 dark:bg-zinc-900 border-zinc-300 dark:border-zinc-800 text-zinc-800 dark:text-zinc-300'
+              : 'bg-blue-600 dark:bg-white text-white dark:text-zinc-950 border-blue-600 dark:border-white font-bold'
           }`}
         >
           {isUser ? <User className="w-4 h-4" /> : <Bot className="w-4 h-4" />}
@@ -145,25 +98,22 @@ export const ChatMessageComponent: React.FC<ChatMessageProps> = ({
         <div className="flex-1 min-w-0 space-y-2">
           {/* Header info */}
           <div className="flex items-center justify-between select-none">
-            <div className="flex items-center gap-2">
-              <span className="text-xs font-bold text-zinc-900">
-                {isUser ? 'You' : assistantName}
-              </span>
-              {!isUser && getIntentBadge()}
-            </div>
+            <span className="text-xs font-bold text-zinc-900 dark:text-white">
+              {isUser ? 'You' : 'LearnForge Agent'}
+            </span>
             {isUser ? (
               <button
                 type="button"
                 onClick={handleCopyQuery}
-                className="opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1 text-[11px] font-medium text-zinc-500 hover:text-zinc-900 bg-zinc-100 hover:bg-zinc-200 px-2 py-0.5 rounded-lg cursor-pointer"
+                className="opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1 text-[10px] font-mono text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white bg-zinc-100 dark:bg-zinc-900 px-2 py-0.5 rounded-lg border border-zinc-200 dark:border-zinc-800"
                 title="Copy query text"
               >
-                {copiedQuery ? <Check className="w-3 h-3 text-emerald-600" /> : <Copy className="w-3 h-3 text-zinc-500" />}
+                {copiedQuery ? <Check className="w-3 h-3 text-emerald-500" /> : <Copy className="w-3 h-3 text-zinc-400" />}
                 <span>{copiedQuery ? 'Copied' : 'Copy'}</span>
               </button>
             ) : (
               <ResponseActions
-                content={displayContent || message.content}
+                content={message.content}
                 onRegenerate={onRegenerate}
                 onExport={onExport}
               />
@@ -172,51 +122,18 @@ export const ChatMessageComponent: React.FC<ChatMessageProps> = ({
 
           {/* User Message */}
           {isUser ? (
-            <p className="text-[15px] text-zinc-800 whitespace-pre-wrap leading-relaxed select-text">
+            <p className="text-[14px] text-zinc-800 dark:text-zinc-200 whitespace-pre-wrap leading-relaxed select-text font-sans">
               {message.content}
             </p>
           ) : (
-            /* Assistant Message — Agent Activity Timeline + Clean Markdown */
-            <div className="space-y-3 select-text">
-              <ThinkingCard
-                isStreaming={isStreaming}
-                userPrompt={message.user_prompt}
-                intent={intent}
-                sourcesCount={message.sources_used?.length || 0}
-                toolsCount={message.tools_used?.length || 0}
-                generationTimeMs={message.generation_time_ms || 1800}
-                provider={message.provider_used || (aiMode === 'local' ? 'ollama' : 'cloud')}
-                model={message.model_name || message.model_used || selectedModel}
-                activities={parsed.activities}
-                thinking={parsed.thinking}
-              />
-
-              {displayContent ? (
-                <div className="markdown-body text-[15px] space-y-4 select-text">
-                  <MarkdownContent content={displayContent} />
+            /* Assistant Message */
+            <div className="space-y-3 select-text text-[14px] text-zinc-900 dark:text-zinc-100 leading-relaxed font-sans">
+              <MarkdownContent content={message.content} />
+              {isStreaming && (
+                <div className="flex items-center gap-2 text-xs text-zinc-500 dark:text-zinc-400 py-1 font-mono">
+                  <span className="inline-block w-2 h-2 rounded-full bg-blue-500 animate-pulse" />
+                  <span>Generating adaptive response...</span>
                 </div>
-              ) : isStreaming ? (
-                <div className="flex items-center gap-2 text-xs text-zinc-500 py-1">
-                  <span className="inline-block w-2 h-2 rounded-full bg-blue-600 animate-pulse" />
-                  <span>Formulating response...</span>
-                </div>
-              ) : null}
-
-              {/* Real Execution Path Runtime Metadata Card */}
-              {!isStreaming && (
-                <RuntimeMetadataCard
-                  metadata={buildExecutionRuntimeMetadata(
-                    message.model_name || message.model_used || selectedModel || 'gpt-5.6-sol',
-                    message.provider_used || (aiMode === 'local' ? 'ollama' : 'opencode'),
-                    message.mode_used || aiMode,
-                    intent,
-                    message.user_prompt || '',
-                    displayContent || message.content,
-                    Date.now() - (message.generation_time_ms || 2100),
-                    message.sources_used || [],
-                    message.tools_used || []
-                  )}
-                />
               )}
             </div>
           )}
@@ -231,9 +148,8 @@ export const ChatMessage = React.memo(ChatMessageComponent, (prev, next) => {
     prev.message.id === next.message.id &&
     prev.message.role === next.message.role &&
     prev.message.content === next.message.content &&
-    prev.message.intent === next.message.intent &&
+    prev.isStreaming === next.isStreaming &&
     prev.onRegenerate === next.onRegenerate &&
     prev.onExport === next.onExport
   );
 });
-

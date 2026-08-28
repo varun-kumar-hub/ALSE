@@ -4,10 +4,8 @@ import {
   X,
   ShieldCheck,
   Cloud,
-  Sparkles,
   Globe,
 } from 'lucide-react';
-import { Button } from '../ui/Button';
 import { useAppStore } from '../../stores/appStore';
 import { getDefaultWorkspacePath } from '../../services/workspace';
 import { DEFAULT_PROVIDER_CONFIGS, mergeProviderConfigs } from '../../services/providers';
@@ -15,7 +13,6 @@ import { AiExecutionMode, ProviderConfig } from '../../services/types';
 
 import { LocalSettings } from './LocalSettings';
 import { CloudSettings } from './CloudSettings';
-import { HybridSettings } from './HybridSettings';
 
 interface SettingsPanelProps {
   onClose: () => void;
@@ -30,7 +27,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ onClose }) => {
   } = useAppStore();
 
   const [workspacePath, setWorkspacePath] = useState(workspaceLocation);
-  const [aiMode, setAiMode] = useState<AiExecutionMode>(savedAiMode || 'hybrid');
+  const [aiMode, setAiMode] = useState<AiExecutionMode>(savedAiMode || 'cloud');
   const [providerConfigs, setProviderConfigs] = useState<ProviderConfig[]>(() =>
     mergeProviderConfigs(savedProviderConfigs || DEFAULT_PROVIDER_CONFIGS)
   );
@@ -48,12 +45,10 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ onClose }) => {
     await updateSetting('aiMode', aiMode);
     await updateSetting('providerConfigs', JSON.stringify(providerConfigs));
 
-    // Synchronize Zustand Store runtime state immediately
     const store = useAppStore.getState();
     store.setProviderConfigs(providerConfigs);
     store.setAiMode(aiMode);
 
-    // Sync active connected model
     const activeProvider =
       providerConfigs.find(
         (p) => p.kind === (aiMode === 'local' ? 'local' : 'cloud') && p.enabled && (p.apiKeySet || p.kind === 'local')
@@ -92,98 +87,50 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ onClose }) => {
     });
   };
 
-  // Header accent & mode descriptors
-  const getHeaderAccent = () => {
-    switch (aiMode) {
-      case 'local':
-        return {
-          title: 'Local AI Runtime',
-          subtitle: '100% Offline & Private Execution Manager',
-          border: 'border-emerald-200',
-          bg: 'bg-emerald-50/60',
-          color: 'text-emerald-700',
-          badgeBg: 'bg-emerald-100 text-emerald-800',
-          icon: ShieldCheck,
-          footerText: 'Everything runs on your computer. No internet connection required.',
-        };
-      case 'cloud':
-        return {
-          title: 'Cloud AI Provider Manager',
-          subtitle: 'API Keys & Connected Cloud Endpoints',
-          border: 'border-blue-200',
-          bg: 'bg-blue-50/60',
-          color: 'text-blue-700',
-          badgeBg: 'bg-blue-100 text-blue-800',
-          icon: Cloud,
-          footerText: 'Using official cloud AI provider endpoints. Internet connection required.',
-        };
-      case 'hybrid':
-      default:
-        return {
-          title: 'Hybrid Intelligence Orchestrator',
-          subtitle: 'Automatic Capability Routing & Priority Management',
-          border: 'border-purple-200',
-          bg: 'bg-purple-50/60',
-          color: 'text-purple-700',
-          badgeBg: 'bg-purple-100 text-purple-800',
-          icon: Sparkles,
-          footerText: 'Local models are preferred for privacy. Cloud models are used when required.',
-        };
-    }
-  };
-
-  const activeHeader = getHeaderAccent();
-  const HeaderIcon = activeHeader.icon;
-
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-zinc-950/25 backdrop-blur-md animate-in fade-in duration-200 select-none">
-      <div className="relative w-full max-w-3xl bg-white border border-zinc-200 rounded-2xl shadow-xl overflow-hidden max-h-[90vh] flex flex-col">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-md animate-in fade-in duration-200 select-none text-zinc-100 font-sans">
+      <div className="relative w-full max-w-3xl bg-zinc-950 border border-zinc-800 rounded-2xl shadow-2xl overflow-hidden max-h-[90vh] flex flex-col">
         {/* Modal Header */}
-        <div className={`flex items-center justify-between px-6 py-4 border-b ${activeHeader.border} ${activeHeader.bg} transition-colors duration-300`}>
-          <div className="flex items-center gap-2.5">
-            <HeaderIcon className={`w-5 h-5 ${activeHeader.color}`} />
-            <div>
-              <h2 className="text-base font-bold text-zinc-950">{activeHeader.title}</h2>
-              <p className={`text-[11px] ${activeHeader.color}`}>{activeHeader.subtitle}</p>
-            </div>
+        <div className="flex items-center justify-between px-6 py-4 border-b border-zinc-850 bg-zinc-950">
+          <div>
+            <h2 className="text-base font-bold text-white tracking-tight">LearnForge Settings</h2>
+            <p className="text-xs text-zinc-400 font-mono">Models, Runtime & API Configuration</p>
           </div>
           <button
             onClick={onClose}
-            className="p-1.5 rounded-lg text-zinc-500 hover:text-zinc-950 hover:bg-zinc-100 transition-colors"
+            className="p-1.5 rounded-lg text-zinc-400 hover:text-white hover:bg-zinc-850 transition"
           >
-            <X className="w-5 h-5" />
+            <X className="w-4 h-4" />
           </button>
         </div>
 
         {/* Settings Body */}
-        <div className="flex-1 overflow-y-auto p-6 space-y-6 text-xs">
+        <div className="flex-1 overflow-y-auto p-6 space-y-6 text-xs font-mono">
           {/* Execution Mode Selector Bar */}
           <div className="space-y-2">
-            <label className="text-[11px] font-bold text-zinc-900 uppercase tracking-wider flex items-center gap-1.5">
-              <Globe className="w-4 h-4 text-blue-600" /> Select AI Execution Mode
+            <label className="text-[11px] font-bold text-zinc-400 uppercase tracking-wider flex items-center gap-1.5 font-mono">
+              <Globe className="w-3.5 h-3.5 text-zinc-400" /> ACTIVE EXECUTION MODE
             </label>
 
-            <div className="grid grid-cols-3 gap-3">
+            <div className="grid grid-cols-2 gap-3">
               <button
                 type="button"
                 onClick={() => {
                   setAiMode('local');
                   updateSetting('aiMode', 'local');
                 }}
-                className={`p-3 rounded-xl border text-left flex flex-col justify-between transition-all ${
+                className={`p-4 rounded-2xl border text-left flex justify-between transition-all cursor-pointer ${
                   aiMode === 'local'
-                    ? 'border-emerald-500 bg-emerald-50/70 shadow-sm ring-2 ring-emerald-500/20'
-                    : 'border-zinc-200 hover:border-zinc-300 bg-white'
+                    ? 'border-emerald-500/50 bg-emerald-500/10 text-white shadow-xs'
+                    : 'border-zinc-850 hover:border-zinc-700 bg-zinc-900/60 text-zinc-400'
                 }`}
               >
-                <div className="flex items-center justify-between w-full">
-                  <ShieldCheck className="w-4 h-4 text-emerald-600" />
-                  {aiMode === 'local' && <Check className="w-3.5 h-3.5 text-emerald-600" />}
+                <div>
+                  <ShieldCheck className={`w-5 h-5 mb-2 ${aiMode === 'local' ? 'text-emerald-400' : 'text-zinc-500'}`} />
+                  <p className="font-bold text-white text-sm">Local Mode</p>
+                  <p className="text-[10px] text-zinc-400">Offline Ollama execution</p>
                 </div>
-                <div className="mt-2">
-                  <p className="font-bold text-zinc-900">Local Mode</p>
-                  <p className="text-[10px] text-zinc-500">100% Offline & Private</p>
-                </div>
+                {aiMode === 'local' && <Check className="w-4 h-4 text-emerald-400" />}
               </button>
 
               <button
@@ -192,87 +139,77 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ onClose }) => {
                   setAiMode('cloud');
                   updateSetting('aiMode', 'cloud');
                 }}
-                className={`p-3 rounded-xl border text-left flex flex-col justify-between transition-all ${
+                className={`p-4 rounded-2xl border text-left flex justify-between transition-all cursor-pointer ${
                   aiMode === 'cloud'
-                    ? 'border-blue-600 bg-blue-50/70 shadow-sm ring-2 ring-blue-500/20'
-                    : 'border-zinc-200 hover:border-zinc-300 bg-white'
+                    ? 'border-blue-500/50 bg-blue-500/10 text-white shadow-xs'
+                    : 'border-zinc-850 hover:border-zinc-700 bg-zinc-900/60 text-zinc-400'
                 }`}
               >
-                <div className="flex items-center justify-between w-full">
-                  <Cloud className="w-4 h-4 text-blue-600" />
-                  {aiMode === 'cloud' && <Check className="w-3.5 h-3.5 text-blue-600" />}
+                <div>
+                  <Cloud className={`w-5 h-5 mb-2 ${aiMode === 'cloud' ? 'text-blue-400' : 'text-zinc-500'}`} />
+                  <p className="font-bold text-white text-sm">Cloud Mode</p>
+                  <p className="text-[10px] text-zinc-400">Cloud AI Providers</p>
                 </div>
-                <div className="mt-2">
-                  <p className="font-bold text-zinc-900">Cloud Mode</p>
-                  <p className="text-[10px] text-zinc-500">API Keys (OpenAI, Gemini...)</p>
-                </div>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => {
-                  setAiMode('hybrid');
-                  updateSetting('aiMode', 'hybrid');
-                }}
-                className={`p-3 rounded-xl border text-left flex flex-col justify-between transition-all ${
-                  aiMode === 'hybrid'
-                    ? 'border-purple-600 bg-purple-50/70 shadow-sm ring-2 ring-purple-500/20'
-                    : 'border-zinc-200 hover:border-zinc-300 bg-white'
-                }`}
-              >
-                <div className="flex items-center justify-between w-full">
-                  <Sparkles className="w-4 h-4 text-purple-600" />
-                  {aiMode === 'hybrid' && <Check className="w-3.5 h-3.5 text-purple-600" />}
-                </div>
-                <div className="mt-2">
-                  <p className="font-bold text-zinc-900">Hybrid Mode</p>
-                  <p className="text-[10px] text-zinc-500">Smart Capability Routing</p>
-                </div>
+                {aiMode === 'cloud' && <Check className="w-4 h-4 text-blue-400" />}
               </button>
             </div>
           </div>
 
-          {/* Dynamic Mode Page Render */}
+          {/* Dynamic Mode Settings Render */}
           <div className="pt-2">
-            {aiMode === 'local' && (
+            {aiMode === 'local' ? (
               <LocalSettings
                 workspacePath={workspacePath}
                 onWorkspaceChange={setWorkspacePath}
               />
-            )}
-
-            {aiMode === 'cloud' && (
+            ) : (
               <CloudSettings
                 providerConfigs={providerConfigs}
                 updateProviderConfig={updateProviderConfig}
                 onSaveProvider={handleSaveProvider}
               />
             )}
-
-            {aiMode === 'hybrid' && (
-              <HybridSettings providerConfigs={providerConfigs} />
-            )}
           </div>
         </div>
 
         {/* Modal Footer */}
-        <div className="px-6 py-3 border-t border-zinc-200 bg-zinc-50 flex items-center justify-between">
-          <p className="text-[11px] text-zinc-500 font-mono italic">
-            {activeHeader.footerText}
-          </p>
+        <div className="px-6 py-4 border-t border-zinc-200 dark:border-zinc-850 bg-white dark:bg-zinc-950 flex items-center justify-between">
+          <button
+            type="button"
+            onClick={async () => {
+              if (confirm('Wipe all mock data, test chats, and mastery traces to start 100% fresh from the beginning?')) {
+                const { clearAllChatsAndMessages } = await import('../../services/database');
+                const { ps6Db } = await import('../../services/ps6Database');
+                await clearAllChatsAndMessages();
+                ps6Db.clearAllData();
+                window.location.reload();
+              }
+            }}
+            className="px-3 py-1.5 text-xs font-mono font-bold text-rose-500 hover:bg-rose-500/10 rounded-xl transition cursor-pointer"
+          >
+            🗑 Reset All Data & Start Fresh
+          </button>
 
           <div className="flex items-center gap-2">
             {savedSuccess && (
-              <span className="text-xs font-semibold text-emerald-600 flex items-center gap-1">
+              <span className="text-xs font-mono font-semibold text-emerald-500 flex items-center gap-1">
                 <Check className="w-4 h-4" /> Saved!
               </span>
             )}
-            <Button type="button" variant="ghost" size="sm" onClick={onClose}>
+            <button
+              type="button"
+              onClick={onClose}
+              className="px-4 py-2 bg-zinc-100 dark:bg-zinc-900 hover:bg-zinc-200 dark:hover:bg-zinc-850 text-zinc-700 dark:text-zinc-300 font-semibold text-xs rounded-xl transition cursor-pointer"
+            >
               Cancel
-            </Button>
-            <Button type="button" variant="primary" size="sm" onClick={handleSave}>
+            </button>
+            <button
+              type="button"
+              onClick={handleSave}
+              className="px-4 py-2 bg-blue-600 dark:bg-white hover:bg-blue-500 dark:hover:bg-zinc-200 text-white dark:text-zinc-950 font-bold text-xs rounded-xl shadow-xs transition cursor-pointer"
+            >
               Save Settings
-            </Button>
+            </button>
           </div>
         </div>
       </div>

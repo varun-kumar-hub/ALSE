@@ -237,6 +237,96 @@ export async function togglePinChat(id: string, pinned: boolean): Promise<void> 
   await db.execute(`UPDATE chats SET pinned = $1 WHERE id = $2`, [pinned ? 1 : 0, id]);
 }
 
+export async function toggleChatReadStatus(id: string, isRead: boolean): Promise<void> {
+  const db = await initDatabase();
+  if (isFallbackMode || !db) {
+    const chats = localStorageFallback.getChats();
+    const chat = chats.find((c) => c.id === id);
+    if (chat) {
+      chat.is_read = isRead;
+      localStorageFallback.saveChats(chats);
+    }
+    return;
+  }
+
+  await db.execute(`UPDATE chats SET is_read = $1 WHERE id = $2`, [isRead ? 1 : 0, id]);
+}
+
+export async function moveChatToProject(id: string, projectId: string | null): Promise<void> {
+  const db = await initDatabase();
+  if (isFallbackMode || !db) {
+    const chats = localStorageFallback.getChats();
+    const chat = chats.find((c) => c.id === id);
+    if (chat) {
+      chat.project_id = projectId || undefined;
+      localStorageFallback.saveChats(chats);
+    }
+    return;
+  }
+
+  await db.execute(`UPDATE chats SET project_id = $1 WHERE id = $2`, [projectId ?? null, id]);
+}
+
+export async function moveChatToGroup(id: string, groupName: string | null): Promise<void> {
+  const db = await initDatabase();
+  if (isFallbackMode || !db) {
+    const chats = localStorageFallback.getChats();
+    const chat = chats.find((c) => c.id === id);
+    if (chat) {
+      chat.group_name = groupName || undefined;
+      localStorageFallback.saveChats(chats);
+    }
+    return;
+  }
+
+  await db.execute(`UPDATE chats SET group_name = $1 WHERE id = $2`, [groupName ?? null, id]);
+}
+
+export async function toggleProjectPinned(id: string, isPinned: boolean): Promise<void> {
+  const db = await initDatabase();
+  if (isFallbackMode || !db) {
+    const projects = await getProjects();
+    const proj = projects.find((p) => p.id === id);
+    if (proj) {
+      proj.is_pinned = isPinned;
+      localStorage.setItem('ai_os_projects', JSON.stringify(projects));
+    }
+    return;
+  }
+
+  await db.execute(`UPDATE workspace_projects SET is_pinned = $1 WHERE id = $2`, [isPinned ? 1 : 0, id]);
+}
+
+export async function renameProject(id: string, newName: string): Promise<void> {
+  const db = await initDatabase();
+  if (isFallbackMode || !db) {
+    const projects = await getProjects();
+    const proj = projects.find((p) => p.id === id);
+    if (proj) {
+      proj.name = newName;
+      localStorage.setItem('ai_os_projects', JSON.stringify(projects));
+    }
+    return;
+  }
+
+  await db.execute(`UPDATE workspace_projects SET name = $1 WHERE id = $2`, [newName, id]);
+}
+
+export async function moveProjectToGroup(id: string, groupName: string | null): Promise<void> {
+  const db = await initDatabase();
+  if (isFallbackMode || !db) {
+    const projects = await getProjects();
+    const proj = projects.find((p) => p.id === id);
+    if (proj) {
+      proj.group_name = groupName || undefined;
+      localStorage.setItem('ai_os_projects', JSON.stringify(projects));
+    }
+    return;
+  }
+
+  await db.execute(`UPDATE workspace_projects SET group_name = $1 WHERE id = $2`, [groupName ?? null, id]);
+}
+
 export async function deleteChat(id: string): Promise<void> {
   const db = await initDatabase();
   if (isFallbackMode || !db) {
@@ -416,12 +506,18 @@ export async function getAllSettings(): Promise<AppSettings> {
 export interface ProjectItem {
   id: string;
   name: string;
+  topic?: string;
+  goal?: string;
   description?: string;
+  learning_budget?: number;
   icon?: string;
   color?: string;
   instructions?: string;
+  is_pinned?: boolean;
+  group_name?: string;
   created_at: string;
   updated_at?: string;
+  is_archived?: boolean;
 }
 
 export interface NoteItem {
@@ -432,19 +528,85 @@ export interface NoteItem {
   updatedAt: string;
 }
 
+const DEFAULT_PROJECTS: ProjectItem[] = [
+  {
+    id: 'data-structures',
+    name: 'Data Structures',
+    topic: 'Data Structures & Algorithms',
+    goal: 'Master DSA fundamentals to advanced graph algorithms',
+    description: 'Arrays, Linked Lists, Trees, Graphs, and Algorithmic Thinking',
+    learning_budget: 30,
+    icon: '📘',
+    color: 'bg-blue-500/10 text-blue-400 border-blue-500/20',
+    created_at: new Date().toISOString(),
+  },
+  {
+    id: 'agririsk',
+    name: 'Machine Learning',
+    topic: 'Machine Learning & Predictive Risk',
+    goal: 'Predictive modeling, regression, neural networks, and XGBoost',
+    description: 'Supervised Learning, Decision Trees, CNNs, and Model Evaluation',
+    learning_budget: 30,
+    icon: '🧠',
+    color: 'bg-purple-500/10 text-purple-400 border-purple-500/20',
+    created_at: new Date().toISOString(),
+  },
+  {
+    id: 'adaptive-learning',
+    name: 'Adaptive Learning',
+    topic: 'Operating Systems & Autonomous AI',
+    goal: 'PS6 Autonomous Adaptive Learning Strategy Engine',
+    description: 'Processes, Threads, Concurrency, Mutexes, and Deadlocks',
+    learning_budget: 25,
+    icon: '💻',
+    color: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20',
+    created_at: new Date().toISOString(),
+  },
+];
+
 export async function getProjects(): Promise<ProjectItem[]> {
   const db = await initDatabase();
   if (isFallbackMode || !db) {
     const raw = localStorage.getItem('ai_os_projects');
-    return raw ? JSON.parse(raw) : [];
+    if (!raw) {
+      localStorage.setItem('ai_os_projects', JSON.stringify(DEFAULT_PROJECTS));
+      return DEFAULT_PROJECTS;
+    }
+    return JSON.parse(raw);
   }
-  return db.select<ProjectItem[]>(`SELECT id, name, description, created_at FROM workspace_projects ORDER BY created_at DESC`);
+  const rows = await db.select<ProjectItem[]>(`SELECT id, name, description, created_at FROM workspace_projects ORDER BY created_at DESC`);
+  if (rows.length === 0) {
+    for (const p of DEFAULT_PROJECTS) {
+      await db.execute(
+        `INSERT INTO workspace_projects (id, name, description, created_at) VALUES ($1, $2, $3, $4)`,
+        [p.id, p.name, p.description || '', p.created_at]
+      );
+    }
+    return DEFAULT_PROJECTS;
+  }
+  return rows;
 }
 
-export async function createProject(name: string, description?: string, instructions?: string): Promise<ProjectItem> {
+export async function createProject(
+  name: string,
+  topic?: string,
+  goal?: string,
+  description?: string,
+  learningBudget = 30,
+  instructions?: string
+): Promise<ProjectItem> {
   const id = String(Date.now());
   const created_at = new Date().toISOString();
-  const project: ProjectItem = { id, name, description, instructions, created_at };
+  const project: ProjectItem = {
+    id,
+    name,
+    topic: topic || name,
+    goal: goal || 'Master core domain concepts',
+    description,
+    learning_budget: learningBudget,
+    instructions,
+    created_at,
+  };
   const db = await initDatabase();
   if (isFallbackMode || !db) {
     const existing = await getProjects();
@@ -464,7 +626,16 @@ export async function updateProject(id: string, updates: Partial<ProjectItem>): 
 export async function deleteProject(id: string): Promise<void> {
   const existing = await getProjects();
   const filtered = existing.filter((p) => p.id !== id);
-  localStorage.setItem('ai_os_projects', JSON.stringify(filtered));
+  const db = await initDatabase();
+  if (isFallbackMode || !db) {
+    localStorage.setItem('ai_os_projects', JSON.stringify(filtered));
+    const chats = localStorageFallback.getChats();
+    const updatedChats = chats.map((c) => (c.project_id === id ? { ...c, project_id: undefined } : c));
+    localStorageFallback.saveChats(updatedChats);
+    return;
+  }
+  await db.execute(`DELETE FROM workspace_projects WHERE id = $1`, [id]);
+  await db.execute(`UPDATE chats SET project_id = NULL WHERE project_id = $1`, [id]);
 }
 
 export async function getNotebookNotes(): Promise<NoteItem[]> {
@@ -508,4 +679,17 @@ export async function deleteNotebookNote(id: string): Promise<void> {
     return;
   }
   await db.execute(`DELETE FROM notebook_notes WHERE id = $1`, [id]);
+}
+
+export async function clearAllChatsAndMessages(): Promise<void> {
+  const db = await initDatabase();
+  if (isFallbackMode || !db) {
+    localStorage.removeItem('ai_os_chats');
+    Object.keys(localStorage).forEach((k) => {
+      if (k.startsWith('ai_os_msg_')) localStorage.removeItem(k);
+    });
+    return;
+  }
+  await db.execute(`DELETE FROM messages`);
+  await db.execute(`DELETE FROM chats`);
 }

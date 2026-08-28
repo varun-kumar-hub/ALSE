@@ -86,10 +86,16 @@ export interface ChatMessage {
 export interface Project {
   id: string;
   name: string;
+  topic?: string;
+  goal?: string;
   description?: string;
   icon?: string;
   color?: string;
   instructions?: string;
+  learning_budget?: number;
+  is_pinned?: boolean;
+  group_id?: string;
+  group_name?: string;
   created_at: string;
   updated_at: string;
   is_archived?: boolean;
@@ -111,6 +117,9 @@ export interface Chat {
   created_at: string;
   updated_at: string;
   pinned: boolean;
+  is_read?: boolean;
+  group_id?: string;
+  group_name?: string;
   model?: string;
   project_id?: string;
   context_summary?: string;

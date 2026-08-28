@@ -23,6 +23,7 @@ interface AppState {
   sidebarOpen: boolean; 
   activeView: 'welcome' | 'setup' | 'chat' | 'settings';
   currentChatId: string | null;
+  activeProjectId: string | null;
   selectedModel: string;
   executionConfig: AuthoritativeExecutionConfig;
   models: OllamaModel[];
@@ -53,6 +54,7 @@ interface AppState {
   toggleSidebar: () => void;
   setActiveView: (view: 'welcome' | 'setup' | 'chat' | 'settings') => void;
   setCurrentChatId: (id: string | null) => void;
+  setActiveProjectId: (id: string | null) => void;
   setSelectedModel: (model: string) => void;
   setAssistantName: (name: string) => void;
   setAiMode: (mode: AppSettings['aiMode']) => void;
@@ -86,6 +88,7 @@ export const useAppStore = create<AppState>((set) => ({
   sidebarOpen: true,
   activeView: 'chat',
   currentChatId: null,
+  activeProjectId: localStorage.getItem('ai_os_active_project_id') || null,
   selectedModel: 'gpt-5.6-sol',
   executionConfig: buildAuthoritativeExecutionConfig('cloud', 'gpt-5.6-sol', []),
   models: [],
@@ -148,6 +151,14 @@ export const useAppStore = create<AppState>((set) => ({
     }
     set({ currentChatId: id });
   },
+  setActiveProjectId: (id) => {
+    if (id) {
+      localStorage.setItem('ai_os_active_project_id', id);
+    } else {
+      localStorage.removeItem('ai_os_active_project_id');
+    }
+    set({ activeProjectId: id });
+  },
   setSelectedModel: (model) =>
     set((state) => ({
       selectedModel: model,
@@ -190,7 +201,20 @@ export const useAppStore = create<AppState>((set) => ({
         state.isBackendReady
       ),
     })),
-  setTheme: (theme) => set({ theme }),
+  setTheme: (theme) => {
+    localStorage.setItem('ai_os_theme', theme);
+    const isDark =
+      theme === 'dark' ||
+      (theme === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches);
+    document.documentElement.setAttribute('data-theme', isDark ? 'dark' : 'light');
+    if (isDark) {
+      document.documentElement.classList.add('dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+    }
+    set({ theme });
+    setSetting('theme', theme);
+  },
   setIsStreaming: (streaming) => set({ isStreaming: streaming }),
   setStreamingContent: (content) =>
     set((state) => ({
@@ -216,6 +240,19 @@ export const useAppStore = create<AppState>((set) => ({
   initApp: async () => {
     // 1. Load settings from SQLite / storage
     const settings = await getAllSettings();
+    const savedTheme =
+      (localStorage.getItem('ai_os_theme') as 'dark' | 'light' | 'system') || settings.theme || 'dark';
+
+    const isDark =
+      savedTheme === 'dark' ||
+      (savedTheme === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches);
+
+    document.documentElement.setAttribute('data-theme', isDark ? 'dark' : 'light');
+    if (isDark) {
+      document.documentElement.classList.add('dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+    }
     const isCloudMode = settings.aiMode === 'cloud';
 
     // 2. Fetch local models ONLY if not strictly in Cloud Mode

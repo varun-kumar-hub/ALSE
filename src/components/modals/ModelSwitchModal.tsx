@@ -1,5 +1,5 @@
 import React from 'react';
-import { ShieldAlert, Zap, CheckCircle2, X, Cpu, Globe, Layers } from 'lucide-react';
+import { ShieldAlert, Zap, X, Cpu, Globe } from 'lucide-react';
 import { useAppStore } from '../../stores/appStore';
 
 export const ModelSwitchModal: React.FC = () => {
@@ -21,7 +21,6 @@ export const ModelSwitchModal: React.FC = () => {
   } = modelSwitchModalOptions;
 
   const handleConnectAsInactive = () => {
-    // Keep target provider connected without switching current global active model
     closeModelSwitchModal();
   };
 
@@ -31,41 +30,41 @@ export const ModelSwitchModal: React.FC = () => {
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 animate-in fade-in duration-200">
-      <div className="bg-white rounded-3xl shadow-2xl border border-zinc-200 max-w-md w-full p-6 space-y-5 text-zinc-900 select-none">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 backdrop-blur-xs p-4 animate-in fade-in duration-200 select-none">
+      <div className="bg-zinc-950 rounded-2xl shadow-2xl border border-zinc-800 max-w-md w-full p-6 space-y-5 text-zinc-100">
         {/* Header Title */}
         <div className="flex items-start justify-between">
           <div className="flex items-center gap-3">
-            <div className="p-2.5 rounded-2xl bg-amber-100 text-amber-800 border border-amber-300">
-              <ShieldAlert className="w-5 h-5 text-amber-700" />
+            <div className="p-2.5 rounded-xl bg-amber-500/10 text-amber-400 border border-amber-500/20">
+              <ShieldAlert className="w-5 h-5 text-amber-400" />
             </div>
             <div>
-              <h3 className="font-extrabold text-base text-zinc-950">
+              <h3 className="font-extrabold text-base text-white tracking-tight">
                 {actionType === 'add_inactive_or_active' && 'Model Already Active'}
                 {actionType === 'switch_active_model' && 'Switch Active Model?'}
                 {actionType === 'switch_execution_mode' && `Switch to ${targetMode === 'local' ? 'Local' : 'Cloud'} Mode?`}
                 {actionType === 'switch_chat_model' && 'Change Conversation Model?'}
               </h3>
-              <p className="text-xs text-zinc-500 font-medium">Model Connection Confirmation</p>
+              <p className="text-xs text-zinc-400 font-mono">Model Connection Confirmation</p>
             </div>
           </div>
           <button
             onClick={closeModelSwitchModal}
-            className="p-1 text-zinc-400 hover:text-zinc-700 hover:bg-zinc-100 rounded-full transition-all cursor-pointer"
+            className="p-1 text-zinc-400 hover:text-white hover:bg-zinc-850 rounded-lg transition"
           >
             <X className="w-4 h-4" />
           </button>
         </div>
 
         {/* Dynamic Context Description */}
-        <div className="bg-zinc-50 rounded-2xl p-4 border border-zinc-200/80 space-y-2 text-xs text-zinc-700">
+        <div className="bg-zinc-900/80 rounded-xl p-4 border border-zinc-850 space-y-2 text-xs text-zinc-300 font-sans">
           {actionType === 'add_inactive_or_active' && (
             <>
               <p>
-                <strong>{currentActiveModel}</strong> (<em>{currentActiveProvider}</em>) is currently active.
+                <strong className="text-white">{currentActiveModel}</strong> (<em className="text-zinc-400">{currentActiveProvider}</em>) is currently active.
               </p>
               <p>
-                How would you like to configure <strong>{targetModel}</strong> from <strong>{providerName}</strong>?
+                How would you like to configure <strong className="text-white">{targetModel}</strong> from <strong className="text-white">{providerName}</strong>?
               </p>
             </>
           )}
@@ -73,24 +72,24 @@ export const ModelSwitchModal: React.FC = () => {
           {actionType === 'switch_active_model' && (
             <>
               <p>
-                You are switching the global AI execution model from <strong>{currentActiveModel}</strong> to{' '}
-                <strong>{targetModel}</strong> (<em>{providerName}</em>).
+                You are switching the global AI execution model from <strong className="text-white">{currentActiveModel}</strong> to{' '}
+                <strong className="text-white">{targetModel}</strong> (<em className="text-zinc-400">{providerName}</em>).
               </p>
-              <p className="text-zinc-500">Future requests will use {targetModel} as your primary intelligence engine.</p>
+              <p className="text-zinc-400">Future requests will use {targetModel} as your primary intelligence engine.</p>
             </>
           )}
 
           {actionType === 'switch_execution_mode' && (
             <>
-              <div className="flex items-center gap-2 font-bold text-zinc-900">
-                {targetMode === 'local' ? <Cpu className="w-4 h-4 text-emerald-600" /> : <Globe className="w-4 h-4 text-blue-600" />}
+              <div className="flex items-center gap-2 font-bold text-white font-mono">
+                {targetMode === 'local' ? <Cpu className="w-4 h-4 text-emerald-400" /> : <Globe className="w-4 h-4 text-blue-400" />}
                 <span>
-                  Switching Execution Mode: {currentMode?.toUpperCase()} &rarr; {targetMode?.toUpperCase()}
+                  Execution Mode: {currentMode?.toUpperCase()} &rarr; {targetMode?.toUpperCase()}
                 </span>
               </div>
               <p>
-                Future prompts will execute in <strong>{targetMode === 'local' ? '100% Offline Local Mode' : 'Cloud Mode'}</strong> using{' '}
-                <strong>{targetModel}</strong>.
+                Future prompts will execute in <strong className="text-white">{targetMode === 'local' ? '100% Offline Local Mode' : 'Cloud Mode'}</strong> using{' '}
+                <strong className="text-white">{targetModel}</strong>.
               </p>
             </>
           )}
@@ -98,71 +97,38 @@ export const ModelSwitchModal: React.FC = () => {
           {actionType === 'switch_chat_model' && (
             <>
               <p>
-                This conversation (<em>"{chatTitle || 'Current Chat'}"</em>) was using <strong>{currentActiveModel}</strong>.
-              </p>
-              <p>
-                Would you like to switch this conversation to <strong>{targetModel}</strong> or update globally?
+                Change active model for conversation <strong className="text-white">"{chatTitle}"</strong> to{' '}
+                <strong className="text-white">{targetModel}</strong>.
               </p>
             </>
           )}
         </div>
 
-        {/* Actions Button Bar */}
-        <div className="flex flex-col gap-2 pt-1">
+        {/* Active vs Inactive Action Choice */}
+        <div className="flex items-center justify-end gap-2 pt-2">
           {actionType === 'add_inactive_or_active' && (
-            <>
-              <button
-                onClick={handleMakeActive}
-                className="w-full flex items-center justify-center gap-2 py-2.5 px-4 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold text-xs shadow-sm transition-all cursor-pointer"
-              >
-                <Zap className="w-4 h-4 text-amber-300" />
-                <span>Connect & Make Active Model</span>
-              </button>
-              <button
-                onClick={handleConnectAsInactive}
-                className="w-full flex items-center justify-center gap-2 py-2.5 px-4 bg-zinc-100 hover:bg-zinc-200 text-zinc-800 rounded-xl font-bold text-xs transition-all cursor-pointer"
-              >
-                <CheckCircle2 className="w-4 h-4 text-emerald-600" />
-                <span>Connect as Inactive (Keep {currentActiveModel})</span>
-              </button>
-            </>
+            <button
+              onClick={handleConnectAsInactive}
+              className="px-3.5 py-2 bg-zinc-900 hover:bg-zinc-850 text-zinc-300 font-semibold rounded-xl text-xs transition"
+            >
+              Keep Connected (Inactive)
+            </button>
           )}
 
-          {(actionType === 'switch_active_model' || actionType === 'switch_execution_mode') && (
-            <div className="flex items-center justify-end gap-2">
-              <button
-                onClick={closeModelSwitchModal}
-                className="py-2 px-4 bg-zinc-100 hover:bg-zinc-200 text-zinc-700 rounded-xl font-bold text-xs transition-all cursor-pointer"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleMakeActive}
-                className="flex items-center gap-2 py-2 px-4 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold text-xs shadow-sm transition-all cursor-pointer"
-              >
-                <Zap className="w-3.5 h-3.5 text-amber-300" />
-                <span>Confirm & Switch Model</span>
-              </button>
-            </div>
-          )}
+          <button
+            onClick={closeModelSwitchModal}
+            className="px-3.5 py-2 bg-zinc-900 hover:bg-zinc-850 text-zinc-300 font-semibold rounded-xl text-xs transition"
+          >
+            Cancel
+          </button>
 
-          {actionType === 'switch_chat_model' && (
-            <div className="flex items-center justify-end gap-2">
-              <button
-                onClick={closeModelSwitchModal}
-                className="py-2 px-4 bg-zinc-100 hover:bg-zinc-200 text-zinc-700 rounded-xl font-bold text-xs transition-all cursor-pointer"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleMakeActive}
-                className="flex items-center gap-2 py-2 px-4 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold text-xs shadow-sm transition-all cursor-pointer"
-              >
-                <Layers className="w-3.5 h-3.5" />
-                <span>Switch Model</span>
-              </button>
-            </div>
-          )}
+          <button
+            onClick={handleMakeActive}
+            className="px-4 py-2 bg-white hover:bg-zinc-200 text-zinc-950 font-bold rounded-xl text-xs shadow-xs transition flex items-center gap-1.5"
+          >
+            <Zap className="w-3.5 h-3.5 text-zinc-900" />
+            <span>Make Active Model</span>
+          </button>
         </div>
       </div>
     </div>

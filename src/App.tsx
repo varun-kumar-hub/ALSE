@@ -1,16 +1,27 @@
 import { useEffect, useState } from 'react';
 import { Sidebar } from './components/sidebar/Sidebar';
 import { ChatArea } from './components/chat/ChatArea';
+import { ChatHeader } from './components/chat/ChatHeader';
 import { WelcomeScreen } from './components/welcome/WelcomeScreen';
 import { SetupWizard } from './components/setup/SetupWizard';
 import { SettingsPanel } from './components/settings/SettingsPanel';
 import { DebugPanel } from './components/debug/DebugPanel';
 import { CommandPaletteModal } from './components/palette/CommandPaletteModal';
-import { ProjectDashboard } from './components/projects/ProjectDashboard';
-import { ProjectModal } from './components/projects/ProjectModal';
 import { ModelSwitchModal } from './components/modals/ModelSwitchModal';
+import { NewProjectModal } from './components/modals/NewProjectModal';
+
+import { LearnView } from './components/views/LearnView';
+import { KnowledgeView } from './components/views/KnowledgeView';
+import { ResearchView } from './components/views/ResearchView';
+import { StoryChallengeView } from './components/views/StoryChallengeView';
+import { AnalyticsView } from './components/views/AnalyticsView';
+import { EvaluationLabView } from './components/views/EvaluationLabView';
+import { JudgeControlView } from './components/views/JudgeControlView';
+import { ProjectsView } from './components/views/ProjectsView';
+import { ProjectDashboardView } from './components/views/ProjectDashboardView';
+import { AdaptiveLearningDashboard } from './components/dashboard/AdaptiveLearningDashboard';
+
 import { useAppStore } from './stores/appStore';
-import { useProjectStore } from './stores/projectStore';
 import {
   getChats,
   createChat,
@@ -19,6 +30,9 @@ import {
   deleteChat as dbDeleteChat,
   getMessages,
   addMessage,
+  getProjects,
+  deleteProject as dbDeleteProject,
+  ProjectItem,
 } from './services/database';
 import { createProviderManager, getCapabilitiesForIntent, getProviderIdForModel } from './services/providers';
 import { saveWorkspaceFile } from './services/workspace';
@@ -26,12 +40,9 @@ import { detectQueryIntent } from './lib/intentDetector';
 import { optimizePrompt } from './lib/promptOptimizer';
 import { filterResponseForIntent } from './lib/responseFilter';
 import { buildThinkingTimeline } from './lib/thinkingTimeline';
-import { webSearch, webExtract, WebSearchResult } from './services/webTools';
-import { getFactGroundedSummary } from './services/wikipediaTool';
-import { createOrUpdateCheckpoint } from './runtime/checkpointManager';
-import { logProviderRequest } from './services/providerLogger';
-import { urlIntelligenceEngine } from './services/urlIntelligenceService';
-import { Chat, ChatMessage as ChatMessageType, SourceItem, ThinkingTimelineStep } from './services/types';
+import { webSearch, webExtract } from './services/webTools';
+import { processLearnerInteraction } from './engine/ps6Engine';
+import { Chat, ChatMessage as ChatMessageType } from './services/types';
 
 function hasActiveTextSelection(): boolean {
   const selection = window.getSelection?.();
@@ -40,12 +51,13 @@ function hasActiveTextSelection(): boolean {
 
 export function App() {
   const {
-    activeView,
-    setActiveView,
+    activeView: storeView,
+    setActiveView: setStoreView,
     currentChatId,
     setCurrentChatId,
+    activeProjectId,
+    setActiveProjectId,
     selectedModel,
-    assistantName,
     aiMode,
     defaultProvider,
     providerConfigs,
@@ -60,13 +72,17 @@ export function App() {
     initApp,
   } = useAppStore();
 
+  const [activeWorkspaceView, setActiveWorkspaceView] = useState<string>('chat');
   const [chats, setChats] = useState<Chat[]>([]);
+  const [projects, setProjects] = useState<ProjectItem[]>([]);
   const [messages, setMessages] = useState<ChatMessageType[]>([]);
   const [showSettings, setShowSettings] = useState(false);
+  const [showNewProjectModal, setShowNewProjectModal] = useState(false);
 
-  // Initialize app settings and local persistence.
+  // Initialize app settings, projects, and local persistence.
   useEffect(() => {
     initApp();
+    loadProjects();
     loadChats();
   }, []);
 
@@ -79,37 +95,21 @@ export function App() {
     }
   }, [currentChatId]);
 
-  // Global Keyboard Shortcuts (Module 15)
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      const isCmdOrCtrl = e.metaKey || e.ctrlKey;
+  const loadProjects = async () => {
+    const list = await getProjects();
+    setProjects(list);
+  };
 
-      if (isCmdOrCtrl && e.key.toLowerCase() === 'n') {
-        e.preventDefault();
-        handleNewChat();
-      } else if (isCmdOrCtrl && e.key.toLowerCase() === 'k') {
-        e.preventDefault();
-        const searchInput = document.querySelector<HTMLInputElement>('input[placeholder*="Search everything"]');
-        searchInput?.focus();
-      } else if (isCmdOrCtrl && e.key === '/') {
-        e.preventDefault();
-        const chatInput = document.querySelector<HTMLTextAreaElement>('textarea');
-        chatInput?.focus();
-      } else if (isCmdOrCtrl && e.shiftKey && e.key.toLowerCase() === 'm') {
-        e.preventDefault();
-        const settingsBtn = document.querySelector<HTMLButtonElement>('button[title="Open Settings"]');
-        settingsBtn?.click();
-      }
-    };
+  const loadChats = async (explicitChatId?: string | null, overrideProjectId?: string | null) => {
+    const targetProjectId = overrideProjectId !== undefined ? overrideProjectId : activeProjectId;
+    const allChats = await getChats();
+    setChats(allChats);
 
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, []);
-
-  const loadChats = async (explicitChatId?: string | null) => {
-    const list = await getChats();
-    setChats(list);
-    useProjectStore.getState().loadProjects();
+    // Context-scoped chats for current active workspace
+    const contextChats = allChats.filter((c) => {
+      if (targetProjectId === null) return !c.project_id;
+      return c.project_id === targetProjectId;
+    });
 
     if (explicitChatId !== undefined) {
       setCurrentChatId(explicitChatId);
@@ -117,89 +117,102 @@ export function App() {
     }
 
     const savedChatId = localStorage.getItem('ai_os_active_chat_id');
-    const savedProjectId = localStorage.getItem('ai_os_active_project_id');
 
-    if (savedProjectId) {
-      useProjectStore.getState().setActiveProjectId(savedProjectId);
-    }
-
-    if (currentChatId && list.some((c) => c.id === currentChatId)) {
+    if (currentChatId && contextChats.some((c) => c.id === currentChatId)) {
       return;
     }
 
-    if (savedChatId && list.some((c) => c.id === savedChatId)) {
+    if (savedChatId && contextChats.some((c) => c.id === savedChatId)) {
       setCurrentChatId(savedChatId);
-    } else if (list.length > 0) {
-      setCurrentChatId(list[0].id);
+    } else if (contextChats.length > 0) {
+      setCurrentChatId(contextChats[0].id);
     } else {
       setCurrentChatId(null);
     }
   };
 
-  const handleNewChat = async (projectId?: string) => {
-    const chat = await createChat('New Chat', selectedModel, projectId);
-    if (projectId) {
-      useProjectStore.getState().setActiveProjectId(projectId);
-    } else {
-      useProjectStore.getState().setActiveProjectId(null);
-    }
+  const handleSelectProject = async (projectId: string | null) => {
+    setActiveProjectId(projectId);
+    await loadChats(undefined, projectId);
+  };
+
+  const handleNewChat = async (initialPrompt?: string) => {
+    const title = initialPrompt ? initialPrompt.slice(0, 30) : 'New Chat';
+    const chat = await createChat(title, selectedModel, activeProjectId || undefined);
     setCurrentChatId(chat.id);
     setMessages([]);
-    await loadChats(chat.id);
+    setActiveWorkspaceView('chat');
+    await loadChats(chat.id, activeProjectId);
+
+    if (initialPrompt) {
+      handleSendMessage(initialPrompt);
+    }
   };
 
   const handleSelectChat = (id: string) => {
     setCurrentChatId(id);
+    setActiveWorkspaceView('chat');
   };
 
   const handleRenameChat = async (id: string, newTitle: string) => {
     await updateChatTitle(id, newTitle);
-    await loadChats(currentChatId);
+    await loadChats(currentChatId, activeProjectId);
   };
 
   const handleTogglePin = async (id: string, currentPin: boolean) => {
     await togglePinChat(id, !currentPin);
-    await loadChats(currentChatId);
+    await loadChats(currentChatId, activeProjectId);
   };
 
   const handleDeleteChat = async (id: string) => {
     await dbDeleteChat(id);
-    const remaining = chats.filter((c) => c.id !== id);
-    setChats(remaining);
+    const allChats = await getChats();
+    setChats(allChats);
+
+    const contextChats = allChats.filter((c) => {
+      if (activeProjectId === null) return !c.project_id;
+      return c.project_id === activeProjectId;
+    });
 
     let nextActiveId: string | null = currentChatId;
-
     if (currentChatId === id) {
-      if (remaining.length > 0) {
-        const nextChat = remaining[0];
-        nextActiveId = nextChat.id;
-        setCurrentChatId(nextChat.id);
-        if (nextChat.project_id) {
-          useProjectStore.getState().setActiveProjectId(nextChat.project_id);
-        }
+      if (contextChats.length > 0) {
+        nextActiveId = contextChats[0].id;
+        setCurrentChatId(nextActiveId);
       } else {
         nextActiveId = null;
         setCurrentChatId(null);
         setMessages([]);
       }
     }
-    await loadChats(nextActiveId);
+    await loadChats(nextActiveId, activeProjectId);
   };
 
-  // Main streaming chat completion logic
+  const handleDeleteProject = async (projectId: string) => {
+    await dbDeleteProject(projectId);
+    await loadProjects();
+    if (activeProjectId === projectId) {
+      await handleSelectProject(null);
+    }
+  };
+
+  const handleProjectCreated = async (newProj: ProjectItem) => {
+    await loadProjects();
+    await handleSelectProject(newProj.id);
+    setActiveWorkspaceView('project_dashboard');
+  };
+
+  // Main streaming chat completion logic connected to PS6 engine
   const handleSendMessage = async (userPrompt: string) => {
-    const startTime = Date.now();
     let targetChatId = currentChatId;
 
-    // Create chat automatically if none active
     if (!targetChatId) {
-      const newChat = await createChat('New Chat', selectedModel);
+      const newChat = await createChat('New Chat', selectedModel, activeProjectId || undefined);
       targetChatId = newChat.id;
       setCurrentChatId(targetChatId);
-      await loadChats(targetChatId);
+      await loadChats(targetChatId, activeProjectId);
     }
 
-    // 1. Add User Message
     const intent = detectQueryIntent(userPrompt);
     const providerManager = createProviderManager(providerConfigs, aiMode, defaultProvider);
     const capabilities = getCapabilitiesForIntent(intent);
@@ -208,208 +221,58 @@ export function App() {
     updateThinkingTimelinePhase('analyze');
 
     await addMessage(targetChatId, 'user', userPrompt, intent);
-
     const currentMsgs = await getMessages(targetChatId);
     setMessages(currentMsgs);
 
     if (currentMsgs.length <= 2) {
       const autoTitle = userPrompt.trim().slice(0, 42) || 'New Chat';
       await updateChatTitle(targetChatId, autoTitle);
-      await loadChats(targetChatId);
+      await loadChats(targetChatId, activeProjectId);
     }
 
-    // 3. Fact Grounding & Web Tools Auto-Routing (Wikipedia, web_search, web_extract, web_crawl)
     updateThinkingTimelinePhase('gather');
     let webContext = '';
     const urlMatch = userPrompt.match(/https?:\/\/[^\s]+/i);
-
     const actualToolsUsed: string[] = [];
-    const actualSourcesUsed: SourceItem[] = [];
 
     if (urlMatch) {
       const targetUrl = urlMatch[0];
-      let domain = '';
       try {
-        domain = new URL(targetUrl).hostname.replace(/^www\./, '');
-      } catch {}
-
-      updateThinkingTimelinePhase('gather');
-      setThinkingTimeline((prev: ThinkingTimelineStep[]) =>
-        prev.map((step) =>
-          step.phase === 'gather'
-            ? {
-                ...step,
-                status: 'running',
-                detail: `Crawling & analyzing ${domain || targetUrl}...`,
-                subSteps: [
-                  `Target Domain: ${domain || targetUrl}`,
-                  `Fetching sitemaps & crawling endpoints`,
-                  `Extracting page contents, projects & skills`,
-                ],
-              }
-            : step
-        )
-      );
-
-      try {
-        const dataset = await urlIntelligenceEngine.runDeepResearch(
-          targetUrl,
-          { maxPages: 50, maxDepth: 5 },
-          (progressMsg) => {
-            setThinkingTimeline((prev: ThinkingTimelineStep[]) =>
-              prev.map((step) =>
-                step.phase === 'gather'
-                  ? {
-                      ...step,
-                      status: 'running',
-                      detail: progressMsg,
-                      subSteps: Array.from(new Set([...(step.subSteps || []), progressMsg])).slice(-4),
-                    }
-                  : step
-              )
-            );
-          }
-        );
-
-        if (dataset && dataset.contextText) {
-          webContext = `\n\n${dataset.contextText}\n\n`;
-          actualToolsUsed.push(...dataset.toolsUsed);
-          actualSourcesUsed.push(...dataset.sources);
-
-          setThinkingTimeline((prev: ThinkingTimelineStep[]) =>
-            prev.map((step) =>
-              step.phase === 'gather'
-                ? {
-                    ...step,
-                    status: 'completed',
-                    detail: `Extracted ${dataset.stats.resourcesDiscovered} resources across ${dataset.stats.pagesScanned} pages in ${(dataset.stats.durationMs / 1000).toFixed(1)}s`,
-                  }
-                : step
-            )
-          );
-        }
-      } catch (err) {
-        console.warn('[URL Intelligence Engine] Deep research fallback to single page extract:', err);
         const extractRes = await webExtract(targetUrl, 4000);
         if (extractRes.ok) {
-          webContext = `\n\n[Web Page Content for ${targetUrl}]:\n${extractRes.content}\n\n`;
-          actualToolsUsed.push('Web Page Extractor');
-          actualSourcesUsed.push({
-            title: targetUrl,
-            url: targetUrl,
-            domain: domain || 'web',
-            type: 'web',
-          });
+          webContext = `\n\n[Web Content for ${targetUrl}]:\n${extractRes.content}\n\n`;
+          actualToolsUsed.push('Web Extractor');
         }
+      } catch (err) {
+        console.warn('URL extract failed:', err);
       }
     } else {
-      // 1. Live Web Search: Run when web search pill is active & query relates to news/entities/movies/updates
-      const isNoSearch = userPrompt.includes('--no-web-search');
       const isSearchWorthy =
-        !isNoSearch &&
-        (intent === 'research' ||
-          intent === 'biography' ||
-          intent === 'general' ||
-          /\b(search|lookup|look up|news|latest|upcoming|update|updates|talk|social media|movie|movies|film|films|release date|box office|who|what|when|where)\b/i.test(
-            userPrompt
-          ));
+        intent === 'research' ||
+        /\b(search|lookup|news|latest|update|who|what|when|where)\b/i.test(userPrompt);
 
       if (isSearchWorthy) {
-        // Resolve entity/pronouns from active chat title & context (e.g., "his upcoming movies" -> "Prabhas upcoming movies")
-        const activeChat = chats.find((c) => c.id === targetChatId);
-        let entityName = '';
-        if (activeChat?.title && !/new chat/i.test(activeChat.title)) {
-          entityName = activeChat.title
-            .replace(/^(who is|who was|what is|tell me about|biography of)\s+/i, '')
-            .split(/\?|\!|list/i)[0]
-            .trim();
-        }
-
-        let cleanQuery = userPrompt
-          .replace(/--no-web-search/g, '')
-          .replace(/\b(search for|search|lookup|look up|find latest|what is the latest|news about|tell me about)\b/gi, '')
-          .trim() || userPrompt;
-
-        if (entityName && /\b(his|her|he|she|this|that|their|the actor|the movie)\b/i.test(cleanQuery)) {
-          cleanQuery = cleanQuery.replace(/\b(his|her|their|this|that|the actor|the movie)\b/gi, entityName);
-        } else if (entityName && !cleanQuery.toLowerCase().includes(entityName.toLowerCase()) && cleanQuery.length < 50) {
-          cleanQuery = `${entityName} ${cleanQuery}`;
-        }
-
-        const searchRes = await webSearch(cleanQuery, 6);
+        const searchRes = await webSearch(userPrompt, 4);
         if (searchRes.ok && searchRes.content) {
-          webContext += `\n\n[Live Web Search Results]:\n${searchRes.content}\n\n`;
+          webContext += `\n\n[Web Search Results]:\n${searchRes.content}\n\n`;
           actualToolsUsed.push('Web Search');
-
-          const rawResults = (searchRes.data as { results?: WebSearchResult[] })?.results || [];
-          rawResults.forEach((r) => {
-            let dom = '';
-            try {
-              dom = new URL(r.url).hostname.replace(/^www\./, '');
-            } catch {}
-            actualSourcesUsed.push({
-              title: r.title,
-              url: r.url,
-              domain: dom || 'web',
-              type: dom.includes('wikipedia') ? 'wiki' : dom.includes('rfc-editor') ? 'rfc' : 'web',
-              snippet: r.snippet,
-            });
-          });
-        }
-      }
-
-      // 2. Wikipedia Grounding for encyclopedic biographies, entities & filmographies
-      if (
-        intent === 'biography' ||
-        /\b(who is|who was|biography of|bio of|history of|filmography|movies of|movies he|movies she|acted in|films of|list all movies)\b/i.test(
-          userPrompt
-        )
-      ) {
-        const wikiFact = await getFactGroundedSummary(userPrompt);
-        if (wikiFact) {
-          webContext += `\n\n${wikiFact}\n\n`;
-          actualToolsUsed.push('Wikipedia Search');
-          if (!actualSourcesUsed.some((s) => s.domain === 'wikipedia.org')) {
-            actualSourcesUsed.push({
-              title: `Wikipedia Summary for ${userPrompt.slice(0, 30)}`,
-              url: 'https://en.wikipedia.org',
-              domain: 'wikipedia.org',
-              type: 'wiki',
-            });
-          }
         }
       }
     }
 
-    // 4. Prepare AI Prompt & Intent
-    updateThinkingTimelinePhase(
-      ['research', 'comparison', 'debugging', 'file-analysis', 'data-analysis'].includes(intent)
-        ? 'gather'
-        : 'plan'
-    );
-    // Build Memory strictly from the current active chat session and project context
+    updateThinkingTimelinePhase('plan');
     const memoryEpisodes: string[] = [];
-    const activeChat = chats.find((c) => c.id === targetChatId);
-    const activeProject = activeChat?.project_id
-      ? useProjectStore.getState().projects.find((p) => p.id === activeChat.project_id)
-      : null;
-
-    if (activeProject && activeProject.instructions) {
-      memoryEpisodes.push(`- [Project Custom Instructions for "${activeProject.name}"]: ${activeProject.instructions}`);
-    }
-
     currentMsgs
       .filter((m) => m.role === 'user')
       .slice(-3)
       .forEach((m) => {
-        const epDate = m.created_at ? m.created_at.split('T')[0] : new Date().toISOString().split('T')[0];
-        memoryEpisodes.push(`- [${epDate}] Memory episode from current session: "${m.content.slice(0, 80)}"`);
+        memoryEpisodes.push(`- Previous question: "${m.content.slice(0, 80)}"`);
       });
 
     const optimizedPrompt = optimizePrompt(
       userPrompt,
       intent,
-      assistantName,
+      'LearnForge Agent',
       {
         mode: aiMode,
         provider: aiMode === 'local' ? 'ollama' : 'cloud',
@@ -423,29 +286,19 @@ export function App() {
     setStreamingContent('');
     setGenerationStage('initializing');
 
-    // Build chat history context payload
     const historyPayload: ChatMessageType[] = [
       ...currentMsgs.map((m) => ({ role: m.role, content: m.content })),
       { role: 'user', content: optimizedPrompt },
     ];
 
     let fullAccumulatedResponse = '';
-
     setGenerationStage('understanding');
     setTimeout(() => {
       setGenerationStage('generating');
       updateThinkingTimelinePhase('generate');
-    }, 400);
+    }, 300);
 
-    const opencodeConfig = providerConfigs.find((p) => p.id === 'opencode');
-    const configuredCloudConfig =
-      providerConfigs.find((p) => p.kind === 'cloud' && Boolean(p.apiKey && p.apiKey.trim().length > 0)) ||
-      opencodeConfig;
-    const activeCloudModel = configuredCloudConfig?.defaultModel || 'gpt-5.6-sol';
-    const effectiveModel =
-      aiMode === 'cloud'
-        ? (getProviderIdForModel(selectedModel) === 'ollama' || !selectedModel ? activeCloudModel : selectedModel)
-        : (aiMode === 'local' ? (getProviderIdForModel(selectedModel) !== 'ollama' ? 'qwen3:8b' : selectedModel) : selectedModel);
+    const effectiveModel = selectedModel || (aiMode === 'local' ? 'qwen3:8b' : 'gpt-5.6-sol');
 
     try {
       await providerManager.streamChat(
@@ -466,15 +319,14 @@ export function App() {
       failThinkingTimelinePhase('generate');
       fullAccumulatedResponse =
         fullAccumulatedResponse ||
-        `I could not complete this response because the AI provider service is unavailable.\n\nRequest: "${userPrompt}"`;
+        `I encountered an issue connecting to the AI provider. Request: "${userPrompt}"`;
       setStreamingContent(fullAccumulatedResponse);
     } finally {
       setGenerationStage('finalizing');
       updateThinkingTimelinePhase('validate');
-
-      // Save final assistant message to SQLite
       fullAccumulatedResponse = filterResponseForIntent(fullAccumulatedResponse, intent);
       updateThinkingTimelinePhase('format');
+
       if (fullAccumulatedResponse.trim() && targetChatId) {
         const assistantMsg = await addMessage(
           targetChatId,
@@ -484,63 +336,25 @@ export function App() {
           {
             model_id: effectiveModel,
             model_name: effectiveModel,
-            provider: getProviderIdForModel(effectiveModel) || (aiMode === 'local' ? 'ollama' : 'opencode'),
+            provider: getProviderIdForModel(effectiveModel) || (aiMode === 'local' ? 'ollama' : 'cloud'),
             mode: aiMode === 'local' ? 'local' : 'cloud',
           }
         );
-        const actualProviderId = getProviderIdForModel(selectedModel) || (aiMode === 'local' ? 'ollama' : 'opencode');
-        const isLocal = actualProviderId === 'ollama';
-        const providerName =
-          actualProviderId === 'opencode'
-            ? 'OpenCode Zen'
-            : actualProviderId === 'openai'
-            ? 'OpenAI'
-            : actualProviderId === 'anthropic'
-            ? 'Claude (Anthropic)'
-            : actualProviderId === 'gemini'
-            ? 'Google Gemini'
-            : 'Local Ollama';
-
-        assistantMsg.provider_used = actualProviderId;
-        assistantMsg.model_used = selectedModel;
-        assistantMsg.user_prompt = userPrompt;
-        assistantMsg.tools_used = actualToolsUsed;
-        assistantMsg.sources_used = actualSourcesUsed;
-        assistantMsg.generation_time_ms = Date.now() - startTime;
         setMessages((prev) => [...prev, assistantMsg]);
 
-        logProviderRequest({
-          providerId: actualProviderId,
-          providerName,
-          model: selectedModel || 'opencode-zen-coder',
-          endpoint: isLocal ? 'http://localhost:11434/api/chat' : 'https://opencode.ai/zen/v1/chat/completions',
-          durationMs: Date.now() - startTime,
-          success: !fullAccumulatedResponse.includes('Cloud Request Failed'),
-          inputTokens: Math.ceil(userPrompt.length / 4),
-          outputTokens: Math.ceil(fullAccumulatedResponse.length / 4),
-        });
-
-        // Persist Namma-Agent state checkpoint manifest (FR-4.1 - FR-4.3)
-        await createOrUpdateCheckpoint(targetChatId, {
-          status: 'COMPLETED',
-          workflow: intent,
-          model_config: {
-            provider: aiMode === 'local' ? 'ollama' : 'cloud',
-            model: selectedModel,
-          },
-          messages: [
-            ...messages.map((m) => ({ role: m.role, content: m.content })),
-            { role: 'user', content: userPrompt },
-            { role: 'assistant', content: fullAccumulatedResponse },
-          ],
-        });
+        // Process interaction through PS6 Adaptive Engine to update learner model
+        try {
+          await processLearnerInteraction(userPrompt, fullAccumulatedResponse, activeProjectId);
+        } catch (err) {
+          console.warn('[PS6 Engine] Error updating learner state:', err);
+        }
       }
 
       completeThinkingTimeline();
       setIsStreaming(false);
       setStreamingContent('');
       setGenerationStage('idle');
-      await loadChats();
+      await loadChats(targetChatId, activeProjectId);
     }
   };
 
@@ -560,114 +374,156 @@ export function App() {
   const handleExportChat = async () => {
     if (!currentChatId) return;
     const activeChat = chats.find((c) => c.id === currentChatId);
-    const title = activeChat?.title || 'Chat Export';
+    const title = activeChat?.title || 'LearnForge Export';
     const filename = `${title.toLowerCase().replace(/[^a-z0-9]/g, '_')}.md`;
 
     const markdownContent = `# ${title}\n\nExported on ${new Date().toLocaleString()}\n\n---\n\n${messages
-      .map((m) => `### ${m.role === 'user' ? 'User' : assistantName}\n\n${m.content}\n`)
+      .map((m) => `### ${m.role === 'user' ? 'User' : 'LearnForge Agent'}\n\n${m.content}\n`)
       .join('\n---\n\n')}`;
 
     await saveWorkspaceFile('reports', filename, markdownContent);
   };
 
-  // Route Views
-  if (activeView === 'welcome') {
-    return <WelcomeScreen onContinue={() => setActiveView('setup')} />;
+  if (storeView === 'welcome') {
+    return <WelcomeScreen onContinue={() => setStoreView('setup')} />;
   }
 
-  if (activeView === 'setup') {
-    return <SetupWizard onComplete={() => setActiveView('chat')} />;
+  if (storeView === 'setup') {
+    return <SetupWizard onComplete={() => setStoreView('chat')} />;
   }
 
   const activeChat = chats.find((c) => c.id === currentChatId);
-  const { activeProjectId } = useProjectStore();
+  const activeProject = projects.find((p) => p.id === activeProjectId);
 
-  const [isCmdPaletteOpen, setIsCmdPaletteOpen] = useState(false);
-  const [isDebugOpen, setIsDebugOpen] = useState(false);
-  const [isProjectModalOpen, setIsProjectModalOpen] = useState(false);
+  const projectChats = chats.filter((c) => c.project_id === activeProjectId);
 
   return (
-    <div className="flex h-screen w-screen overflow-hidden bg-[#f6f5f2] text-zinc-950 font-sans">
-      <button
-        data-cmd-palette
-        onClick={() => setIsCmdPaletteOpen(!isCmdPaletteOpen)}
-        className="hidden"
-      />
-      <button
-        data-debug-toggle
-        onClick={() => setIsDebugOpen(!isDebugOpen)}
-        className="hidden"
-      />
-      <button
-        data-new-project
-        onClick={() => setIsProjectModalOpen(true)}
-        className="hidden"
-      />
-
+    <div className="flex h-screen w-screen overflow-hidden bg-white dark:bg-zinc-950 text-zinc-900 dark:text-zinc-100 font-sans transition-colors">
       <Sidebar
         chats={chats}
+        projects={projects}
+        activeProjectId={activeProjectId}
         activeChatId={currentChatId}
-        onNewChat={handleNewChat}
-        onSelectChat={(id) => {
-          const selectedChat = chats.find((c) => c.id === id);
-          if (selectedChat?.project_id) {
-            useProjectStore.getState().setActiveProjectId(selectedChat.project_id);
-          } else {
-            useProjectStore.getState().setActiveProjectId(null);
-          }
-          handleSelectChat(id);
+        activeView={activeWorkspaceView}
+        onSelectView={(v) => setActiveWorkspaceView(v)}
+        onSelectProject={(projId) => {
+          handleSelectProject(projId);
+          if (projId) setActiveWorkspaceView('project_dashboard');
         }}
+        onNewChat={() => handleNewChat()}
+        onOpenNewProject={() => setShowNewProjectModal(true)}
+        onSelectChat={handleSelectChat}
         onRenameChat={handleRenameChat}
         onTogglePin={handleTogglePin}
         onDeleteChat={handleDeleteChat}
+        onDeleteProject={handleDeleteProject}
         onOpenSettings={() => setShowSettings(true)}
+        onRefreshData={() => {
+          loadChats();
+          loadProjects();
+        }}
       />
 
-      {activeProjectId ? (
-        <ProjectDashboard
-          projectId={activeProjectId}
-          onNewProjectChat={(projId) => handleNewChat(projId)}
-          onSelectChat={(chatId) => {
-            if (chatId) {
-              handleSelectChat(chatId);
-            } else {
-              setCurrentChatId(null);
+      {/* Main Workspace Area */}
+      <main className="flex-1 h-screen flex flex-col overflow-hidden bg-slate-50 dark:bg-zinc-950 text-zinc-900 dark:text-zinc-100 relative transition-colors">
+        {activeWorkspaceView !== 'project_dashboard' && activeWorkspaceView !== 'projects' && (
+          <ChatHeader
+            chatTitle={
+              activeWorkspaceView === 'chat'
+                ? activeChat?.title || 'LearnForge'
+                : activeWorkspaceView.toUpperCase().replace('_', ' ')
             }
-          }}
-          chats={chats}
-          activeChatId={currentChatId}
-          messages={messages}
-          onSendMessage={handleSendMessage}
-          onStopStreaming={handleStopStreaming}
-          onRegenerate={handleRegenerate}
-          onExport={handleExportChat}
-        />
-      ) : (
-        <ChatArea
-          chatTitle={activeChat?.title || 'Nexus Agent'}
-          messages={messages}
-          onSendMessage={handleSendMessage}
-          onStopStreaming={handleStopStreaming}
-          onRegenerate={handleRegenerate}
-          onExport={handleExportChat}
-        />
-      )}
+            projectName={activeProject ? activeProject.name : null}
+            onExport={handleExportChat}
+          />
+        )}
+
+        <div className="flex-1 flex overflow-hidden">
+          {activeWorkspaceView === 'chat' && (
+            <ChatArea
+              chatTitle={activeChat?.title || 'LearnForge'}
+              messages={messages}
+              onSendMessage={handleSendMessage}
+              onStopStreaming={handleStopStreaming}
+              onRegenerate={handleRegenerate}
+              onExport={handleExportChat}
+            />
+          )}
+
+          {activeWorkspaceView === 'projects' && (
+            <ProjectsView
+              projects={projects}
+              onSelectProject={(projId) => {
+                handleSelectProject(projId);
+                setActiveWorkspaceView('project_dashboard');
+              }}
+              onOpenNewProject={() => setShowNewProjectModal(true)}
+              onDeleteProject={handleDeleteProject}
+            />
+          )}
+
+          {activeWorkspaceView === 'project_dashboard' && activeProject && (
+            <ProjectDashboardView
+              project={activeProject}
+              projectChats={projectChats}
+              activeChatId={currentChatId}
+              messages={messages}
+              onBackToProjects={() => setActiveWorkspaceView('projects')}
+              onSelectChat={handleSelectChat}
+              onNewChat={() => handleNewChat()}
+              onSendMessage={handleSendMessage}
+              onStopStreaming={handleStopStreaming}
+              onRegenerate={handleRegenerate}
+              onExport={handleExportChat}
+            />
+          )}
+
+          {activeWorkspaceView === 'dashboard' && (
+            <AdaptiveLearningDashboard
+              activeProjectId={activeProjectId}
+              projects={projects}
+              onSelectProject={(projId) => handleSelectProject(projId)}
+            />
+          )}
+
+          {activeWorkspaceView === 'learn' && (
+            <LearnView onStartTopicChat={(topic) => handleNewChat(topic)} />
+          )}
+
+          {activeWorkspaceView === 'knowledge' && <KnowledgeView />}
+
+          {activeWorkspaceView === 'research' && (
+            <ResearchView onStartTopicChat={(topic) => handleNewChat(topic)} />
+          )}
+
+          {activeWorkspaceView === 'story_challenge' && <StoryChallengeView />}
+
+          {activeWorkspaceView === 'analytics' && <AnalyticsView />}
+
+          {activeWorkspaceView === 'evaluation_lab' && <EvaluationLabView />}
+
+          {activeWorkspaceView === 'judge_control' && <JudgeControlView />}
+        </div>
+      </main>
 
       <CommandPaletteModal
-        isOpen={isCmdPaletteOpen}
-        onClose={() => setIsCmdPaletteOpen(false)}
-        onNewChat={handleNewChat}
+        isOpen={false}
+        onClose={() => {}}
+        onNewChat={() => handleNewChat()}
         onOpenSettings={() => setShowSettings(true)}
       />
 
-      <DebugPanel isOpen={isDebugOpen} onClose={() => setIsDebugOpen(false)} />
-      <ProjectModal isOpen={isProjectModalOpen} onClose={() => setIsProjectModalOpen(false)} />
+      <DebugPanel isOpen={false} onClose={() => {}} />
 
       {showSettings && <SettingsPanel onClose={() => setShowSettings(false)} />}
       <ModelSwitchModal />
+      <NewProjectModal
+        isOpen={showNewProjectModal}
+        onClose={() => setShowNewProjectModal(false)}
+        onProjectCreated={handleProjectCreated}
+      />
     </div>
   );
 }
 
 export default App;
-

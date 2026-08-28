@@ -3,14 +3,9 @@ import {
   ShieldCheck,
   Cpu,
   Download,
-  Database,
-  TerminalSquare,
   RefreshCw,
   CheckCircle2,
-  Check,
 } from 'lucide-react';
-import { Button } from '../ui/Button';
-import { Input } from '../ui/Input';
 import { useAppStore } from '../../stores/appStore';
 import { pullModelStream } from '../../services/ollama';
 
@@ -47,30 +42,30 @@ export const LocalSettings: React.FC<LocalSettingsProps> = ({
   };
 
   return (
-    <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-250 select-none text-xs">
+    <div className="space-y-6 animate-in fade-in duration-200 select-none text-xs text-zinc-100">
       {/* Local Runtime Status Card */}
-      <div className="p-4 rounded-2xl border border-emerald-200 bg-emerald-50/40 space-y-3">
+      <div className="p-5 rounded-2xl border border-emerald-500/30 bg-emerald-500/5 space-y-3">
         <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <ShieldCheck className="w-5 h-5 text-emerald-600" />
+          <div className="flex items-center gap-2.5">
+            <ShieldCheck className="w-5 h-5 text-emerald-400" />
             <div>
-              <h4 className="font-bold text-sm text-emerald-950">Local AI Runtime Active</h4>
-              <p className="text-[10px] text-emerald-700">100% Offline & Private System Execution</p>
+              <h4 className="font-bold text-sm text-white">Local AI Runtime Active</h4>
+              <p className="text-[10px] text-emerald-400/80 font-mono">100% Offline & Private System Execution</p>
             </div>
           </div>
-          <span className="px-2.5 py-1 rounded-full bg-emerald-100 text-emerald-800 font-bold text-[10px] flex items-center gap-1 border border-emerald-200">
-            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" /> Ollama v0.11.7 Running
+          <span className="px-3 py-1 rounded-full bg-emerald-500/10 text-emerald-300 font-mono font-bold text-[10px] flex items-center gap-1.5 border border-emerald-500/20">
+            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" /> Ollama Active
           </span>
         </div>
 
         <div className="grid grid-cols-2 gap-3 pt-1 text-[11px] font-mono">
-          <div className="p-2.5 rounded-xl bg-white border border-emerald-100">
-            <span className="text-zinc-400 text-[10px] block uppercase">Active Workspace</span>
-            <span className="font-semibold text-zinc-800 truncate block">{workspacePath || 'D:\\NexusAgent'}</span>
+          <div className="p-3 rounded-xl bg-zinc-950/80 border border-zinc-800">
+            <span className="text-zinc-500 text-[10px] block uppercase">Active Workspace</span>
+            <span className="font-semibold text-zinc-200 truncate block">{workspacePath || 'D:\\NexusAgent'}</span>
           </div>
-          <div className="p-2.5 rounded-xl bg-white border border-emerald-100">
-            <span className="text-zinc-400 text-[10px] block uppercase">Model Storage</span>
-            <span className="font-semibold text-zinc-800 truncate block">C:\Users\.ollama\models</span>
+          <div className="p-3 rounded-xl bg-zinc-950/80 border border-zinc-800">
+            <span className="text-zinc-500 text-[10px] block uppercase">Model Storage</span>
+            <span className="font-semibold text-zinc-200 truncate block">C:\Users\.ollama\models</span>
           </div>
         </div>
       </div>
@@ -78,17 +73,16 @@ export const LocalSettings: React.FC<LocalSettingsProps> = ({
       {/* Installed Models Grid */}
       <div className="space-y-3">
         <div className="flex items-center justify-between">
-          <h4 className="text-xs font-semibold text-zinc-900 flex items-center gap-1.5">
-            <Cpu className="w-4 h-4 text-emerald-600" /> Installed Local Models ({models.length})
+          <h4 className="text-xs font-mono font-semibold text-zinc-400 uppercase tracking-wider flex items-center gap-1.5">
+            <Cpu className="w-4 h-4 text-emerald-400" /> Installed Local Models ({models.length})
           </h4>
-          <Button
-            size="sm"
-            variant="ghost"
+          <button
             onClick={() => refreshModels()}
-            leftIcon={<RefreshCw className="w-3.5 h-3.5" />}
+            className="px-3 py-1 bg-zinc-900 border border-zinc-800 hover:bg-zinc-850 text-zinc-300 rounded-lg font-mono text-xs flex items-center gap-1.5 transition"
           >
-            Refresh List
-          </Button>
+            <RefreshCw className="w-3.5 h-3.5" />
+            <span>Refresh</span>
+          </button>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5">
@@ -96,34 +90,38 @@ export const LocalSettings: React.FC<LocalSettingsProps> = ({
             models.map((m) => (
               <div
                 key={m.name}
-                className="p-3 rounded-xl border border-zinc-200 bg-white flex items-center justify-between shadow-sm"
+                className="p-3.5 rounded-xl border border-zinc-850 bg-zinc-950/80 flex items-center justify-between shadow-xs"
               >
                 <div className="space-y-0.5 min-w-0">
-                  <p className="font-bold text-zinc-900 truncate font-mono">{m.name}</p>
+                  <p className="font-bold text-white truncate font-mono">{m.name}</p>
                   <p className="text-[10px] text-zinc-500 font-mono">
                     Size: {m.size ? (m.size / (1024 * 1024 * 1024)).toFixed(2) : '4.20'} GB
                   </p>
                 </div>
-                <span className="px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-700 text-[10px] font-bold border border-emerald-200">
+                <span className="px-2.5 py-0.5 rounded-md bg-emerald-500/10 text-emerald-400 text-[10px] font-mono font-bold border border-emerald-500/20">
                   Ready
                 </span>
               </div>
             ))
           ) : (
             <>
-              <div className="p-3 rounded-xl border border-zinc-200 bg-white flex items-center justify-between">
+              <div className="p-3.5 rounded-xl border border-zinc-850 bg-zinc-950/80 flex items-center justify-between">
                 <div>
-                  <p className="font-bold text-zinc-900 font-mono">qwen3:8b</p>
+                  <p className="font-bold text-white font-mono">qwen3:8b</p>
                   <p className="text-[10px] text-zinc-500">General Intelligence Agent</p>
                 </div>
-                <span className="px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-700 text-[10px] font-bold">Ready</span>
+                <span className="px-2.5 py-0.5 rounded-md bg-emerald-500/10 text-emerald-400 text-[10px] font-mono font-bold border border-emerald-500/20">
+                  Ready
+                </span>
               </div>
-              <div className="p-3 rounded-xl border border-zinc-200 bg-white flex items-center justify-between">
+              <div className="p-3.5 rounded-xl border border-zinc-850 bg-zinc-950/80 flex items-center justify-between">
                 <div>
-                  <p className="font-bold text-zinc-900 font-mono">qwen2.5-coder:7b</p>
+                  <p className="font-bold text-white font-mono">qwen2.5-coder:7b</p>
                   <p className="text-[10px] text-zinc-500">Coding Specialist Agent</p>
                 </div>
-                <span className="px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-700 text-[10px] font-bold">Ready</span>
+                <span className="px-2.5 py-0.5 rounded-md bg-emerald-500/10 text-emerald-400 text-[10px] font-mono font-bold border border-emerald-500/20">
+                  Ready
+                </span>
               </div>
             </>
           )}
@@ -131,53 +129,30 @@ export const LocalSettings: React.FC<LocalSettingsProps> = ({
       </div>
 
       {/* Model Puller / Manager */}
-      <div className="p-4 rounded-2xl border border-zinc-200 bg-zinc-50/50 space-y-3">
-        <h4 className="text-xs font-semibold text-zinc-900 flex items-center gap-1.5">
-          <Download className="w-4 h-4 text-emerald-600" /> Pull / Download Local Model
+      <div className="p-5 rounded-2xl border border-zinc-850 bg-zinc-950/80 space-y-3">
+        <h4 className="text-xs font-mono font-semibold text-zinc-400 uppercase tracking-wider flex items-center gap-1.5">
+          <Download className="w-4 h-4 text-emerald-400" /> Pull / Download Local Model
         </h4>
         <div className="flex gap-2">
-          <Input
+          <input
             type="text"
-            placeholder="Enter model tag (e.g. qwen3:8b, deepseek-r1:7b, nomic-embed-text)..."
+            placeholder="e.g. llama3:8b, mistral, codellama..."
             value={pullModelInput}
             onChange={(e) => setPullModelInput(e.target.value)}
-            disabled={isPulling}
+            className="flex-1 bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-2 text-xs text-white placeholder-zinc-600 font-mono focus:outline-none focus:border-zinc-700 transition"
           />
-          <Button
-            type="button"
-            variant="primary"
+          <button
             onClick={handlePullModel}
-            isLoading={isPulling}
-            leftIcon={<Download className="w-4 h-4" />}
-            className="bg-emerald-600 hover:bg-emerald-700 text-white shrink-0"
+            disabled={isPulling || !pullModelInput.trim()}
+            className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white font-bold text-xs rounded-xl shadow-xs transition flex items-center gap-1.5"
           >
-            Pull Model
-          </Button>
+            <Download className="w-3.5 h-3.5" />
+            <span>{isPulling ? 'Pulling...' : 'Download Model'}</span>
+          </button>
         </div>
-        {pullStatus && <p className="text-[10px] text-zinc-500 font-mono">{pullStatus}</p>}
-      </div>
-
-      {/* Local Memory & MCP Pipeline */}
-      <div className="grid grid-cols-2 gap-3 pt-2">
-        <div className="p-3.5 rounded-2xl border border-zinc-200 bg-white space-y-2">
-          <h5 className="font-semibold text-zinc-900 flex items-center gap-1.5">
-            <Database className="w-4 h-4 text-blue-600" /> Local Memory Pipeline
-          </h5>
-          <div className="space-y-1 text-[11px] font-mono text-zinc-600">
-            <p className="flex items-center gap-1"><Check className="w-3 h-3 text-emerald-600" /> SQLite Database Active</p>
-            <p className="flex items-center gap-1"><Check className="w-3 h-3 text-emerald-600" /> nomic-embed-text Vector RAG</p>
-          </div>
-        </div>
-
-        <div className="p-3.5 rounded-2xl border border-zinc-200 bg-white space-y-2">
-          <h5 className="font-semibold text-zinc-900 flex items-center gap-1.5">
-            <TerminalSquare className="w-4 h-4 text-purple-600" /> Local MCP Tools
-          </h5>
-          <div className="space-y-1 text-[11px] font-mono text-zinc-600">
-            <p className="flex items-center gap-1"><Check className="w-3 h-3 text-emerald-600" /> Filesystem & Workspace Access</p>
-            <p className="flex items-center gap-1"><Check className="w-3 h-3 text-emerald-600" /> Browser / Web Extraction Engine</p>
-          </div>
-        </div>
+        {pullStatus && (
+          <p className="text-[10px] font-mono text-emerald-400 pt-1">{pullStatus}</p>
+        )}
       </div>
     </div>
   );

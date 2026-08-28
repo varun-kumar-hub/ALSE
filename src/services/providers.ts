@@ -62,10 +62,10 @@ export const DEFAULT_PROVIDER_CONFIGS: ProviderConfig[] = [
     id: reg.id,
     name: reg.name,
     kind: reg.kind,
-    enabled: false,
+    enabled: reg.id === 'nvidia',
     defaultModel: reg.defaultModel,
-    apiKeySet: false,
-    apiKey: '',
+    apiKeySet: reg.id === 'nvidia',
+    apiKey: reg.id === 'nvidia' ? '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' : '',
     baseUrl: reg.isCustom ? reg.baseUrl : undefined,
     isCustom: reg.isCustom,
     capabilities: reg.capabilities,
@@ -233,17 +233,27 @@ class OpenAICompatibleProvider implements AiProvider {
 
     // Browser Mode fallback fetch
     try {
+      const selectedModel = model || this.config.defaultModel;
+      const requestPayload: any = {
+        model: selectedModel,
+        messages: messages.map((m) => ({ role: m.role, content: m.content })),
+        stream: true,
+        temperature: 1,
+        top_p: 0.95,
+        max_tokens: 16384,
+      };
+
+      if (this.config.id === 'nvidia' || selectedModel.includes('nemotron')) {
+        requestPayload.extra_body = { chat_template_kwargs: { enable_thinking: true } };
+      }
+
       const response = await fetchWithCorsProxy(this.endpoint, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${this.config.apiKey.trim()}`,
         },
-        body: JSON.stringify({
-          model: model || this.config.defaultModel,
-          messages: messages.map((m) => ({ role: m.role, content: m.content })),
-          stream: true,
-        }),
+        body: JSON.stringify(requestPayload),
       });
 
       if (!response.ok) {
@@ -252,7 +262,7 @@ class OpenAICompatibleProvider implements AiProvider {
           done: true,
           message: {
             role: 'assistant',
-            content: `Cloud Request Failed (${this.config.name})\n\nProvider: ${this.config.name}\nModel: ${model || this.config.defaultModel}\n\nReason: HTTP ${response.status} ${response.statusText} - ${errorText.slice(0, 150) || 'Request rejected by cloud endpoint.'}`,
+            content: `Cloud Request Failed (${this.config.name})\n\nProvider: ${this.config.name}\nModel: ${selectedModel}\n\nReason: HTTP ${response.status} ${response.statusText} - ${errorText.slice(0, 150) || 'Request rejected by cloud endpoint.'}`,
           },
         });
         return;
@@ -284,7 +294,8 @@ class OpenAICompatibleProvider implements AiProvider {
             }
             try {
               const json = JSON.parse(dataStr);
-              const deltaContent = json.choices?.[0]?.delta?.content || '';
+              const deltaObj = json.choices?.[0]?.delta;
+              const deltaContent = deltaObj?.content || deltaObj?.reasoning_content || '';
               if (deltaContent) {
                 onChunk({
                   done: false,

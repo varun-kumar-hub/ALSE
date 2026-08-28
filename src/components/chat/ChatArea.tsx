@@ -1,6 +1,5 @@
 import React, { useRef, useEffect, useState, useCallback } from 'react';
 import { ArrowDown } from 'lucide-react';
-import { ChatHeader } from './ChatHeader';
 import { ChatMessage } from './ChatMessage';
 import { ChatInput } from './ChatInput';
 import { OSDashboard } from '../dashboard/OSDashboard';
@@ -17,7 +16,6 @@ interface ChatAreaProps {
 }
 
 export const ChatArea: React.FC<ChatAreaProps> = ({
-  chatTitle,
   messages,
   onSendMessage,
   onStopStreaming,
@@ -27,7 +25,6 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
   const {
     isStreaming,
     streamingContent,
-    thinkingTimeline,
   } = useAppStore();
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
@@ -100,7 +97,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
     if (autoScrollRef.current) {
       scrollToBottom('auto');
     }
-  }, [messages.length, streamingContent, thinkingTimeline, scrollToBottom]);
+  }, [messages, streamingContent, scrollToBottom]);
 
   const handleJumpToLatest = () => {
     autoScrollRef.current = true;
@@ -109,10 +106,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
   };
 
   return (
-    <div className="flex-1 h-screen flex flex-col bg-[#f6f5f2] relative overflow-hidden">
-      {/* Header */}
-      <ChatHeader chatTitle={chatTitle} onExport={onExport} />
-
+    <div className="flex-1 h-full flex flex-col bg-slate-50 dark:bg-zinc-950 text-zinc-950 dark:text-white relative overflow-hidden transition-colors">
       {/* Main Messages Scroll Container */}
       <div
         ref={scrollContainerRef}
@@ -129,7 +123,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
           />
         ) : (
           /* Render Messages */
-          <div className="py-4">
+          <div className="py-4 space-y-4">
             {messages.map((msg, idx) => (
               <ChatMessage
                 key={msg.id || idx}
@@ -159,7 +153,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
         <button
           type="button"
           onClick={handleJumpToLatest}
-          className="absolute bottom-24 right-6 z-20 inline-flex items-center gap-2 rounded-full border border-zinc-200 bg-white px-3 py-2 text-xs font-semibold text-zinc-700 shadow-lg transition-colors hover:bg-zinc-50 hover:text-zinc-950"
+          className="absolute bottom-24 right-6 z-20 inline-flex items-center gap-2 rounded-full border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-3 py-2 text-xs font-semibold text-zinc-800 dark:text-zinc-200 shadow-lg transition-colors hover:bg-zinc-100 dark:hover:bg-zinc-800"
           title="Jump to latest message"
         >
           <ArrowDown className="h-4 w-4" />
