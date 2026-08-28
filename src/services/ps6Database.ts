@@ -140,14 +140,7 @@ export const ps6Db = {
   // Concepts & Relationships
   getConcepts(projectId?: string | null): Concept[] {
     const key = getProjectStorageKey(STORAGE_KEYS.CONCEPTS, projectId);
-    let loaded = getStorage<Concept[]>(key, []);
-    if (loaded.length === 0) {
-      if (projectId === 'agririsk') this.seedMachineLearning(projectId);
-      else if (projectId === 'data-structures') this.seedDataStructures(projectId);
-      else this.seedOperatingSystemsData(projectId || undefined);
-      loaded = getStorage<Concept[]>(key, []);
-    }
-    return loaded;
+    return getStorage<Concept[]>(key, []);
   },
 
   saveConcept(concept: Concept, projectId?: string | null): void {
@@ -165,12 +158,7 @@ export const ps6Db = {
   // Mastery Tracking
   getAllMastery(projectId?: string | null): ConceptMastery[] {
     const key = getProjectStorageKey(STORAGE_KEYS.MASTERY, projectId);
-    let loaded = getStorage<ConceptMastery[]>(key, []);
-    if (loaded.length === 0) {
-      this.getConcepts(projectId); // triggers seeding
-      loaded = getStorage<ConceptMastery[]>(key, []);
-    }
-    return loaded;
+    return getStorage<ConceptMastery[]>(key, []);
   },
 
   getMasteryForConcept(conceptId: string, projectId?: string | null): ConceptMastery | null {

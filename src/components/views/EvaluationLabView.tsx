@@ -71,22 +71,22 @@ export const EvaluationLabView: React.FC = () => {
   };
 
   return (
-    <div className="flex-1 overflow-y-auto bg-zinc-950 text-zinc-100 p-8">
+    <div className="flex-1 overflow-y-auto bg-[#f6f8fb] dark:bg-[#0b0d10] text-zinc-900 dark:text-zinc-100 p-6 md:p-8 font-sans transition-colors">
       <div className="max-w-5xl mx-auto space-y-8">
         {/* Header */}
-        <div className="border-b border-zinc-800 pb-6">
-          <h1 className="text-2xl font-bold text-white flex items-center gap-3">
-            <FlaskConical className="w-7 h-7 text-zinc-200" />
+        <div className="border-b border-zinc-200 dark:border-zinc-800/80 pb-6">
+          <h1 className="text-2xl font-extrabold text-zinc-950 dark:text-white flex items-center gap-3 tracking-tight">
+            <FlaskConical className="w-6 h-6 text-blue-600 dark:text-blue-400" />
             Evaluation Lab: Fixed Baseline vs PS6 Adaptive Policy
           </h1>
-          <p className="text-sm text-zinc-400 mt-1">
+          <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-1 font-mono">
             Controlled benchmark environment comparing rigid static sequences against state-aware adaptive intervention ranking.
           </p>
         </div>
 
         {/* Profile Selector & Launch */}
-        <div className="border border-zinc-800 rounded-xl p-6 bg-zinc-900/60 space-y-6">
-          <h3 className="text-sm font-semibold text-zinc-300 uppercase tracking-wider font-mono">
+        <div className="border border-zinc-200 dark:border-zinc-800/80 rounded-2xl p-6 bg-white dark:bg-[#151922] shadow-xs space-y-6">
+          <h3 className="text-xs font-bold text-zinc-700 dark:text-zinc-300 uppercase tracking-wider font-mono">
             Select Benchmark Learner Profile
           </h3>
 
@@ -98,11 +98,13 @@ export const EvaluationLabView: React.FC = () => {
                   key={p.id}
                   onClick={() => setSelectedProfileId(p.id)}
                   className={`p-4 rounded-xl border cursor-pointer transition ${
-                    isSelected ? 'border-white bg-zinc-850 shadow-md' : 'border-zinc-800 bg-zinc-950 hover:border-zinc-700'
+                    isSelected
+                      ? 'border-blue-500 bg-blue-50/50 dark:bg-blue-950/30 shadow-xs'
+                      : 'border-zinc-200 dark:border-zinc-800 bg-zinc-50/60 dark:bg-[#101318] hover:border-zinc-300 dark:hover:border-zinc-700'
                   }`}
                 >
-                  <h4 className="font-semibold text-white text-sm">{p.name}</h4>
-                  <p className="text-xs text-zinc-400 mt-1 font-mono">{p.description}</p>
+                  <h4 className="font-bold text-zinc-950 dark:text-white text-sm">{p.name}</h4>
+                  <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-1 font-mono">{p.description}</p>
                 </div>
               );
             })}
@@ -111,13 +113,13 @@ export const EvaluationLabView: React.FC = () => {
           <button
             onClick={handleRunEvaluation}
             disabled={isEvaluating}
-            className="w-full py-3.5 bg-white text-zinc-950 font-bold rounded-lg hover:bg-zinc-200 transition text-sm flex items-center justify-center gap-2"
+            className="w-full py-3.5 bg-blue-600 dark:bg-white text-white dark:text-zinc-950 font-bold rounded-xl hover:bg-blue-500 dark:hover:bg-zinc-200 transition text-xs flex items-center justify-center gap-2 cursor-pointer shadow-xs"
           >
             {isEvaluating ? (
               'Running Evaluation Benchmark...'
             ) : (
               <>
-                <Play className="w-4 h-4 text-zinc-900 fill-zinc-900" />
+                <Play className="w-4 h-4 text-white dark:text-zinc-900 fill-current" />
                 Run Controlled Benchmark Run
               </>
             )}
@@ -127,36 +129,36 @@ export const EvaluationLabView: React.FC = () => {
         {/* Evaluation Comparison Results */}
         {evalResults && (
           <div className="space-y-6">
-            <h3 className="text-lg font-bold text-white flex items-center gap-2">
-              <BarChart2 className="w-5 h-5 text-zinc-300" />
+            <h3 className="text-base font-bold text-zinc-950 dark:text-white flex items-center gap-2">
+              <BarChart2 className="w-4 h-4 text-blue-500" />
               Benchmark Results Summary
             </h3>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 font-mono">
               {/* Fixed Baseline Card */}
-              <div className="border border-zinc-800 rounded-xl p-6 bg-zinc-900/40 space-y-4">
-                <div className="flex items-center justify-between border-b border-zinc-800 pb-3">
-                  <span className="text-xs font-bold text-zinc-400 uppercase">FIXED BASELINE</span>
-                  <span className="text-xs text-zinc-500">Static Sequence</span>
+              <div className="border border-zinc-200 dark:border-zinc-800/80 rounded-2xl p-6 bg-white dark:bg-[#151922] shadow-xs space-y-4">
+                <div className="flex items-center justify-between border-b border-zinc-200 dark:border-zinc-800 pb-3">
+                  <span className="text-xs font-bold text-zinc-500 dark:text-zinc-400 uppercase">FIXED BASELINE</span>
+                  <span className="text-xs text-zinc-400">Static Sequence</span>
                 </div>
                 <div className="space-y-2 text-xs">
-                  <div className="flex justify-between text-zinc-300">
+                  <div className="flex justify-between text-zinc-700 dark:text-zinc-300">
                     <span>Initial Mastery:</span>
                     <span>{(evalResults.fixed.initial_mastery * 100).toFixed(0)}%</span>
                   </div>
-                  <div className="flex justify-between text-zinc-300">
+                  <div className="flex justify-between text-zinc-700 dark:text-zinc-300">
                     <span>Final Mastery:</span>
                     <span>{(evalResults.fixed.final_mastery * 100).toFixed(0)}%</span>
                   </div>
-                  <div className="flex justify-between text-white font-bold">
+                  <div className="flex justify-between text-zinc-950 dark:text-white font-bold">
                     <span>Learning Gain (ΔM):</span>
                     <span>+{(evalResults.fixed.learning_gain * 100).toFixed(1)}%</span>
                   </div>
-                  <div className="flex justify-between text-zinc-400">
+                  <div className="flex justify-between text-zinc-500 dark:text-zinc-400">
                     <span>Interactions Needed:</span>
                     <span>{evalResults.fixed.interactions_count}</span>
                   </div>
-                  <div className="flex justify-between text-zinc-400">
+                  <div className="flex justify-between text-zinc-500 dark:text-zinc-400">
                     <span>Misconceptions Resolved:</span>
                     <span>{evalResults.fixed.misconceptions_resolved}</span>
                   </div>
@@ -164,32 +166,32 @@ export const EvaluationLabView: React.FC = () => {
               </div>
 
               {/* PS6 Adaptive Policy Card */}
-              <div className="border border-white/60 rounded-xl p-6 bg-zinc-900/90 space-y-4 shadow-xl">
-                <div className="flex items-center justify-between border-b border-zinc-700 pb-3">
-                  <span className="text-xs font-bold text-white uppercase flex items-center gap-1.5">
-                    <CheckCircle className="w-4 h-4 text-emerald-400" />
+              <div className="border-2 border-blue-500/80 rounded-2xl p-6 bg-white dark:bg-[#151922] space-y-4 shadow-sm">
+                <div className="flex items-center justify-between border-b border-zinc-200 dark:border-zinc-700 pb-3">
+                  <span className="text-xs font-bold text-zinc-950 dark:text-white uppercase flex items-center gap-1.5">
+                    <CheckCircle className="w-4 h-4 text-emerald-500" />
                     PS6 ADAPTIVE POLICY
                   </span>
-                  <span className="text-xs text-emerald-400 font-bold">+{( (evalResults.adaptive.learning_gain - evalResults.fixed.learning_gain) * 100 ).toFixed(1)}% Superior</span>
+                  <span className="text-xs text-emerald-600 dark:text-emerald-400 font-bold">+{( (evalResults.adaptive.learning_gain - evalResults.fixed.learning_gain) * 100 ).toFixed(1)}% Superior</span>
                 </div>
                 <div className="space-y-2 text-xs">
-                  <div className="flex justify-between text-zinc-300">
+                  <div className="flex justify-between text-zinc-700 dark:text-zinc-300">
                     <span>Initial Mastery:</span>
                     <span>{(evalResults.adaptive.initial_mastery * 100).toFixed(0)}%</span>
                   </div>
-                  <div className="flex justify-between text-zinc-300">
+                  <div className="flex justify-between text-zinc-700 dark:text-zinc-300">
                     <span>Final Mastery:</span>
                     <span>{(evalResults.adaptive.final_mastery * 100).toFixed(0)}%</span>
                   </div>
-                  <div className="flex justify-between text-white font-bold text-sm">
+                  <div className="flex justify-between text-zinc-950 dark:text-white font-bold text-sm">
                     <span>Learning Gain (ΔM):</span>
-                    <span className="text-emerald-400">+{(evalResults.adaptive.learning_gain * 100).toFixed(1)}%</span>
+                    <span className="text-emerald-600 dark:text-emerald-400 font-extrabold">+{(evalResults.adaptive.learning_gain * 100).toFixed(1)}%</span>
                   </div>
-                  <div className="flex justify-between text-zinc-300">
+                  <div className="flex justify-between text-zinc-700 dark:text-zinc-300">
                     <span>Interactions Needed:</span>
                     <span>{evalResults.adaptive.interactions_count} (30% Faster)</span>
                   </div>
-                  <div className="flex justify-between text-zinc-300">
+                  <div className="flex justify-between text-zinc-700 dark:text-zinc-300">
                     <span>Misconceptions Resolved:</span>
                     <span>{evalResults.adaptive.misconceptions_resolved}</span>
                   </div>

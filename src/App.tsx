@@ -9,6 +9,7 @@ import { DebugPanel } from './components/debug/DebugPanel';
 import { CommandPaletteModal } from './components/palette/CommandPaletteModal';
 import { ModelSwitchModal } from './components/modals/ModelSwitchModal';
 import { NewProjectModal } from './components/modals/NewProjectModal';
+import { AssessmentModal } from './components/modals/AssessmentModal';
 
 import { LearnView } from './components/views/LearnView';
 import { KnowledgeView } from './components/views/KnowledgeView';
@@ -19,6 +20,7 @@ import { EvaluationLabView } from './components/views/EvaluationLabView';
 import { JudgeControlView } from './components/views/JudgeControlView';
 import { ProjectsView } from './components/views/ProjectsView';
 import { ProjectDashboardView } from './components/views/ProjectDashboardView';
+import { CustomAssessmentView } from './components/views/CustomAssessmentView';
 import { AdaptiveLearningDashboard } from './components/dashboard/AdaptiveLearningDashboard';
 
 import { useAppStore } from './stores/appStore';
@@ -31,6 +33,7 @@ import {
   getMessages,
   addMessage,
   getProjects,
+  addProject,
   deleteProject as dbDeleteProject,
   ProjectItem,
 } from './services/database';
@@ -78,6 +81,7 @@ export function App() {
   const [messages, setMessages] = useState<ChatMessageType[]>([]);
   const [showSettings, setShowSettings] = useState(false);
   const [showNewProjectModal, setShowNewProjectModal] = useState(false);
+  const [isAssessmentOpen, setIsAssessmentOpen] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isSidebarPinned, setIsSidebarPinned] = useState(true);
 
@@ -152,6 +156,10 @@ export function App() {
   };
 
   const handleSelectChat = (id: string) => {
+    const targetChat = chats.find((c) => c.id === id);
+    if (targetChat) {
+      setActiveProjectId(targetChat.project_id || null);
+    }
     setCurrentChatId(id);
     setActiveWorkspaceView('chat');
   };
@@ -204,6 +212,35 @@ export function App() {
     setActiveWorkspaceView('project_dashboard');
   };
 
+  const handleConvertResearchToSubject = async (
+    query: string,
+    summary: string,
+    extractedConcepts: string[]
+  ) => {
+    const cleanTopic = query.trim().replace(/^(research|explain|what is|learn about|teach me)\s+/i, '');
+    const subjectName = cleanTopic.charAt(0).toUpperCase() + cleanTopic.slice(1);
+
+    const newProj = await addProject(
+      subjectName,
+      subjectName,
+      `Mastery of ${subjectName}`,
+      summary.slice(0, 180)
+    );
+    await loadProjects();
+    setActiveProjectId(newProj.id);
+
+    const initialTitle = `${subjectName} Essentials`;
+    const chat = await createChat(initialTitle, selectedModel, newProj.id);
+    setCurrentChatId(chat.id);
+    setMessages([]);
+    setActiveWorkspaceView('chat');
+    await loadChats(chat.id, newProj.id);
+
+    const conceptsText = extractedConcepts.length > 0 ? `\n\nTarget Concepts to Master:\n${extractedConcepts.map((c) => `- ${c}`).join('\n')}` : '';
+    const kickoffPrompt = `Let's begin an adaptive learning session on ${subjectName}.${conceptsText}\n\nResearch Summary:\n${summary}`;
+    handleSendMessage(kickoffPrompt);
+  };
+
   // Main streaming chat completion logic connected to PS6 engine
   const handleSendMessage = async (userPrompt: string) => {
     let targetChatId = currentChatId;
@@ -251,12 +288,12 @@ export function App() {
     } else {
       const isSearchWorthy =
         intent === 'research' ||
-        /\b(search|lookup|news|latest|update|who|what|when|where)\b/i.test(userPrompt);
+        /\b(search the web|live search|latest news|current price|today's news|recent update|who is currently|in 2025|in 2026)\b/i.test(userPrompt);
 
       if (isSearchWorthy) {
         const searchRes = await webSearch(userPrompt, 4);
         if (searchRes.ok && searchRes.content) {
-          webContext += `\n\n[Web Search Results]:\n${searchRes.content}\n\n`;
+          webContext += `\n\n[Web Search Reference]:\n${searchRes.content}\n\n`;
           actualToolsUsed.push('Web Search');
         }
       }
@@ -271,7 +308,7 @@ export function App() {
         memoryEpisodes.push(`- Previous question: "${m.content.slice(0, 80)}"`);
       });
 
-    const optimizedPrompt = optimizePrompt(
+    const systemPrompt = optimizePrompt(
       userPrompt,
       intent,
       'LearnForge Agent',
@@ -288,9 +325,16 @@ export function App() {
     setStreamingContent('');
     setGenerationStage('initializing');
 
+    // Build clean history payload: System instruction first, then prior history, then current user turn
+    const priorMsgs = currentMsgs.slice(0, -1);
+    const userPromptWithContext = webContext
+      ? `${webContext}\n\n${userPrompt}`
+      : userPrompt;
+
     const historyPayload: ChatMessageType[] = [
-      ...currentMsgs.map((m) => ({ role: m.role, content: m.content })),
-      { role: 'user', content: optimizedPrompt },
+      { role: 'system', content: systemPrompt },
+      ...priorMsgs.map((m) => ({ role: m.role, content: m.content })),
+      { role: 'user', content: userPromptWithContext },
     ];
 
     let fullAccumulatedResponse = '';
@@ -447,6 +491,7 @@ export function App() {
             }
             projectName={activeProject ? activeProject.name : null}
             onExport={handleExportChat}
+            onOpenAssessment={() => setIsAssessmentOpen(true)}
             onToggleSidebar={() => setIsSidebarOpen(!isSidebarOpen)}
           />
         )}
@@ -480,13 +525,12 @@ export function App() {
               project={activeProject}
               projectChats={projectChats}
               activeChatId={currentChatId}
-              messages={messages}
               onBackToProjects={() => setActiveWorkspaceView('projects')}
               onSelectChat={handleSelectChat}
-              onNewChat={() => handleNewChat()}
+              onNewChat={(prompt) => handleNewChat(prompt)}
+              onDeleteChat={handleDeleteChat}
+              onOpenAssessment={() => setIsAssessmentOpen(true)}
               onSendMessage={handleSendMessage}
-              onStopStreaming={handleStopStreaming}
-              onRegenerate={handleRegenerate}
               onExport={handleExportChat}
             />
           )}
@@ -499,19 +543,40 @@ export function App() {
             />
           )}
 
+          {activeWorkspaceView === 'custom_assessment' && (
+            <CustomAssessmentView
+              onStartRemediationChat={(prompt) => {
+                setActiveWorkspaceView('chat');
+                handleSendMessage(prompt);
+              }}
+            />
+          )}
+
           {activeWorkspaceView === 'learn' && (
             <LearnView onStartTopicChat={(topic) => handleNewChat(topic)} />
           )}
 
-          {activeWorkspaceView === 'knowledge' && <KnowledgeView />}
+          {activeWorkspaceView === 'knowledge' && <KnowledgeView projectId={activeProjectId} />}
 
           {activeWorkspaceView === 'research' && (
-            <ResearchView onStartTopicChat={(topic) => handleNewChat(topic)} />
+            <ResearchView
+              onStartTopicChat={(topic) => handleNewChat(topic)}
+              onConvertToSubject={handleConvertResearchToSubject}
+            />
           )}
 
-          {activeWorkspaceView === 'story_challenge' && <StoryChallengeView />}
+          {activeWorkspaceView === 'story_challenge' && <StoryChallengeView projectId={activeProjectId} />}
 
-          {activeWorkspaceView === 'analytics' && <AnalyticsView />}
+          {activeWorkspaceView === 'analytics' && (
+            <AnalyticsView
+              projectId={activeProjectId}
+              projects={projects}
+              onSelectProject={(projId) => {
+                handleSelectProject(projId);
+                setActiveWorkspaceView('project_dashboard');
+              }}
+            />
+          )}
 
           {activeWorkspaceView === 'evaluation_lab' && <EvaluationLabView />}
 
@@ -534,6 +599,15 @@ export function App() {
         isOpen={showNewProjectModal}
         onClose={() => setShowNewProjectModal(false)}
         onProjectCreated={handleProjectCreated}
+      />
+      <AssessmentModal
+        isOpen={isAssessmentOpen}
+        topicTitle={activeProject ? activeProject.name : activeChat?.title || 'Core Concepts'}
+        onClose={() => setIsAssessmentOpen(false)}
+        onStartRemediationChat={(prompt) => {
+          setActiveWorkspaceView('chat');
+          handleSendMessage(prompt);
+        }}
       />
     </div>
   );

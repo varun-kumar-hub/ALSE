@@ -64,6 +64,18 @@ export default defineConfig(async () => ({
     strictPort: true,
     host: host || false,
     proxy: {
+      '/api/learning': {
+        target: 'http://127.0.0.1:8000',
+        changeOrigin: true,
+      },
+      '/api/health': {
+        target: 'http://127.0.0.1:8000',
+        changeOrigin: true,
+      },
+      '/api/analytics': {
+        target: 'http://127.0.0.1:8000',
+        changeOrigin: true,
+      },
       '/api': {
         target: 'http://127.0.0.1:11434',
         changeOrigin: true,
@@ -97,6 +109,18 @@ export default defineConfig(async () => ({
         changeOrigin: true,
         secure: false,
         rewrite: (path) => path.replace(/^\/proxy\/nvidia/, ''),
+      },
+      '/proxy/groq': {
+        target: 'https://api.groq.com',
+        changeOrigin: true,
+        secure: false,
+        rewrite: (path) => path.replace(/^\/proxy\/groq/, ''),
+      },
+      '/proxy/openrouter': {
+        target: 'https://openrouter.ai',
+        changeOrigin: true,
+        secure: false,
+        rewrite: (path) => path.replace(/^\/proxy\/openrouter/, ''),
       },
       '/proxy/ddg': {
         target: 'https://html.duckduckgo.com',

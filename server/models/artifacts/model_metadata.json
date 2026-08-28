@@ -1,0 +1,36 @@
+{
+  "version": "1.0.0",
+  "trained_at": "2026-08-28T18:58:00.513026Z",
+  "training_samples": 6000,
+  "models": {
+    "mastery_predictor": {
+      "algorithm": "GradientBoostingRegressor",
+      "metrics": {
+        "mae": 0.0026,
+        "rmse": 0.0035,
+        "r2": 0.9997
+      }
+    },
+    "learning_gain_predictor": {
+      "algorithm": "RandomForestRegressor",
+      "metrics": {
+        "mae": 0.0176,
+        "rmse": 0.0213,
+        "r2": 0.5938
+      }
+    },
+    "knowledge_state_estimator": {
+      "algorithm": "BayesianKnowledgeTracing (BKT)",
+      "p_init": 0.3,
+      "p_transit": 0.15
+    },
+    "difficulty_estimator": {
+      "algorithm": "ItemResponseTheory (1PL IRT)",
+      "target_success_zone": "70-80%"
+    },
+    "action_ranker": {
+      "algorithm": "MultiFactorUtilityEngine",
+      "candidate_actions": 11
+    }
+  }
+}

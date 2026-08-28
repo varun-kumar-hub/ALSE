@@ -588,6 +588,8 @@ export async function createProject(
   return project;
 }
 
+export const addProject = createProject;
+
 export async function updateProject(id: string, updates: Partial<ProjectItem>): Promise<void> {
   const existing = await getProjects();
   const updated = existing.map((p) => (p.id === id ? { ...p, ...updates, updated_at: new Date().toISOString() } : p));

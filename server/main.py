@@ -2,19 +2,20 @@ import sys
 import os
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
-from typing import List, Optional, Dict, Any
 
-from ml.knowledge_state import KnowledgeStateEstimator
-from ml.mastery_predictor import ConceptMasteryPredictor
-from ml.misconception_detector import MisconceptionDetector
-from ml.difficulty_estimator import DifficultyEstimator
-from ml.learning_gain_predictor import LearningGainPredictor
-from ml.action_ranker import ActionRanker
+from api.routes.learning import router as learning_router
+from api.routes.learner import router as learner_router
+from api.routes.interventions import router as interventions_router
+from api.routes.analytics import router as analytics_router
+from api.routes.models import router as models_router
 
-app = FastAPI(title="LearnForge PS6 ML Engine", version="1.0.0")
+app = FastAPI(
+    title="LearnForge Adaptive Learning Engine",
+    description="Production-grade AI Adaptive Learning Backend with Bayesian Knowledge Tracing, IRT Difficulty, and Multi-Factor Intervention Ranking.",
+    version="1.0.0"
+)
 
 app.add_middleware(
     CORSMiddleware,
@@ -24,15 +25,19 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Instantiate models
-knowledge_estimator = KnowledgeStateEstimator()
-mastery_predictor = ConceptMasteryPredictor()
-misconception_detector = MisconceptionDetector()
-difficulty_estimator = DifficultyEstimator()
-gain_predictor = LearningGainPredictor()
-action_ranker = ActionRanker()
+# Register modern modular API routes
+app.include_router(learning_router)
+app.include_router(learner_router)
+app.include_router(interventions_router)
+app.include_router(analytics_router)
+app.include_router(models_router)
 
-# Request Models
+from services.adaptive_engine import AdaptiveLearningEngine
+from pydantic import BaseModel
+from typing import List, Optional
+
+engine = AdaptiveLearningEngine()
+
 class EstimateStateRequest(BaseModel):
     correctness: float = 0.5
     recency_factor: float = 1.0
@@ -60,56 +65,85 @@ class RankActionsRequest(BaseModel):
         "MISCONCEPTION_REMEDIATION", "PREREQUISITE_REVIEW"
     ]
 
+# Backwards compatible legacy routes
+@app.post("/api/ml/estimate_state")
+def legacy_estimate_state(req: EstimateStateRequest):
+    bkt = engine.knowledge_estimator.update_state(
+        prior_mastery=0.30,
+        correct=req.correctness >= 0.5,
+        question_difficulty=req.task_difficulty,
+        hint_used=req.hint_count > 0,
+    )
+    misc = engine.misconception_detector.evaluate_misconception(
+        concept_id="general",
+        concept_name="General",
+        recent_correctness=[req.correctness >= 0.5],
+        repeated_error_count=req.repeated_error_count,
+        confidence=req.confidence,
+    )
+    diff = engine.difficulty_estimator.estimate_optimal_difficulty(
+        learner_mastery=bkt["mastery_score"],
+        has_misconception=misc["has_misconception"],
+    )
+    return {
+        "proficiency": bkt["mastery_score"],
+        "mastery": bkt["mastery_score"],
+        "misconception": {
+            "has_misconception": misc["has_misconception"],
+            "probability": misc["probability"],
+            "status": "active" if misc["has_misconception"] else "none",
+            "severity": misc["severity"].lower(),
+        },
+        "optimal_difficulty": diff["recommended_difficulty"],
+    }
+
+@app.post("/api/ml/predict_gain")
+def legacy_predict_gain(req: PredictGainRequest):
+    res = engine.gain_predictor.predict_gain(
+        current_mastery=req.current_mastery,
+        task_difficulty=req.task_difficulty,
+        action_type=req.action_type,
+        has_misconception=req.has_misconception,
+    )
+    return {"action_type": req.action_type, "predicted_gain": res["predicted_gain"]}
+
+@app.post("/api/ml/rank_actions")
+def legacy_rank_actions(req: RankActionsRequest):
+    ranked = engine.action_ranker.rank_interventions(
+        concept=req.concept,
+        current_mastery=req.current_mastery,
+        learner_ability=req.learner_ability,
+        has_misconception=req.has_misconception,
+        candidate_actions=req.candidate_actions,
+    )
+    candidates = [
+        {
+            "action": a["action"],
+            "predicted_gain": a["predicted_gain"],
+            "cost": a["cost"],
+            "utility": a["utility"],
+            "target_difficulty": req.learner_ability,
+            "reason": f"Ranked #{i+1} by ML Utility Engine",
+        }
+        for i, a in enumerate(ranked["ranked_actions"])
+    ]
+    return {
+        "concept": req.concept,
+        "budget_remaining": req.budget_remaining,
+        "selected_intervention": candidates[0] if candidates else None,
+        "all_ranked_candidates": candidates,
+    }
+
 @app.get("/api/health")
 def health_check():
     return {
         "status": "ok",
-        "service": "LearnForge PS6 ML Engine",
-        "models_loaded": ["knowledge_state", "mastery_predictor", "misconception_detector", "difficulty_estimator", "learning_gain", "action_ranker"]
-    }
-
-@app.post("/api/ml/estimate_state")
-def estimate_learner_state(req: EstimateStateRequest):
-    proficiency = knowledge_estimator.estimate_proficiency(
-        req.correctness, req.recency_factor, req.explanation_quality, req.hint_count
-    )
-    misc_res = misconception_detector.detect(
-        req.confidence, req.correctness, req.repeated_error_count
-    )
-    mastery = mastery_predictor.predict_mastery(
-        req.correctness, req.task_difficulty, req.recency_factor,
-        req.explanation_quality, req.confidence, 1 if misc_res["has_misconception"] else 0
-    )
-    opt_diff = difficulty_estimator.estimate_optimal_difficulty(proficiency, req.correctness)
-
-    return {
-        "proficiency": proficiency,
-        "mastery": mastery,
-        "misconception": misc_res,
-        "optimal_difficulty": opt_diff
-    }
-
-@app.post("/api/ml/predict_gain")
-def predict_learning_gain(req: PredictGainRequest):
-    gain = gain_predictor.predict_gain(
-        req.current_mastery, req.task_difficulty, req.action_type, req.has_misconception
-    )
-    return {"action_type": req.action_type, "predicted_gain": gain}
-
-@app.post("/api/ml/rank_actions")
-def rank_candidate_actions(req: RankActionsRequest):
-    ranked = action_ranker.rank_candidate_actions(
-        req.concept, req.current_mastery, req.learner_ability,
-        req.has_misconception, req.budget_remaining, req.candidate_actions
-    )
-    selected = ranked[0] if ranked else None
-    return {
-        "concept": req.concept,
-        "budget_remaining": req.budget_remaining,
-        "selected_intervention": selected,
-        "all_ranked_candidates": ranked
+        "service": "LearnForge Adaptive Learning Engine",
+        "version": "1.0.0",
+        "engine": "active"
     }
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run("main:app", host="127.0.0.1", port=8000, reload=True)
+    uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
+

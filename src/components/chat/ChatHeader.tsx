@@ -1,5 +1,5 @@
 import React from 'react';
-import { Cpu, Download, Folder, MessageSquare, Sun, Moon, Menu } from 'lucide-react';
+import { Cpu, Download, Folder, MessageSquare, Sun, Moon, Menu, Award } from 'lucide-react';
 import { Button } from '../ui/Button';
 import { useAppStore } from '../../stores/appStore';
 
@@ -7,10 +7,17 @@ interface ChatHeaderProps {
   chatTitle: string;
   projectName?: string | null;
   onExport: () => void;
+  onOpenAssessment?: () => void;
   onToggleSidebar?: () => void;
 }
 
-export const ChatHeader: React.FC<ChatHeaderProps> = ({ chatTitle, projectName, onExport, onToggleSidebar }) => {
+export const ChatHeader: React.FC<ChatHeaderProps> = ({
+  chatTitle,
+  projectName,
+  onExport,
+  onOpenAssessment,
+  onToggleSidebar,
+}) => {
   const { executionConfig, aiMode, selectedModel, theme, setTheme } = useAppStore();
 
   const displayActiveModel = selectedModel || executionConfig.modelName;
@@ -52,6 +59,19 @@ export const ChatHeader: React.FC<ChatHeaderProps> = ({ chatTitle, projectName, 
 
       {/* Right Controls */}
       <div className="flex items-center gap-3 shrink-0">
+        {/* Adaptive Assessment Button */}
+        {onOpenAssessment && (
+          <button
+            type="button"
+            onClick={onOpenAssessment}
+            className="px-3 py-1.5 rounded-xl bg-blue-50 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-800/80 text-blue-700 dark:text-blue-300 hover:bg-blue-100 dark:hover:bg-blue-900/60 font-semibold text-xs flex items-center gap-1.5 transition cursor-pointer shadow-2xs"
+            title="Take an adaptive quiz to test your knowledge"
+          >
+            <Award className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
+            <span>Take Assessment</span>
+          </button>
+        )}
+
         {/* Quick Theme Toggle Button */}
         <button
           onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}

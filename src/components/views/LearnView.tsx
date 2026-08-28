@@ -13,7 +13,9 @@ export const LearnView: React.FC<LearnViewProps> = ({ onStartTopicChat }) => {
   const [latestTrace, setLatestTrace] = useState<DecisionTrace | null>(null);
 
   useEffect(() => {
-    setMasteries(ps6Db.getAllMastery());
+    // Only load concepts that have recorded interaction evidence
+    const all = ps6Db.getAllMastery().filter((m) => (m.evidence_count || 0) > 0);
+    setMasteries(all);
     setMisconceptions(ps6Db.getMisconceptions().filter((m) => m.status !== 'resolved'));
     const traces = ps6Db.getDecisionTraces();
     if (traces.length > 0) setLatestTrace(traces[0]);

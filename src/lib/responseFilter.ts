@@ -1,96 +1,70 @@
-import { QueryIntent } from '../services/types';
+/**
+ * LearnForge Clean Educational Response Filter
+ * Strips meta commentary, prompt artifacts, leaked internal reasoning, and duplicate sections from model responses.
+ */
 
-const CODE_ALLOWED_INTENTS: QueryIntent[] = ['coding', 'debugging'];
-
-const CODE_INTRO_PATTERNS = [
-  /^here(?:'s| is)\s+(?:a|an)?\s*(?:python|javascript|typescript|react|rust|sql|html|css)?\s*(?:code|example|implementation|script)\b/i,
-  /^you can (?:also )?(?:implement|create|write|use) (?:this|it) (?:in|with)\b/i,
-  /^if you want to (?:create|implement|write|code|build)\b/i,
-  /^(?:sample|example|alternative) implementation\b/i,
+const META_PATTERNS = [
+  /^We need to (answer|provide|define|structure|explain|make sure).+?\n/gim,
+  /^We'll do:.+?\n/gim,
+  /^Thus answer:.+?\n/gim,
+  /^According to (guidelines|the protocols|the system).+?\n/gim,
+  /^Must base answer strictly.+?\n/gim,
+  /^Okay, the user just said.+?\n/gim,
+  /^First, checking the temporal anchor.+?\n/gim,
+  /^Looking at the intent classification.+?\n/gim,
+  /^The Educational Presentation Protocol.+?\n/gim,
+  /^The Cognitive Planning protocol.+?\n/gim,
+  /^Most importantly: "Never output meta commentary".+?\n/gim,
+  /^I recall that in the previous conversation.+?\n/gim,
+  /^The system (warns against|explicitly says).+?\n/gim,
+  /^I need to (explain|define|structure|make sure|understand|analyze|follow).+?\n/gim,
+  /^I will (structure|provide|now explain|break down|format|answer).+?\n/gim,
+  /^I should (ensure|keep in mind|note that|mention).+?\n/gim,
+  /^Given today's date.+?\n/gim,
+  /^Looking at the current real-time clock.+?\n/gim,
+  /^The search results (show|indicate|contain).+?\n/gim,
+  /^Based on (the provided|my reasoning|the search results).+?\n/gim,
+  /^Since the provided search results.+?\n/gim,
+  /^Let me (analyze|break down|explain|structure|think about).+?\n/gim,
+  /\\think[\s\S]*?\\endthink/gi,
 ];
 
-/**
- * Final safety pass over model output. It removes common "helpful but unwanted"
- * additions for non-coding intents and collapses duplicate lines/paragraphs.
- */
-export function filterResponseForIntent(content: string, intent: QueryIntent): string {
-  if (!content.trim()) return content;
+export function cleanEducationalContent(rawText: string): string {
+  if (!rawText) return '';
 
-  const allowCode = CODE_ALLOWED_INTENTS.includes(intent);
-  const withoutCode = allowCode ? content : removeCodeAdditions(content);
-  return removeRedundancy(withoutCode).trim();
-}
+  let cleaned = rawText;
 
-function removeCodeAdditions(content: string): string {
-  const lines = content.split(/\r?\n/);
-  const kept: string[] = [];
-  let inCodeFence = false;
-  let skipSection = false;
+  // 1. Remove raw <think>...</think> and \think...\endthink tags
+  cleaned = cleaned.replace(/<think>[\s\S]*?<\/think>/gi, '');
+  cleaned = cleaned.replace(/\\think[\s\S]*?\\endthink/gi, '');
+  cleaned = cleaned.trim();
 
-  for (const line of lines) {
-    const trimmed = line.trim();
-
-    if (/^```/.test(trimmed)) {
-      inCodeFence = !inCodeFence;
-      continue;
-    }
-
-    if (inCodeFence) continue;
-
-    if (/^(#{1,6}\s*)?(code|implementation|example code|sample code|python example|api example|pseudocode)\b[:\s-]*/i.test(trimmed)) {
-      skipSection = true;
-      continue;
-    }
-
-    if (skipSection && /^(#{1,6}\s+|\*\*[^*]+\*\*:?)\s*/.test(trimmed)) {
-      skipSection = false;
-    }
-
-    if (skipSection || CODE_INTRO_PATTERNS.some((pattern) => pattern.test(trimmed))) {
-      continue;
-    }
-
-    kept.push(line);
+  // 2. Strip leading meta-commentary artifacts
+  for (const pattern of META_PATTERNS) {
+    cleaned = cleaned.replace(pattern, '');
   }
 
-  return kept.join('\n');
-}
-
-function removeRedundancy(content: string): string {
-  const paragraphs = content.split(/\n{2,}/);
-  const seenParagraphs = new Set<string>();
-  const filteredParagraphs: string[] = [];
-
-  for (const paragraph of paragraphs) {
-    const normalizedParagraph = normalizeForComparison(paragraph);
-    if (!normalizedParagraph || seenParagraphs.has(normalizedParagraph)) continue;
-
-    seenParagraphs.add(normalizedParagraph);
-    filteredParagraphs.push(removeDuplicateLines(paragraph.trim()));
+  // 3. Remove duplicate repeated blocks if the model echoed the entire response twice
+  const titleMatch = cleaned.match(/^(#+\s+[^\n]+)/);
+  if (titleMatch) {
+    const title = titleMatch[1];
+    const secondTitleIndex = cleaned.indexOf(title, title.length);
+    if (secondTitleIndex !== -1 && secondTitleIndex > 80) {
+      const firstPart = cleaned.slice(0, secondTitleIndex).trim();
+      const secondPart = cleaned.slice(secondTitleIndex).trim();
+      if (firstPart.length > 50 && secondPart.length > 50) {
+        // If the two parts start identically, keep the cleanest one
+        cleaned = firstPart;
+      }
+    }
   }
 
-  return filteredParagraphs.join('\n\n').replace(/\n{3,}/g, '\n\n');
+  // 4. Normalize multiple consecutive blank lines to at most two
+  cleaned = cleaned.replace(/\n{3,}/g, '\n\n');
+
+  return cleaned.trim();
 }
 
-function removeDuplicateLines(paragraph: string): string {
-  const seenLines = new Set<string>();
-  const lines = paragraph.split(/\r?\n/);
-
-  return lines
-    .filter((line) => {
-      const normalizedLine = normalizeForComparison(line);
-      if (!normalizedLine) return true;
-      if (seenLines.has(normalizedLine)) return false;
-      seenLines.add(normalizedLine);
-      return true;
-    })
-    .join('\n');
-}
-
-function normalizeForComparison(value: string): string {
-  return value
-    .toLowerCase()
-    .replace(/[`*_#>\-[\]().,:;!?]/g, '')
-    .replace(/\s+/g, ' ')
-    .trim();
+export function filterResponseForIntent(rawText: string, _intent?: string): string {
+  return cleanEducationalContent(rawText);
 }

@@ -25,6 +25,8 @@ import {
   Search,
   Sun,
   Moon,
+  ArrowRight,
+  Award,
 } from 'lucide-react';
 import { Chat } from '../../services/types';
 import { ProjectItem, moveChatToProject, moveChatToGroup, toggleChatReadStatus } from '../../services/database';
@@ -79,6 +81,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const [isGeneralExpanded, setIsGeneralExpanded] = useState(true);
   const [isProjectsExpanded, setIsProjectsExpanded] = useState(true);
   const [isToolsExpanded, setIsToolsExpanded] = useState(true);
+  const [expandedSubjectIds, setExpandedSubjectIds] = useState<Record<string, boolean>>({});
 
   const [editingChatId, setEditingChatId] = useState<string | null>(null);
   const [editingTitle, setEditingTitle] = useState('');
@@ -87,6 +90,21 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const [sidebarSearch, setSidebarSearch] = useState('');
 
   const activeProject = projects.find((p) => p.id === activeProjectId);
+
+  const isSubjectExpanded = (projId: string) => {
+    if (expandedSubjectIds[projId] !== undefined) {
+      return expandedSubjectIds[projId];
+    }
+    return activeProjectId === projId;
+  };
+
+  const toggleSubjectExpanded = (projId: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setExpandedSubjectIds((prev) => ({
+      ...prev,
+      [projId]: !isSubjectExpanded(projId),
+    }));
+  };
 
   // Close context menu on global click
   useEffect(() => {
@@ -97,32 +115,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
     window.addEventListener('click', handleGlobalClick);
     return () => window.removeEventListener('click', handleGlobalClick);
   }, []);
-
-  // Filter chats by search query & active workspace context
-  const currentWorkspaceChats = chats.filter((c) => {
-    const matchesSearch = c.title.toLowerCase().includes(sidebarSearch.toLowerCase());
-    if (!matchesSearch) return false;
-    if (activeProjectId === null) {
-      return !c.project_id;
-    }
-    return c.project_id === activeProjectId;
-  });
-
-  const pinnedChats = currentWorkspaceChats.filter((c) => c.pinned);
-  const unpinnedChats = currentWorkspaceChats.filter((c) => !c.pinned);
-
-  // Group chats
-  const groupedChats: Record<string, Chat[]> = {};
-  const ungroupedChats: Chat[] = [];
-
-  unpinnedChats.forEach((c) => {
-    if (c.group_name) {
-      if (!groupedChats[c.group_name]) groupedChats[c.group_name] = [];
-      groupedChats[c.group_name].push(c);
-    } else {
-      ungroupedChats.push(c);
-    }
-  });
 
   const handleStartRename = (c: Chat) => {
     setEditingChatId(c.id);
@@ -149,8 +141,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
     if (onRefreshData) onRefreshData();
   };
 
-  const handleToggleRead = async (chatId: string, currentRead?: boolean) => {
-    await toggleChatReadStatus(chatId, !currentRead);
+  const handleToggleRead = async (chatId: string, currentReadStatus?: boolean) => {
+    await toggleChatReadStatus(chatId, !currentReadStatus);
     setActiveMenuChatId(null);
     if (onRefreshData) onRefreshData();
   };
@@ -193,8 +185,24 @@ export const Sidebar: React.FC<SidebarProps> = ({
           </div>
         )}
 
-        {/* Action Menu Trigger Button (⋮) */}
-        <div className="flex items-center gap-1 shrink-0 ml-1">
+        {/* Action buttons on Hover */}
+        <div className="flex items-center gap-0.5 shrink-0 ml-1">
+          {/* Quick Delete / Close button */}
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              if (confirm(`Close / Delete chat "${c.title}"?`)) {
+                onDeleteChat(c.id);
+              }
+            }}
+            className="p-1 rounded-lg hover:bg-rose-50 dark:hover:bg-rose-950/40 text-zinc-400 hover:text-rose-500 opacity-0 group-hover:opacity-100 transition cursor-pointer"
+            title="Delete / Close Chat"
+          >
+            <Trash2 className="w-3 h-3" />
+          </button>
+
+          {/* Action Menu Trigger Button (⋮) */}
           <button
             onClick={(e) => {
               e.stopPropagation();
@@ -375,13 +383,33 @@ export const Sidebar: React.FC<SidebarProps> = ({
         {/* Product Title Header */}
         <div className="p-4 border-b border-zinc-200 dark:border-zinc-800/80 flex items-center justify-between">
           <div>
-            <h2 className="text-base font-extrabold text-zinc-950 dark:text-white tracking-tight flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => {
+                onSelectProject(null);
+                onSelectView('welcome');
+              }}
+              className="text-base font-extrabold text-zinc-950 dark:text-white tracking-tight flex items-center gap-2 hover:opacity-80 transition cursor-pointer text-left"
+              title="Go to Welcome / Home"
+            >
               <span className="w-2.5 h-2.5 rounded-full bg-blue-500 inline-block shadow-xs"></span>
               LearnForge
-            </h2>
-            <span className="text-[10px] text-zinc-500 dark:text-zinc-400 font-mono block mt-0.5">
-              {activeProject ? `Subject: ${activeProject.name}` : 'General Workspace'}
-            </span>
+            </button>
+            {activeProject ? (
+              <button
+                type="button"
+                onClick={() => onSelectView('project_dashboard')}
+                className="group/subj inline-flex items-center gap-1 text-[10px] font-mono text-blue-600 dark:text-blue-400 hover:underline mt-0.5 cursor-pointer text-left"
+                title={`Open ${activeProject.name} Workspace`}
+              >
+                <span>Subject: {activeProject.name}</span>
+                <ArrowRight className="w-2.5 h-2.5 opacity-0 group-hover/subj:opacity-100 transition" />
+              </button>
+            ) : (
+              <span className="text-[10px] text-zinc-500 dark:text-zinc-400 font-mono block mt-0.5">
+                General Workspace
+              </span>
+            )}
           </div>
 
           <div className="flex items-center gap-1">
@@ -444,13 +472,13 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
           {/* General Chat Header & List */}
           <div>
-            <button
+            <div
               onClick={() => {
                 onSelectProject(null);
                 onSelectView('chat');
                 setIsGeneralExpanded(!isGeneralExpanded);
               }}
-              className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-medium transition cursor-pointer ${
+              className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-medium transition cursor-pointer group ${
                 activeProjectId === null && activeView === 'chat'
                   ? 'bg-zinc-100 dark:bg-zinc-850 text-zinc-950 dark:text-white font-semibold'
                   : 'text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-900'
@@ -460,44 +488,57 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 <MessageSquare className="w-4 h-4 text-zinc-500 dark:text-zinc-400" />
                 <span>General Chat</span>
               </div>
-              {isGeneralExpanded ? (
-                <ChevronDown className="w-3.5 h-3.5 text-zinc-400" />
-              ) : (
-                <ChevronRight className="w-3.5 h-3.5 text-zinc-400" />
-              )}
-            </button>
+
+              <div className="flex items-center gap-1">
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onSelectProject(null);
+                    onNewChat();
+                  }}
+                  className="p-1 rounded-lg text-zinc-400 hover:text-blue-500 hover:bg-zinc-200 dark:hover:bg-zinc-800 transition cursor-pointer"
+                  title="New General Chat"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                </button>
+                {isGeneralExpanded ? (
+                  <ChevronDown className="w-3.5 h-3.5 text-zinc-400" />
+                ) : (
+                  <ChevronRight className="w-3.5 h-3.5 text-zinc-400" />
+                )}
+              </div>
+            </div>
 
             {/* General Chats Container */}
             {activeProjectId === null && isGeneralExpanded && (
               <div className="pl-2 ml-3 border-l border-zinc-200 dark:border-zinc-850 my-1 space-y-1">
                 {/* Pinned Section */}
-                {pinnedChats.length > 0 && (
+                {chats.filter((c) => !c.project_id && c.pinned && c.title.toLowerCase().includes(sidebarSearch.toLowerCase())).length > 0 && (
                   <div className="space-y-0.5 mb-2">
                     <span className="text-[10px] font-mono text-amber-500 font-bold uppercase px-3 block">
                       📌 PINNED
                     </span>
-                    {pinnedChats.map(renderChatItem)}
+                    {chats.filter((c) => !c.project_id && c.pinned && c.title.toLowerCase().includes(sidebarSearch.toLowerCase())).map(renderChatItem)}
                   </div>
                 )}
 
-                {/* Grouped Section */}
-                {Object.keys(groupedChats).map((grp) => (
-                  <div key={grp} className="space-y-0.5 my-1">
-                    <span className="text-[10px] font-mono text-zinc-500 uppercase px-3 block font-semibold">
-                      📁 {grp}
-                    </span>
-                    {groupedChats[grp].map(renderChatItem)}
-                  </div>
-                ))}
+                {/* Ungrouped General Chats */}
+                {chats.filter((c) => !c.project_id && !c.pinned && c.title.toLowerCase().includes(sidebarSearch.toLowerCase())).map(renderChatItem)}
 
-                {/* Ungrouped Chats */}
-                {ungroupedChats.map(renderChatItem)}
-
-                {currentWorkspaceChats.length === 0 && (
-                  <div className="px-3 py-2 text-center">
-                    <span className="text-[11px] text-zinc-400 italic block font-mono">
-                      No general conversations yet
-                    </span>
+                {chats.filter((c) => !c.project_id && c.title.toLowerCase().includes(sidebarSearch.toLowerCase())).length === 0 && (
+                  <div className="px-2 py-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        onSelectProject(null);
+                        onNewChat();
+                      }}
+                      className="w-full py-2 px-3 text-center rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-dashed border-zinc-300 dark:border-zinc-800 text-zinc-600 dark:text-zinc-400 hover:text-blue-500 hover:border-blue-500/50 text-xs font-semibold flex items-center justify-center gap-1.5 transition cursor-pointer"
+                    >
+                      <Plus className="w-3.5 h-3.5" />
+                      <span>Start New General Chat</span>
+                    </button>
                   </div>
                 )}
               </div>
@@ -507,34 +548,56 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
         {/* SUBJECTS Section */}
         <div className="space-y-1 pt-1 border-t border-zinc-200 dark:border-zinc-850">
-          <button
-            type="button"
-            onClick={() => setIsProjectsExpanded(!isProjectsExpanded)}
-            className="w-full flex items-center justify-between px-3 py-1.5 rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-900 transition cursor-pointer text-left group"
-          >
-            <span className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider font-mono group-hover:text-zinc-950 dark:group-hover:text-white">
-              SUBJECTS
-            </span>
-            <span className="text-zinc-400 group-hover:text-zinc-700 dark:group-hover:text-zinc-300 p-0.5">
-              {isProjectsExpanded ? (
-                <ChevronDown className="w-3.5 h-3.5" />
-              ) : (
-                <ChevronRight className="w-3.5 h-3.5" />
-              )}
-            </span>
-          </button>
+          <div className="flex items-center justify-between px-3 py-1.5">
+            <button
+              type="button"
+              onClick={() => setIsProjectsExpanded(!isProjectsExpanded)}
+              className="flex items-center gap-1.5 text-left group cursor-pointer"
+            >
+              <span className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider font-mono group-hover:text-zinc-950 dark:group-hover:text-white">
+                SUBJECTS ({projects.length})
+              </span>
+              <span className="text-zinc-400 group-hover:text-zinc-700 dark:group-hover:text-zinc-300">
+                {isProjectsExpanded ? (
+                  <ChevronDown className="w-3 h-3" />
+                ) : (
+                  <ChevronRight className="w-3 h-3" />
+                )}
+              </span>
+            </button>
+
+            <button
+              type="button"
+              onClick={onOpenNewProject}
+              className="p-1 rounded-lg text-zinc-400 hover:text-blue-500 hover:bg-zinc-100 dark:hover:bg-zinc-900 transition cursor-pointer"
+              title="Create New Subject"
+            >
+              <Plus className="w-3.5 h-3.5" />
+            </button>
+          </div>
 
           {isProjectsExpanded && (
             <div className="space-y-1">
               {projects.map((proj) => {
                 const isSelected = activeProjectId === proj.id;
+                const isExpanded = isSubjectExpanded(proj.id);
+                const projChats = chats.filter(
+                  (c) => c.project_id === proj.id && c.title.toLowerCase().includes(sidebarSearch.toLowerCase())
+                );
+                const projPinned = projChats.filter((c) => c.pinned);
+                const projUnpinned = projChats.filter((c) => !c.pinned);
 
                 return (
                   <div key={proj.id} className="space-y-1">
                     <div
                       onClick={() => {
-                        onSelectProject(proj.id);
-                        onSelectView('project_dashboard');
+                        if (isSelected && isExpanded) {
+                          setExpandedSubjectIds((prev) => ({ ...prev, [proj.id]: false }));
+                        } else {
+                          onSelectProject(proj.id);
+                          onSelectView('project_dashboard');
+                          setExpandedSubjectIds((prev) => ({ ...prev, [proj.id]: true }));
+                        }
                       }}
                       className={`group flex items-center justify-between px-3 py-2 rounded-xl text-xs font-medium transition cursor-pointer ${
                         isSelected
@@ -542,43 +605,81 @@ export const Sidebar: React.FC<SidebarProps> = ({
                           : 'text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-900'
                       }`}
                     >
-                      <div className="flex items-center gap-2.5 min-w-0 flex-1">
+                      <div className="flex items-center gap-1.5 min-w-0 flex-1">
+                        <button
+                          type="button"
+                          onClick={(e) => toggleSubjectExpanded(proj.id, e)}
+                          className="p-0.5 rounded text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 transition cursor-pointer"
+                          title={isExpanded ? 'Collapse subject conversations' : 'Expand subject conversations'}
+                        >
+                          {isExpanded ? (
+                            <ChevronDown className="w-3.5 h-3.5" />
+                          ) : (
+                            <ChevronRight className="w-3.5 h-3.5" />
+                          )}
+                        </button>
                         <span className="text-xs">{proj.icon || '📘'}</span>
                         <span className="truncate">{proj.name}</span>
                       </div>
 
-                      {/* Delete Action */}
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          if (confirm(`Delete subject "${proj.name}"?`)) {
-                            onDeleteProject(proj.id);
-                          }
-                        }}
-                        className="hidden group-hover:block p-1 text-zinc-400 hover:text-rose-500 cursor-pointer"
-                        title="Delete Subject"
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </button>
+                      <div className="flex items-center gap-1">
+                        {/* Plus button directly on Subject row */}
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onSelectProject(proj.id);
+                            setExpandedSubjectIds((prev) => ({ ...prev, [proj.id]: true }));
+                            onNewChat();
+                          }}
+                          className="p-1 rounded-lg text-zinc-400 hover:text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-950/40 transition cursor-pointer"
+                          title={`Start new chat in ${proj.name}`}
+                        >
+                          <Plus className="w-3.5 h-3.5" />
+                        </button>
+
+                        {/* Delete Action */}
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            if (confirm(`Delete subject "${proj.name}"?`)) {
+                              onDeleteProject(proj.id);
+                            }
+                          }}
+                          className="hidden group-hover:block p-1 text-zinc-400 hover:text-rose-500 cursor-pointer"
+                          title="Delete Subject"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
                     </div>
 
                     {/* Per-Subject Chats Container */}
-                    {isSelected && (
+                    {isExpanded && (
                       <div className="pl-2 ml-3 border-l border-zinc-200 dark:border-zinc-850 my-1 space-y-1">
-                        {pinnedChats.length > 0 && (
+                        {projPinned.length > 0 && (
                           <div className="space-y-0.5 mb-2">
                             <span className="text-[10px] font-mono text-amber-500 font-bold uppercase px-3 block">
                               📌 PINNED
                             </span>
-                            {pinnedChats.map(renderChatItem)}
+                            {projPinned.map(renderChatItem)}
                           </div>
                         )}
-                        {unpinnedChats.map(renderChatItem)}
-                        {currentWorkspaceChats.length === 0 && (
-                          <div className="px-3 py-2 text-center">
-                            <span className="text-[11px] text-zinc-400 italic block font-mono">
-                              No subject conversations yet
-                            </span>
+                        {projUnpinned.map(renderChatItem)}
+                        {projChats.length === 0 && (
+                          <div className="px-2 py-2">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                onSelectProject(proj.id);
+                                onNewChat();
+                              }}
+                              className="w-full py-2 px-3 text-center rounded-xl bg-blue-50/50 dark:bg-blue-950/20 border border-dashed border-blue-200 dark:border-blue-800/60 text-blue-600 dark:text-blue-400 hover:bg-blue-100/60 dark:hover:bg-blue-900/40 text-xs font-semibold flex items-center justify-center gap-1.5 transition cursor-pointer"
+                            >
+                              <Plus className="w-3.5 h-3.5" />
+                              <span>+ Start Chat in {proj.name}</span>
+                            </button>
                           </div>
                         )}
                       </div>
@@ -623,6 +724,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
               {(
                 [
                   { id: 'dashboard', label: 'Adaptive Dashboard', icon: BarChart3 },
+                  { id: 'custom_assessment', label: 'Assessments', icon: Award },
                   { id: 'learn', label: 'Learn', icon: Brain },
                   { id: 'knowledge', label: 'Knowledge', icon: Network },
                   { id: 'research', label: 'Research', icon: Compass },

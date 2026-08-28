@@ -70,10 +70,17 @@ export const PROVIDER_REGISTRY: Record<string, ProviderRegistryItem> = {
     modelsEndpoint: 'https://generativelanguage.googleapis.com/v1beta/models',
     chatEndpoint: 'https://generativelanguage.googleapis.com/v1beta/models',
     defaultModel: 'gemini-2.5-flash',
-    supportedModels: ['gemini-2.5-flash', 'gemini-2.5-pro'],
+    supportedModels: [
+      'gemini-2.5-flash',
+      'gemini-2.5-pro',
+      'gemini-1.5-flash',
+      'gemini-1.5-pro',
+      'gemini-2.0-flash',
+      'gemini-3.6-flash',
+    ],
     capabilities: ['chat', 'streaming', 'title-generation', 'json', 'tools', 'reasoning', 'coding', 'research', 'vision'],
-    authHeader: () => ({}),
-    apiKeyPattern: /^AIzaSy/,
+    authHeader: (key) => ({ 'x-goog-api-key': key }),
+    apiKeyPattern: /^(AIzaSy|AQ\.)/,
   },
   openrouter: {
     id: 'openrouter',
@@ -170,7 +177,6 @@ export const PROVIDER_REGISTRY: Record<string, ProviderRegistryItem> = {
 
 /**
  * Validates provider and model compatibility before execution.
- * Prevents invalid combinations such as OpenCode Zen + llama3.2:latest.
  */
 export function validateProviderModelCompatibility(
   providerId: string,
@@ -320,24 +326,38 @@ export async function validateAndDiscoverProvider(
   // 2. Web Browser Fallback Verification
   try {
     if (providerId === 'gemini') {
-      const url = `${modelsEndpoint}?key=${apiKey.trim()}`;
-      const resp = await fetchWithCorsProxy(url, { method: 'GET' });
+      const cleanKey = apiKey.trim();
+      const url = `https://generativelanguage.googleapis.com/v1beta/models?key=${cleanKey}`;
+      const resp = await fetchWithCorsProxy(url, {
+        method: 'GET',
+        headers: {
+          'x-goog-api-key': cleanKey,
+          'Content-Type': 'application/json',
+        },
+      });
       const latencyMs = Date.now() - startTime;
 
       if (!resp.ok) {
+        let errDetail = `HTTP ${resp.status}`;
+        try {
+          const errJson = await resp.json();
+          if (errJson.error && errJson.error.message) {
+            errDetail = errJson.error.message;
+          }
+        } catch {}
         return {
           connected: false,
           models: [],
           capabilities: registry.capabilities,
           errorCategory: 'Authentication Failed',
-          error: `Google Gemini auth failed (HTTP ${resp.status}). Check your API Key.`,
+          error: `Google Gemini authentication failed: ${errDetail}. Please verify your Gemini API key from Google AI Studio.`,
         };
       }
 
       const json = await resp.json();
       const models: string[] = (json.models || [])
         .map((m: { name?: string }) => m.name?.replace('models/', '') || '')
-        .filter(Boolean);
+        .filter((m: string) => m.includes('gemini'));
 
       const resolvedModels = models.length > 0 ? models : registry.supportedModels;
 
@@ -376,7 +396,7 @@ export async function validateAndDiscoverProvider(
         error: `${category} (HTTP ${resp.status}): ${errText.slice(0, 120) || 'Check API Key or URL'}`,
       };
     }
-
+  
     const json = await resp.json();
     let models: string[] = [];
 

@@ -76,28 +76,28 @@ export const ThinkingCard: React.FC<ThinkingCardProps> = ({
         type="button"
         aria-expanded={isExpanded}
         onClick={() => setIsExpanded(!isExpanded)}
-        className="group inline-flex items-center gap-1.5 px-2 py-1 -ml-2 rounded-lg hover:bg-zinc-100/70 text-zinc-500 hover:text-zinc-800 transition-colors cursor-pointer text-left border-none bg-transparent shadow-none outline-none focus-visible:ring-1 focus-visible:ring-zinc-400"
+        className="group inline-flex items-center gap-1.5 px-2 py-1 -ml-2 rounded-lg hover:bg-zinc-100/70 dark:hover:bg-zinc-800/60 text-zinc-500 dark:text-zinc-400 hover:text-zinc-800 dark:hover:text-zinc-200 transition-colors cursor-pointer text-left border-none bg-transparent shadow-none outline-none focus-visible:ring-1 focus-visible:ring-zinc-400"
       >
         <Sparkles
           className={`w-3.5 h-3.5 shrink-0 ${
-            isStreaming ? 'text-blue-600 animate-spin' : 'text-zinc-500 group-hover:text-zinc-700'
+            isStreaming ? 'text-blue-600 dark:text-blue-400 animate-spin' : 'text-zinc-500 dark:text-zinc-400 group-hover:text-zinc-700 dark:group-hover:text-zinc-300'
           }`}
         />
 
-        <span className="font-medium text-xs text-zinc-700 group-hover:text-zinc-900">
+        <span className="font-medium text-xs text-zinc-700 dark:text-zinc-300 group-hover:text-zinc-900 dark:group-hover:text-white">
           {isStreaming ? 'Thinking...' : getSummaryLabel()}
         </span>
 
         {isExpanded ? (
-          <ChevronUp className="w-3.5 h-3.5 text-zinc-400 group-hover:text-zinc-600 shrink-0" />
+          <ChevronUp className="w-3.5 h-3.5 text-zinc-400 dark:text-zinc-500 group-hover:text-zinc-600 dark:group-hover:text-zinc-300 shrink-0" />
         ) : (
-          <ChevronDown className="w-3.5 h-3.5 text-zinc-400 group-hover:text-zinc-600 shrink-0" />
+          <ChevronDown className="w-3.5 h-3.5 text-zinc-400 dark:text-zinc-500 group-hover:text-zinc-600 dark:group-hover:text-zinc-300 shrink-0" />
         )}
       </button>
 
       {/* Expanded High-Level Activities Panel */}
       {isExpanded && (
-        <div className="mt-1.5 mb-2.5 pl-3 py-1 border-l-2 border-zinc-200/80 space-y-1.5 text-xs text-zinc-600 animate-in fade-in duration-150 select-text">
+        <div className="mt-1.5 mb-2.5 pl-3 py-1 border-l-2 border-zinc-200/80 dark:border-zinc-700/80 space-y-1.5 text-xs text-zinc-600 dark:text-zinc-400 animate-in fade-in duration-150 select-text">
           {displayActivities.map((act, i) => {
             const isCompleted = act.status === 'completed' || !isStreaming;
             const isActive = act.status === 'active' && isStreaming;
@@ -105,19 +105,19 @@ export const ThinkingCard: React.FC<ThinkingCardProps> = ({
             return (
               <div key={act.id || i} className="flex items-center gap-2">
                 {isCompleted ? (
-                  <Check className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                  <Check className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400 shrink-0" />
                 ) : isActive ? (
-                  <Sparkles className="w-3.5 h-3.5 text-blue-600 animate-spin shrink-0" />
+                  <Sparkles className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400 animate-spin shrink-0" />
                 ) : (
-                  <span className="w-1.5 h-1.5 rounded-full bg-zinc-300 ml-1 shrink-0" />
+                  <span className="w-1.5 h-1.5 rounded-full bg-zinc-300 dark:bg-zinc-600 ml-1 shrink-0" />
                 )}
                 <span
                   className={
                     isActive
-                      ? 'text-blue-700 font-medium'
+                      ? 'text-blue-700 dark:text-blue-300 font-medium'
                       : isCompleted
-                      ? 'text-zinc-700'
-                      : 'text-zinc-400'
+                      ? 'text-zinc-700 dark:text-zinc-300'
+                      : 'text-zinc-400 dark:text-zinc-500'
                   }
                 >
                   {act.text}
@@ -127,13 +127,13 @@ export const ThinkingCard: React.FC<ThinkingCardProps> = ({
           })}
 
           {(provider || model) && (
-            <div className="pt-1 text-[10px] text-zinc-400 font-mono">
+            <div className="pt-1 text-[10px] text-zinc-400 dark:text-zinc-500 font-mono">
               Engine: {provider === 'ollama' || provider === 'local' ? 'Local Model' : 'Cloud Provider'} ({model || 'qwen3:8b'})
             </div>
           )}
 
           {thinking && (
-            <div className="pt-2 text-xs text-zinc-600 font-sans leading-relaxed whitespace-pre-wrap select-text border-t border-zinc-100 mt-2">
+            <div className="pt-2 text-xs text-zinc-600 dark:text-zinc-400 font-sans leading-relaxed whitespace-pre-wrap select-text border-t border-zinc-100 dark:border-zinc-800 mt-2">
               {thinking}
             </div>
           )}

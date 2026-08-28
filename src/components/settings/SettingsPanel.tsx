@@ -88,17 +88,17 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ onClose }) => {
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-md animate-in fade-in duration-200 select-none text-zinc-100 font-sans">
-      <div className="relative w-full max-w-3xl bg-zinc-950 border border-zinc-800 rounded-2xl shadow-2xl overflow-hidden max-h-[90vh] flex flex-col">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200 select-none text-zinc-900 dark:text-zinc-100 font-sans">
+      <div className="relative w-full max-w-3xl bg-white dark:bg-[#12161f] border border-zinc-200 dark:border-zinc-800 rounded-2xl shadow-2xl overflow-hidden max-h-[90vh] flex flex-col">
         {/* Modal Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-zinc-850 bg-zinc-950">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-zinc-200 dark:border-zinc-800 bg-zinc-50/50 dark:bg-[#12161f]">
           <div>
-            <h2 className="text-base font-bold text-white tracking-tight">LearnForge Settings</h2>
-            <p className="text-xs text-zinc-400 font-mono">Models, Runtime & API Configuration</p>
+            <h2 className="text-base font-bold text-zinc-950 dark:text-white tracking-tight">LearnForge Settings</h2>
+            <p className="text-xs text-zinc-500 dark:text-zinc-400 font-mono">Models, Runtime & API Configuration</p>
           </div>
           <button
             onClick={onClose}
-            className="p-1.5 rounded-lg text-zinc-400 hover:text-white hover:bg-zinc-850 transition"
+            className="p-1.5 rounded-lg text-zinc-400 hover:text-zinc-900 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-zinc-800 transition cursor-pointer"
           >
             <X className="w-4 h-4" />
           </button>
@@ -108,7 +108,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ onClose }) => {
         <div className="flex-1 overflow-y-auto p-6 space-y-6 text-xs font-mono">
           {/* Execution Mode Selector Bar */}
           <div className="space-y-2">
-            <label className="text-[11px] font-bold text-zinc-400 uppercase tracking-wider flex items-center gap-1.5 font-mono">
+            <label className="text-[11px] font-bold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider flex items-center gap-1.5 font-mono">
               <Globe className="w-3.5 h-3.5 text-zinc-400" /> ACTIVE EXECUTION MODE
             </label>
 
@@ -121,16 +121,16 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ onClose }) => {
                 }}
                 className={`p-4 rounded-2xl border text-left flex justify-between transition-all cursor-pointer ${
                   aiMode === 'local'
-                    ? 'border-emerald-500/50 bg-emerald-500/10 text-white shadow-xs'
-                    : 'border-zinc-850 hover:border-zinc-700 bg-zinc-900/60 text-zinc-400'
+                    ? 'border-emerald-500 bg-emerald-50/60 dark:bg-emerald-950/20 text-emerald-950 dark:text-white shadow-xs'
+                    : 'border-zinc-200 dark:border-zinc-800 hover:border-zinc-300 dark:hover:border-zinc-700 bg-white dark:bg-zinc-900/40 text-zinc-600 dark:text-zinc-400'
                 }`}
               >
                 <div>
-                  <ShieldCheck className={`w-5 h-5 mb-2 ${aiMode === 'local' ? 'text-emerald-400' : 'text-zinc-500'}`} />
-                  <p className="font-bold text-white text-sm">Local Mode</p>
-                  <p className="text-[10px] text-zinc-400">Offline Ollama execution</p>
+                  <ShieldCheck className={`w-5 h-5 mb-2 ${aiMode === 'local' ? 'text-emerald-500' : 'text-zinc-400'}`} />
+                  <p className="font-bold text-zinc-950 dark:text-white text-sm">Local Mode</p>
+                  <p className="text-[10px] text-zinc-500 dark:text-zinc-400">Offline Ollama execution</p>
                 </div>
-                {aiMode === 'local' && <Check className="w-4 h-4 text-emerald-400" />}
+                {aiMode === 'local' && <Check className="w-4 h-4 text-emerald-500" />}
               </button>
 
               <button
@@ -141,16 +141,16 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ onClose }) => {
                 }}
                 className={`p-4 rounded-2xl border text-left flex justify-between transition-all cursor-pointer ${
                   aiMode === 'cloud'
-                    ? 'border-blue-500/50 bg-blue-500/10 text-white shadow-xs'
-                    : 'border-zinc-850 hover:border-zinc-700 bg-zinc-900/60 text-zinc-400'
+                    ? 'border-blue-500 bg-blue-50/60 dark:bg-blue-950/20 text-blue-950 dark:text-white shadow-xs'
+                    : 'border-zinc-200 dark:border-zinc-800 hover:border-zinc-300 dark:hover:border-zinc-700 bg-white dark:bg-zinc-900/40 text-zinc-600 dark:text-zinc-400'
                 }`}
               >
                 <div>
-                  <Cloud className={`w-5 h-5 mb-2 ${aiMode === 'cloud' ? 'text-blue-400' : 'text-zinc-500'}`} />
-                  <p className="font-bold text-white text-sm">Cloud Mode</p>
-                  <p className="text-[10px] text-zinc-400">Cloud AI Providers</p>
+                  <Cloud className={`w-5 h-5 mb-2 ${aiMode === 'cloud' ? 'text-blue-500' : 'text-zinc-400'}`} />
+                  <p className="font-bold text-zinc-950 dark:text-white text-sm">Cloud Mode</p>
+                  <p className="text-[10px] text-zinc-500 dark:text-zinc-400">Cloud AI Providers</p>
                 </div>
-                {aiMode === 'cloud' && <Check className="w-4 h-4 text-blue-400" />}
+                {aiMode === 'cloud' && <Check className="w-4 h-4 text-blue-500" />}
               </button>
             </div>
           </div>
@@ -173,7 +173,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ onClose }) => {
         </div>
 
         {/* Modal Footer */}
-        <div className="px-6 py-4 border-t border-zinc-200 dark:border-zinc-850 bg-white dark:bg-zinc-950 flex items-center justify-between">
+        <div className="flex items-center justify-between px-6 py-4 border-t border-zinc-200 dark:border-zinc-800 bg-zinc-50/50 dark:bg-[#12161f]">
           <button
             type="button"
             onClick={async () => {

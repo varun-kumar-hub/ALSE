@@ -5,7 +5,10 @@ import {
   Paperclip,
   X,
   FileText,
+  FileCode,
+  CheckCircle2,
 } from 'lucide-react';
+import { parseUploadedFile, formatFilePrompt, ParsedFileInfo } from '../../lib/fileParser';
 
 interface ChatInputProps {
   onSend: (message: string) => void;
@@ -16,7 +19,8 @@ export const ChatInput: React.FC<ChatInputProps> = ({ onSend }) => {
   const [input, setInput] = useState('');
   const [isExpanded, setIsExpanded] = useState(false);
   const [webSearchEnabled, setWebSearchEnabled] = useState(true);
-  const [attachedFile, setAttachedFile] = useState<{ name: string; size: string } | null>(null);
+  const [attachedFile, setAttachedFile] = useState<ParsedFileInfo | null>(null);
+  const [isParsingFile, setIsParsingFile] = useState(false);
 
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -42,7 +46,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({ onSend }) => {
 
     let fullPrompt = input.trim();
     if (attachedFile) {
-      fullPrompt = `[Attached File: ${attachedFile.name}]\n\n${fullPrompt}`;
+      fullPrompt = formatFilePrompt(attachedFile, fullPrompt);
     }
     if (!webSearchEnabled) {
       fullPrompt = `${fullPrompt} --no-web-search`;
@@ -57,15 +61,19 @@ export const ChatInput: React.FC<ChatInputProps> = ({ onSend }) => {
     }
   };
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      const sizeMb = (file.size / (1024 * 1024)).toFixed(1);
-      setAttachedFile({
-        name: file.name,
-        size: `${sizeMb} MB`,
-      });
-      setIsExpanded(true);
+      setIsParsingFile(true);
+      try {
+        const parsed = await parseUploadedFile(file);
+        setAttachedFile(parsed);
+        setIsExpanded(true);
+      } catch (err) {
+        console.error('File parsing error:', err);
+      } finally {
+        setIsParsingFile(false);
+      }
     }
   };
 
@@ -83,26 +91,35 @@ export const ChatInput: React.FC<ChatInputProps> = ({ onSend }) => {
             ref={fileInputRef}
             onChange={handleFileChange}
             className="hidden"
-            accept=".txt,.pdf,.doc,.docx,.md,.json,.js,.ts,.py"
+            accept=".txt,.pdf,.doc,.docx,.md,.json,.js,.ts,.tsx,.py,.java,.c,.cpp,.rs,.go,.sql,.html,.css,.csv,.log,.env,.yaml,.yml"
           />
 
           {attachedFile && (
             <div className="px-3 pt-2 flex items-center gap-2">
-              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-zinc-100 dark:bg-zinc-800 text-zinc-800 dark:text-zinc-200 text-xs font-mono border border-zinc-200 dark:border-zinc-700">
-                <FileText className="w-3.5 h-3.5 text-zinc-500" />
-                <span className="truncate max-w-[200px]">{attachedFile.name}</span>
-                <span className="text-[10px] text-zinc-400">({attachedFile.size})</span>
+              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-blue-50 dark:bg-blue-950/40 text-blue-900 dark:text-blue-200 text-xs font-mono border border-blue-200 dark:border-blue-800/60 shadow-2xs">
+                <FileCode className="w-3.5 h-3.5 text-blue-500" />
+                <span className="truncate max-w-[220px] font-semibold">{attachedFile.name}</span>
+                <span className="text-[10px] text-blue-500/80">
+                  ({attachedFile.size} · {attachedFile.lineCount} lines)
+                </span>
                 <button
                   type="button"
                   onClick={(e) => {
                     e.stopPropagation();
                     setAttachedFile(null);
                   }}
-                  className="p-0.5 hover:bg-zinc-200 dark:hover:bg-zinc-700 rounded text-zinc-400 hover:text-zinc-900 dark:hover:text-white"
+                  className="p-0.5 hover:bg-blue-200/50 dark:hover:bg-blue-900/60 rounded text-blue-400 hover:text-blue-700 dark:hover:text-blue-100 transition cursor-pointer"
+                  title="Remove file"
                 >
                   <X className="w-3 h-3" />
                 </button>
               </span>
+            </div>
+          )}
+
+          {isParsingFile && (
+            <div className="px-3 pt-2 flex items-center gap-2 text-xs font-mono text-zinc-500 animate-pulse">
+              <span>Parsing file content...</span>
             </div>
           )}
 
@@ -115,7 +132,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({ onSend }) => {
             }}
             onFocus={() => setIsExpanded(true)}
             onKeyDown={handleKeyDown}
-            placeholder="Ask LearnForge anything..."
+            placeholder={attachedFile ? `Ask any question or instruction about ${attachedFile.name}...` : "Ask LearnForge anything..."}
             rows={1}
             className="w-full resize-none bg-transparent px-3 pt-2 pb-10 text-sm leading-relaxed text-zinc-950 dark:text-white placeholder-zinc-400 dark:placeholder-zinc-500 outline-none font-sans"
           />

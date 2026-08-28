@@ -1,51 +1,93 @@
+import os
+import joblib
 import numpy as np
-from sklearn.ensemble import GradientBoostingRegressor
+from typing import Dict, Any, Optional
 
-try:
-    from xgboost import XGBRegressor
-    HAS_XGBOOST = True
-except ImportError:
-    XGBRegressor = None
-    HAS_XGBOOST = False
+MODEL_PATH = os.path.join(os.path.dirname(__file__), "..", "models", "artifacts", "learning_gain_predictor.joblib")
+
+ACTION_ENCODING = {
+    "EXPLANATION": 0,
+    "HINT": 1,
+    "WORKED_EXAMPLE": 2,
+    "EASIER_QUESTION": 3,
+    "SIMILAR_QUESTION": 4,
+    "HARDER_QUESTION": 5,
+    "REVISION": 6,
+    "CONCEPT_RECAP": 7,
+    "PRACTICE": 8,
+    "SCENARIO_CHALLENGE": 9,
+    "PREREQUISITE_REVIEW": 10,
+}
 
 class LearningGainPredictor:
     """
-    Predicts expected learning gain delta_M = f(learner_state, concept, intervention, difficulty, history)
-    using XGBoost / GradientBoosting.
+    Trained Regressor predicting continuous expected learning gains per intervention type.
     """
+
     def __init__(self):
-        if HAS_XGBOOST and XGBRegressor is not None:
-            self.model = XGBRegressor(n_estimators=30, max_depth=3, learning_rate=0.1, random_state=42, verbosity=0)
+        self.model = None
+        self.version = "1.0.0"
+        self.load_model()
+
+    def load_model(self):
+        if os.path.exists(MODEL_PATH):
+            try:
+                self.model = joblib.load(MODEL_PATH)
+            except Exception as e:
+                print(f"[LearningGainPredictor] Model load error: {e}")
+                self.model = None
+
+    def predict_gain(
+        self,
+        current_mastery: float,
+        task_difficulty: float,
+        action_type: str,
+        has_misconception: bool = False,
+        learner_ability: float = 0.5,
+    ) -> Dict[str, Any]:
+        action_code = ACTION_ENCODING.get(action_type.upper(), 0)
+
+        features = np.array([[
+            current_mastery,
+            task_difficulty,
+            action_code,
+            1.0 if has_misconception else 0.0,
+            learner_ability,
+        ]])
+
+        if self.model is not None:
+            try:
+                pred = float(self.model.predict(features)[0])
+                gain = round(max(0.01, min(0.35, pred)), 4)
+            except Exception:
+                gain = self._baseline_gain(action_type, current_mastery, has_misconception)
         else:
-            self.model = GradientBoostingRegressor(n_estimators=30, max_depth=3, learning_rate=0.1, random_state=42)
+            gain = self._baseline_gain(action_type, current_mastery, has_misconception)
 
-        # Train baseline dummy model mapping (current_mastery, difficulty, action_type_id, misconception_flag) -> gain
-        X_train = np.array([
-            [0.1, 0.3, 8.0, 0], # NEW_CONCEPT at low mastery
-            [0.1, 0.2, 2.0, 1], # MISCONCEPTION_REMEDIATION for active misconception
-            [0.8, 0.9, 3.0, 0], # HARDER_CHALLENGE at high mastery
-            [0.8, 0.2, 4.0, 0], # EASIER_CHALLENGE at high mastery (low gain)
-            [0.2, 0.8, 3.0, 0]  # HARDER_CHALLENGE at low mastery (too hard, low gain)
-        ])
-        y_train = np.array([0.25, 0.35, 0.18, 0.05, 0.02])
-        self.model.fit(X_train, y_train)
-
-    def predict_gain(self, current_mastery: float, task_difficulty: float, action_type: str, has_misconception: bool) -> float:
-        action_map = {
-            "REVISION": 0.0,
-            "EXPLANATION": 1.0,
-            "MISCONCEPTION_REMEDIATION": 2.0,
-            "HARDER_CHALLENGE": 3.0,
-            "EASIER_CHALLENGE": 4.0,
-            "HINT": 5.0,
-            "SCENARIO_BRANCH": 6.0,
-            "PREREQUISITE_REVIEW": 7.0,
-            "NEW_CONCEPT": 8.0
+        return {
+            "intervention": action_type,
+            "predicted_gain": gain,
+            "confidence": 0.85,
+            "model_version": self.version,
         }
-        action_id = action_map.get(action_type, 1.0)
-        misc_flag = 1.0 if has_misconception else 0.0
-        
-        features = np.array([[current_mastery, task_difficulty, action_id, misc_flag]])
-        predicted_gain = float(self.model.predict(features)[0])
-        return round(float(np.clip(predicted_gain, 0.01, 0.50)), 3)
 
+    def _baseline_gain(self, action: str, mastery: float, has_misconception: bool) -> float:
+        act = action.upper()
+        if has_misconception:
+            if act in ["EXPLANATION", "WORKED_EXAMPLE", "MISCONCEPTION_REMEDIATION"]:
+                return 0.14
+            elif act == "PREREQUISITE_REVIEW":
+                return 0.12
+            elif act in ["HARDER_QUESTION", "SCENARIO_CHALLENGE"]:
+                return 0.02
+            return 0.06
+
+        if mastery < 0.35:
+            if act in ["WORKED_EXAMPLE", "EXPLANATION", "HINT"]:
+                return 0.12
+            return 0.05
+        elif mastery > 0.70:
+            if act in ["HARDER_QUESTION", "SCENARIO_CHALLENGE", "PRACTICE"]:
+                return 0.11
+            return 0.04
+        return 0.08

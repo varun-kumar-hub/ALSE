@@ -250,7 +250,7 @@ class OpenAICompatibleProvider implements AiProvider {
       };
 
       if (this.config.id === 'nvidia' || selectedModel.includes('nemotron')) {
-        requestPayload.extra_body = { chat_template_kwargs: { enable_thinking: true } };
+        requestPayload.chat_template_kwargs = { enable_thinking: true };
       }
 
       const response = await fetchWithCorsProxy(this.endpoint, {
@@ -360,9 +360,20 @@ class AnthropicProvider implements AiProvider {
     }
 
     try {
+      const systemMessage = messages.find((m) => m.role === 'system')?.content;
       const formattedMessages = messages
         .filter((m) => m.role === 'user' || m.role === 'assistant')
         .map((m) => ({ role: m.role, content: m.content }));
+
+      const payload: any = {
+        model: model || this.config.defaultModel,
+        messages: formattedMessages,
+        max_tokens: 4096,
+        stream: true,
+      };
+      if (systemMessage) {
+        payload.system = systemMessage;
+      }
 
       const response = await fetchWithCorsProxy('https://api.anthropic.com/v1/messages', {
         method: 'POST',
@@ -372,12 +383,7 @@ class AnthropicProvider implements AiProvider {
           'anthropic-version': '2023-06-01',
           'anthropic-dangerous-direct-browser-access': 'true',
         },
-        body: JSON.stringify({
-          model: model || this.config.defaultModel,
-          messages: formattedMessages,
-          max_tokens: 4096,
-          stream: true,
-        }),
+        body: JSON.stringify(payload),
       });
 
       if (!response.ok) {
@@ -463,18 +469,25 @@ class GeminiProvider implements AiProvider {
     }
 
     try {
-      const selectedModelName = model || this.config.defaultModel;
+      const selectedModelName = model || this.config.defaultModel || 'gemini-2.5-flash';
       const url = `https://generativelanguage.googleapis.com/v1beta/models/${selectedModelName}:streamGenerateContent?alt=sse&key=${this.config.apiKey}`;
 
-      const contents = messages.map((m) => ({
+      const systemMessage = messages.find((m) => m.role === 'system')?.content;
+      const nonSystemMessages = messages.filter((m) => m.role !== 'system');
+      const contents = nonSystemMessages.map((m) => ({
         role: m.role === 'assistant' ? 'model' : 'user',
         parts: [{ text: m.content }],
       }));
 
+      const payload: any = { contents };
+      if (systemMessage) {
+        payload.systemInstruction = { parts: [{ text: systemMessage }] };
+      }
+
       const response = await fetchWithCorsProxy(url, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ contents }),
+        body: JSON.stringify(payload),
       });
 
       if (!response.ok) {

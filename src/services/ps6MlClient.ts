@@ -139,3 +139,44 @@ export async function rankActionsML(payload: RankActionsPayload): Promise<RankAc
     all_ranked_candidates: ranked,
   };
 }
+
+export async function sendLearningEventToBackend(event: {
+  learner_id?: string;
+  session_id?: string;
+  concept_id: string;
+  question_difficulty?: number;
+  correct: boolean;
+  response_time_ms?: number;
+  confidence?: number;
+  intervention?: string;
+  misconception_flag?: string;
+}): Promise<any> {
+  try {
+    const res = await fetch(`${FASTAPI_BASE_URL}/api/learning/events`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(event),
+    });
+    if (res.ok) {
+      return await res.json();
+    }
+  } catch (err) {
+    console.debug('[PS6 ML Client] Backend event sync deferred (local offline mode):', err);
+  }
+  return null;
+}
+
+export async function fetchBackendAnalytics(learnerId: string = 'default_learner'): Promise<any> {
+  try {
+    const res = await fetch(`${FASTAPI_BASE_URL}/api/analytics/${learnerId}`, {
+      method: 'GET',
+    });
+    if (res.ok) {
+      return await res.json();
+    }
+  } catch (err) {
+    console.debug('[PS6 ML Client] Analytics fetch fallback to local store:', err);
+  }
+  return null;
+}
+
