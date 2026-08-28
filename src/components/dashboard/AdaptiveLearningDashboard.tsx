@@ -10,15 +10,13 @@ import {
   RefreshCw,
   Info,
   CheckCircle2,
-  XCircle,
-  HelpCircle,
   BarChart3,
   Layers,
   Award,
   Filter,
 } from 'lucide-react';
 import { ps6Db } from '../../services/ps6Database';
-import { Misconception, DecisionTrace } from '../../services/ps6Types';
+import { Misconception } from '../../services/ps6Types';
 import { ProjectItem } from '../../services/database';
 
 interface AdaptiveLearningDashboardProps {

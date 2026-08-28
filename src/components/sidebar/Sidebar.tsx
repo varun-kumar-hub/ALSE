@@ -515,20 +515,18 @@ export const Sidebar: React.FC<SidebarProps> = ({
                       </div>
 
                       {/* Delete Action */}
-                      {!['data-structures', 'agririsk', 'adaptive-learning'].includes(proj.id) && (
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            if (confirm(`Delete subject "${proj.name}"?`)) {
-                              onDeleteProject(proj.id);
-                            }
-                          }}
-                          className="hidden group-hover:block p-1 text-zinc-400 hover:text-rose-500"
-                          title="Delete Subject"
-                        >
-                          <Trash2 className="w-3 h-3" />
-                        </button>
-                      )}
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (confirm(`Delete subject "${proj.name}"?`)) {
+                            onDeleteProject(proj.id);
+                          }
+                        }}
+                        className="hidden group-hover:block p-1 text-zinc-400 hover:text-rose-500 cursor-pointer"
+                        title="Delete Subject"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
                     </div>
 
                     {/* Per-Subject Chats Container */}

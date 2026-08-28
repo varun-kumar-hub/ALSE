@@ -528,41 +528,7 @@ export interface NoteItem {
   updatedAt: string;
 }
 
-const DEFAULT_PROJECTS: ProjectItem[] = [
-  {
-    id: 'data-structures',
-    name: 'Data Structures',
-    topic: 'Data Structures & Algorithms',
-    goal: 'Master DSA fundamentals to advanced graph algorithms',
-    description: 'Arrays, Linked Lists, Trees, Graphs, and Algorithmic Thinking',
-    learning_budget: 30,
-    icon: '📘',
-    color: 'bg-blue-500/10 text-blue-400 border-blue-500/20',
-    created_at: new Date().toISOString(),
-  },
-  {
-    id: 'agririsk',
-    name: 'Machine Learning',
-    topic: 'Machine Learning & Predictive Risk',
-    goal: 'Predictive modeling, regression, neural networks, and XGBoost',
-    description: 'Supervised Learning, Decision Trees, CNNs, and Model Evaluation',
-    learning_budget: 30,
-    icon: '🧠',
-    color: 'bg-purple-500/10 text-purple-400 border-purple-500/20',
-    created_at: new Date().toISOString(),
-  },
-  {
-    id: 'adaptive-learning',
-    name: 'Adaptive Learning',
-    topic: 'Operating Systems & Autonomous AI',
-    goal: 'PS6 Autonomous Adaptive Learning Strategy Engine',
-    description: 'Processes, Threads, Concurrency, Mutexes, and Deadlocks',
-    learning_budget: 25,
-    icon: '💻',
-    color: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20',
-    created_at: new Date().toISOString(),
-  },
-];
+const DEFAULT_PROJECTS: ProjectItem[] = [];
 
 export async function getProjects(): Promise<ProjectItem[]> {
   const db = await initDatabase();
