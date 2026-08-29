@@ -5,203 +5,265 @@ import {
   TimelineStepStatus,
 } from '../services/types';
 
-const PHASE_ORDER: TimelinePhase[] = ['analyze', 'gather', 'plan', 'generate', 'validate', 'format'];
-
 function getCurrentTimeString(): string {
   return new Date().toLocaleTimeString('en-US', { hour12: false });
 }
 
+export interface DetailedThinkingStages {
+  stage1Title: string;
+  stage1Thoughts: string[];
+  stage2Title: string;
+  stage2Thoughts: string[];
+}
+
 /**
  * Generates natural, query-specific agent activity descriptions dynamically.
- * NO generic fixed headings or checklists.
  */
 export function buildDynamicAgentActivities(
   userPrompt: string,
   intent: QueryIntent,
-  toolsUsed: string[] = []
+  _toolsUsed: string[] = []
 ): string[] {
-  const q = userPrompt.trim();
+  const q = (userPrompt || '').trim();
   const lower = q.toLowerCase();
 
-  // 1. Coding & Programming Tasks
+  // 1. Conversational Greeting
+  if (/^(hi|hello|hey|greetings|howdy|good\s+(morning|afternoon|evening|day)|sup|yo)\b[!.?]*$/i.test(lower)) {
+    return [
+      'Recognizing conversational greeting and setting up friendly learner context.',
+      'Checking available subjects, active modules, and learning dashboard state.',
+      'Preparing welcoming response and offering personalized study assistance.',
+    ];
+  }
+
+  // 2. Coding & Programming Tasks
   if (
     intent === 'coding' ||
     intent === 'debugging' ||
-    /\b(code|function|program|script|react|typescript|python|rust|algorithm|prime|array|sort)\b/i.test(lower)
+    /\b(code|function|program|script|react|typescript|python|rust|algorithm|prime|array|sort|oop|class|inheritance)\b/i.test(
+      lower
+    )
   ) {
-    const isPrime = /\bprime\b/i.test(lower);
-    const isReact = /\b(react|component|hook|ui)\b/i.test(lower);
     const isPython = /\bpython\b/i.test(lower);
-
-    if (isPrime) {
-      return [
-        'Working out an optimal and readable prime-checking approach.',
-        'Keeping the logic clean, beginner-friendly, and boundary-checked.',
-        'Verifying the algorithm across edge cases (0, 1, negatives, large primes).',
-      ];
-    }
-    if (isReact) {
-      return [
-        'Planning the component structure, props interface, and state management.',
-        'Ensuring reactive re-renders and clean Tailwind / CSS styling.',
-        'Drafting production-ready implementation with proper TypeScript types.',
-      ];
-    }
     return [
-      `Working out the implementation approach for "${q.slice(0, 50)}${q.length > 50 ? '...' : ''}".`,
-      `Structuring clean, idiomatic ${isPython ? 'Python' : 'code'} with proper error handling.`,
-      'Reviewing edge cases and validating the syntax before outputting.',
+      `Deconstructing coding requirements and algorithmic constraints for "${q.slice(0, 45)}".`,
+      `Formulating complete, production-grade ${isPython ? 'Python' : 'code'} with optimal asymptotic complexity.`,
+      'Verifying edge cases, syntax correctness, and providing clear step-by-step explanation.',
     ];
   }
 
-  // 2. Technical, Networking & Protocol Explanations
+  // 3. Technical & Conceptual Systems (Networking, OS, Data Structures)
   if (
-    /\b(three-way handshake|tcp|udp|ip|http|dns|websocket|protocol|architecture|database index|arq|stop and wait|sliding window|flow control|error control|data link|mac layer|ethernet)\b/i.test(lower)
+    /\b(tcp|udp|handshake|os|process|thread|deadlock|concurrency|binary tree|graph|data structure|linear search|binary search)\b/i.test(
+      lower
+    )
   ) {
-    if (/\b(tcp|handshake)\b/i.test(lower)) {
-      return [
-        'Breaking down how the connection is established between client and server.',
-        'Connecting SYN, SYN-ACK, and ACK packet sequences to the state transitions.',
-        'Structuring a clear timeline diagram to make the handshake intuitive.',
-      ];
-    }
-    if (/\b(arq|stop and wait|sliding window|flow control|error control)\b/i.test(lower)) {
-      return [
-        `Analyzing the data link layer mechanisms for "${q.slice(0, 45)}".`,
-        'Deconstructing frame transmission, acknowledgments (ACK/NACK), timeouts, and retransmissions.',
-        'Structuring a clear step-by-step conceptual breakdown and protocol summary.',
-      ];
-    }
     return [
-      `Deconstructing the core architecture and working principles of ${q.slice(0, 45)}.`,
-      'Formulating real-world analogies and sequence flows for clarity.',
-      'Putting together an organized explanation with key takeaways.',
+      `Analyzing core architectural principles and state transitions for "${q.slice(0, 45)}".`,
+      'Structuring intuitive mental models, protocol sequence flows, and formal definitions.',
+      'Synthesizing a clean explanation with visual diagrams, complexity analysis, and key takeaways.',
     ];
   }
 
-  // 3. People, Biographies & Celebrities
+  // 4. Mathematics & Formal Proofs
   if (
-    intent === 'biography' ||
-    /\b(who is|who was|tell me about|biography of|filmography of|actor|director)\b/i.test(lower)
+    intent === 'mathematics' ||
+    /[0-9]\s*[+\-*/^=]\s*[0-9]/.test(lower) ||
+    /\b(solve|equation|derivative|integral|matrix|algebra|calculus|probability)\b/i.test(lower)
   ) {
-    const nameMatch = q.replace(/\b(who is|who was|tell me about|biography of|bio of)\b/gi, '').trim();
-    const entity = nameMatch || 'the subject';
-
-    const activities = [
-      `Looking up verified career history, background, and major works for ${entity}.`,
-    ];
-
-    if (toolsUsed.includes('Wikipedia Grounding') || toolsUsed.includes('Web Search')) {
-      activities.push(`Cross-referencing retrieved facts and dates from online sources.`);
-    } else {
-      activities.push(`Checking chronological milestones, notable achievements, and awards.`);
-    }
-
-    activities.push(`Pulling together key highlights and verified details into a structured overview.`);
-    return activities;
-  }
-
-  // 4. Local Places, Recommendations, Search
-  if (/\b(near me|restaurants?|places to visit|hotels?|best [a-z]+ in|recommend)\b/i.test(lower)) {
     return [
-      `Checking top-rated recommendations and locations matching "${q.slice(0, 40)}".`,
-      'Filtering the available options by relevance, ratings, and practical value.',
-      'Curating the best recommendations with helpful tips.',
+      `Dissecting mathematical problem statement and identifying required axioms & formulas.`,
+      'Working through step-by-step algebraic isolation and symbolic derivation.',
+      'Verifying numerical accuracy and highlighting boundary value principles.',
     ];
   }
 
-  // 5. Mathematical & Algorithmic
-  if (intent === 'mathematics' || (/[0-9]\s*[+\-*/^=]\s*[0-9]/.test(lower) && /\b(calculate|compute|solve|derivative|integral)\b/i.test(lower))) {
-    return [
-      'Dissecting the problem parameters and selecting the right formulas.',
-      'Working through the calculation step by step to ensure numerical accuracy.',
-      'Formatting the final mathematical derivation clearly.',
-    ];
-  }
-
-  // 6. Comparisons
+  // 5. Comparison
   if (intent === 'comparison' || /\b(vs|versus|difference between|compare)\b/i.test(lower)) {
     return [
-      'Identifying the architectural and functional criteria that actually matter.',
-      'Weighing trade-offs, performance nuances, and ideal use cases side-by-side.',
-      'Formulating a balanced comparison table and actionable conclusion.',
+      `Identifying evaluation criteria, architectural nuances, and performance trade-offs.`,
+      'Constructing a structured markdown comparison matrix across key dimensions.',
+      'Formulating actionable synthesis and guidance on ideal use cases.',
     ];
   }
 
-  // 7. Dynamic Fallback: Custom tailored to query
-  if (q.length < 35) {
-    return [
-      `Analyzing the specific requirements for "${q}".`,
-      'Synthesizing verified knowledge into a clear, direct answer.',
-    ];
-  }
-
+  // 6. General Concept & Learning Query
   return [
-    `Analyzing the context surrounding "${q.slice(0, 50)}...".`,
-    toolsUsed.length > 0 ? `Consulting retrieved ${toolsUsed.join(', ')} context for up-to-date accuracy.` : 'Verifying details and organizing key points.',
-    'Formulating a comprehensive, well-structured response.',
+    `Analyzing user learning goals and foundational concepts for "${q.slice(0, 45)}${q.length > 45 ? '...' : ''}".`,
+    'Synthesizing verified knowledge, real-world analogies, and structured breakdown.',
+    'Reviewing clarity and structuring actionable takeaways for deep retention.',
   ];
+}
+
+/**
+ * Builds a comprehensive, 2-Stage detailed cognitive reasoning plan:
+ * Stage 1: Intent & Content Strategy ("What to Give")
+ * Stage 2: Pedagogical & Structural Execution ("How to Give & What to Do")
+ */
+export function generateDetailedThinkingStages(
+  userPrompt: string,
+  intent: QueryIntent = 'general'
+): DetailedThinkingStages {
+  const q = (userPrompt || '').trim();
+  const lower = q.toLowerCase();
+
+  // Case A: Friendly Greeting
+  if (/^(hi|hello|hey|greetings|howdy|good\s+(morning|afternoon|evening|day)|sup|yo)\b[!.?]*$/i.test(lower)) {
+    return {
+      stage1Title: 'Stage 1: Intent & Content Strategy (What to Give)',
+      stage1Thoughts: [
+        `• Detected conversational greeting ("${q}"). User is initiating an interaction or opening a study session.`,
+        '• Content Scope: Provide a warm, helpful, and concise welcome as LearnForge Agent.',
+        '• Avoid unsolicited encyclopedic dumps, random biographies, or off-topic essay generation.',
+      ],
+      stage2Title: 'Stage 2: Pedagogical & Structural Execution (How to Give & What to Do)',
+      stage2Thoughts: [
+        '• Tone & Structure: Friendly, encouraging, and supportive educational persona.',
+        '• Action: Prompt the user to explore a subject, ask a technical question, test a concept, or continue curriculum tasks.',
+        '• Formatting: Keep it brief, polite, and ready to assist immediately.',
+      ],
+    };
+  }
+
+  // Case B: Coding / Algorithmic
+  if (intent === 'coding' || intent === 'debugging' || /\b(code|algorithm|function|implement|debug)\b/i.test(lower)) {
+    return {
+      stage1Title: 'Stage 1: Intent & Content Strategy (What to Give)',
+      stage1Thoughts: [
+        `• Objective Analysis: User is requesting software engineering implementation or algorithmic logic for "${q.slice(0, 50)}".`,
+        '• Core Components Needed: Complete, runnable code, asymptotic complexity analysis (Big-O Time & Space), and edge case handling.',
+        '• Prerequisite Mapping: Ensure appropriate data structures and language idioms (Python/TypeScript/Rust) are chosen.',
+      ],
+      stage2Title: 'Stage 2: Pedagogical & Structural Execution (How to Give & What to Do)',
+      stage2Thoughts: [
+        '• Structural Breakdown: 1. Overview & Approach -> 2. Complete Optimized Code -> 3. Step-by-Step Walkthrough -> 4. Complexity & Edge Cases.',
+        '• Code Quality: Include thorough comments, type hints, and avoid any placeholder omissions (no `// TODO` or `...`).',
+        '• Pedagogical Value: Explain *why* this implementation is optimal and how memory locality/branch prediction are respected.',
+      ],
+    };
+  }
+
+  // Case C: Mathematics & Quantitative
+  if (intent === 'mathematics' || /[0-9]\s*[+\-*/^=]\s*[0-9]/.test(lower) || /\b(solve|equation|calculus|algebra)\b/i.test(lower)) {
+    return {
+      stage1Title: 'Stage 1: Intent & Content Strategy (What to Give)',
+      stage1Thoughts: [
+        `• Mathematical Goal: User requires rigorous solution and conceptual derivation for "${q.slice(0, 50)}".`,
+        '• Axiomatic Foundations: Identify governing equations, balance models, and algebraic transformation rules.',
+        '• Misconception Guard: Guard against sign transfer loss, illegal distribution, and boundary division by zero.',
+      ],
+      stage2Title: 'Stage 2: Pedagogical & Structural Execution (How to Give & What to Do)',
+      stage2Thoughts: [
+        '• Derivation Flow: State given values -> Write fundamental formula -> Show step-by-step algebraic isolation -> State final answer.',
+        '• Visual Formatting: Render clean LaTeX formatting ($E = mc^2$, fractions, roots) for mathematical clarity.',
+        '• Verification: Substitute solution back into original equation to confirm correctness.',
+      ],
+    };
+  }
+
+  // Case D: General Educational Concept (Physics, History, Biology, CS Concepts, etc.)
+  return {
+    stage1Title: 'Stage 1: Intent & Content Strategy (What to Give)',
+    stage1Thoughts: [
+      `• Conceptual Scope: User wants to understand and master "${q.slice(0, 50)}${q.length > 50 ? '...' : ''}".`,
+      '• Core Concept Deconstruction: Identify governing definitions, primary mechanisms, historical context, and practical significance.',
+      '• Target Depth: Provide balanced intuitive understanding first, supported by formal accuracy and depth.',
+    ],
+    stage2Title: 'Stage 2: Pedagogical & Structural Execution (How to Give & What to Do)',
+    stage2Thoughts: [
+      '• Pedagogical Strategy: 1. Clear Title & Definition -> 2. Intuitive Mental Model -> 3. Core Working Mechanisms -> 4. Key Takeaways.',
+      '• Visual & Structural Enhancements: Include formatted Markdown tables and visual Mermaid architecture diagrams where helpful.',
+      '• Synthesis: Conclude with key retention takeaways and provocative check questions for deep mastery.',
+    ],
+  };
 }
 
 export function buildThinkingTimeline(
   intent: QueryIntent,
-  prompt: string,
-  _selectedModel: string
+  userPrompt: string,
+  _modelName = 'qwen3:8b'
 ): ThinkingTimelineStep[] {
-  const dynamicDescriptions = buildDynamicAgentActivities(prompt, intent);
-  const nowStr = getCurrentTimeString();
+  const dynamicActivities = buildDynamicAgentActivities(userPrompt, intent);
+  const now = getCurrentTimeString();
 
-  return dynamicDescriptions.map((desc, idx) => ({
-    id: `step-${idx}`,
-    title: desc,
-    phase: (PHASE_ORDER[idx] || 'generate') as TimelinePhase,
-    status: (idx === 0 ? 'running' : 'pending') as TimelineStepStatus,
-    timestamp: idx === 0 ? nowStr : undefined,
-  }));
+  return [
+    {
+      id: 'step_analyze',
+      phase: 'analyze',
+      title: 'Cognitive Analysis & Strategy',
+      detail: dynamicActivities[0] || 'Deconstructing user query and identifying conceptual domain.',
+      status: 'running',
+      timestamp: now,
+      subSteps: [
+        'Classifying intent and pedagogical depth',
+        'Mapping domain prerequisites and core concepts',
+      ],
+    },
+    {
+      id: 'step_plan',
+      phase: 'plan',
+      title: 'Pedagogical & Structural Execution',
+      detail: dynamicActivities[1] || 'Structuring comprehensive explanation, diagrams, and code.',
+      status: 'pending',
+      timestamp: now,
+      subSteps: [
+        'Formulating step-by-step mental models and definitions',
+        'Designing visual diagrams and verification checkpoints',
+      ],
+    },
+    {
+      id: 'step_generate',
+      phase: 'generate',
+      title: 'Synthesis & Response Delivery',
+      detail: dynamicActivities[2] || 'Delivering authoritative response with clear key takeaways.',
+      status: 'pending',
+      timestamp: now,
+      subSteps: ['Streaming structured markdown with LaTeX and code blocks'],
+    },
+  ];
 }
 
 export function updateTimelinePhase(
-  steps: ThinkingTimelineStep[],
-  currentPhase: TimelinePhase,
-  status: TimelineStepStatus = 'running'
+  timeline: ThinkingTimelineStep[],
+  phase: TimelinePhase,
+  status: TimelineStepStatus = 'running',
+  detail?: string
 ): ThinkingTimelineStep[] {
-  const phaseIndex = PHASE_ORDER.indexOf(currentPhase);
-  const nowStr = getCurrentTimeString();
-
-  return steps.map((step, idx) => {
-    if (step.status === 'failed' || step.status === 'skipped') return step;
-    if (idx < phaseIndex) {
-      return { ...step, status: 'completed', timestamp: step.timestamp || nowStr };
+  return timeline.map((step) => {
+    if (step.phase === phase) {
+      return {
+        ...step,
+        status,
+        detail: detail || step.detail,
+        timestamp: getCurrentTimeString(),
+      };
     }
-    if (idx === phaseIndex) {
-      return { ...step, status, timestamp: step.timestamp || nowStr };
-    }
-    return { ...step, status: 'pending' };
+    return step;
   });
 }
 
-export function completeTimeline(steps: ThinkingTimelineStep[]): ThinkingTimelineStep[] {
-  const nowStr = getCurrentTimeString();
-  return steps.map((step) =>
-    step.status === 'failed' || step.status === 'skipped'
-      ? step
-      : { ...step, status: 'completed', timestamp: step.timestamp || nowStr }
-  );
+export function completeTimeline(timeline: ThinkingTimelineStep[]): ThinkingTimelineStep[] {
+  return timeline.map((step) => ({
+    ...step,
+    status: 'completed',
+    timestamp: getCurrentTimeString(),
+  }));
 }
 
 export function failTimelinePhase(
-  steps: ThinkingTimelineStep[],
-  currentPhase: TimelinePhase
+  timeline: ThinkingTimelineStep[],
+  phase: TimelinePhase,
+  detail?: string
 ): ThinkingTimelineStep[] {
-  let markedFailure = false;
-  const nowStr = getCurrentTimeString();
-
-  return steps.map((step) => {
-    if (step.phase === currentPhase && !markedFailure) {
-      markedFailure = true;
-      return { ...step, status: 'failed', timestamp: nowStr };
+  return timeline.map((step) => {
+    if (step.phase === phase) {
+      return {
+        ...step,
+        status: 'failed',
+        detail: detail || step.detail,
+        timestamp: getCurrentTimeString(),
+      };
     }
-    if (markedFailure && step.status === 'pending') return { ...step, status: 'skipped' };
-    return step.status === 'running' ? { ...step, status: 'failed', timestamp: nowStr } : step;
+    return step;
   });
 }

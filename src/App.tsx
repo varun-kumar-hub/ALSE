@@ -49,6 +49,7 @@ import { filterResponseForIntent } from './lib/responseFilter';
 import { buildThinkingTimeline } from './lib/thinkingTimeline';
 import { webSearch, webExtract } from './services/webTools';
 import { processLearnerInteraction } from './engine/ps6Engine';
+import { parseCurrentRoute, navigateToRoute, WorkspaceView } from './services/router';
 import { Chat, ChatMessage as ChatMessageType } from './services/types';
 
 function hasActiveTextSelection(): boolean {
@@ -79,7 +80,8 @@ export function App() {
     initApp,
   } = useAppStore();
 
-  const [activeWorkspaceView, setActiveWorkspaceView] = useState<string>('chat');
+  const initialRoute = parseCurrentRoute();
+  const [activeWorkspaceView, setActiveWorkspaceViewState] = useState<string>(initialRoute.view);
   const [chats, setChats] = useState<Chat[]>([]);
   const [projects, setProjects] = useState<ProjectItem[]>([]);
   const [messages, setMessages] = useState<ChatMessageType[]>([]);
@@ -93,12 +95,58 @@ export function App() {
   });
   const abortControllerRef = useRef<AbortController | null>(null);
 
-  // Initialize app settings, projects, and local persistence.
+  // Helper to switch view and synchronously update URL & LocalStorage
+  const switchWorkspaceView = (
+    view: string,
+    targetProjectId?: string | null,
+    targetChatId?: string | null,
+    replace = false
+  ) => {
+    const finalProjId = targetProjectId !== undefined ? targetProjectId : activeProjectId;
+    const finalChatId = targetChatId !== undefined ? targetChatId : currentChatId;
+    setActiveWorkspaceViewState(view);
+    navigateToRoute(view as WorkspaceView, finalProjId, finalChatId, replace);
+  };
+
+  // Initialize app settings, projects, and local persistence with exact route restoration.
   useEffect(() => {
     initApp();
     loadProjects();
-    loadChats();
+
+    const route = parseCurrentRoute();
+    setActiveWorkspaceViewState(route.view);
+    if (route.projectId) {
+      setActiveProjectId(route.projectId);
+    }
+    if (route.chatId) {
+      setCurrentChatId(route.chatId);
+    }
+
+    loadChats(route.chatId || undefined, route.projectId || undefined);
+    navigateToRoute(route.view as WorkspaceView, route.projectId, route.chatId, true);
   }, []);
+
+  // Listen for browser Back/Forward or manual URL Hash changes
+  useEffect(() => {
+    const handleUrlChange = () => {
+      const route = parseCurrentRoute();
+      setActiveWorkspaceViewState(route.view);
+      if (route.projectId !== undefined && route.projectId !== activeProjectId) {
+        setActiveProjectId(route.projectId);
+      }
+      if (route.chatId !== undefined && route.chatId !== currentChatId) {
+        setCurrentChatId(route.chatId);
+      }
+    };
+
+    window.addEventListener('hashchange', handleUrlChange);
+    window.addEventListener('popstate', handleUrlChange);
+
+    return () => {
+      window.removeEventListener('hashchange', handleUrlChange);
+      window.removeEventListener('popstate', handleUrlChange);
+    };
+  }, [currentChatId, activeProjectId]);
 
   // Load messages when active chat changes
   useEffect(() => {
@@ -148,6 +196,8 @@ export function App() {
   const handleSelectProject = async (projectId: string | null) => {
     setActiveProjectId(projectId);
     await loadChats(undefined, projectId);
+    const targetView = activeWorkspaceView === 'projects' ? 'project_dashboard' : activeWorkspaceView;
+    switchWorkspaceView(targetView, projectId, currentChatId);
   };
 
   const handleNewChat = async (initialPrompt?: string, targetProjectId?: string | null) => {
@@ -157,7 +207,7 @@ export function App() {
     setActiveProjectId(projId);
     setCurrentChatId(chat.id);
     setMessages([]);
-    setActiveWorkspaceView('chat');
+    switchWorkspaceView('chat', projId, chat.id);
     await loadChats(chat.id, projId);
 
     if (initialPrompt) {
@@ -167,11 +217,12 @@ export function App() {
 
   const handleSelectChat = (id: string) => {
     const targetChat = chats.find((c) => c.id === id);
+    const targetProjId = targetChat ? targetChat.project_id || null : activeProjectId;
     if (targetChat) {
-      setActiveProjectId(targetChat.project_id || null);
+      setActiveProjectId(targetProjId);
     }
     setCurrentChatId(id);
-    setActiveWorkspaceView('chat');
+    switchWorkspaceView('chat', targetProjId, id);
   };
 
   const handleRenameChat = async (id: string, newTitle: string) => {
@@ -218,8 +269,8 @@ export function App() {
 
   const handleProjectCreated = async (newProj: ProjectItem) => {
     await loadProjects();
-    await handleSelectProject(newProj.id);
-    setActiveWorkspaceView('project_dashboard');
+    setActiveProjectId(newProj.id);
+    switchWorkspaceView('project_dashboard', newProj.id);
   };
 
   const handleConvertResearchToSubject = async (
@@ -243,7 +294,7 @@ export function App() {
     const chat = await createChat(initialTitle, selectedModel, newProj.id);
     setCurrentChatId(chat.id);
     setMessages([]);
-    setActiveWorkspaceView('chat');
+    switchWorkspaceView('chat', newProj.id, chat.id);
     await loadChats(chat.id, newProj.id);
 
     const conceptsText = extractedConcepts.length > 0 ? `\n\nTarget Concepts to Master:\n${extractedConcepts.map((c) => `- ${c}`).join('\n')}` : '';
@@ -521,12 +572,12 @@ export function App() {
           loadProjects();
         }}
         onSelectView={(v) => {
-          setActiveWorkspaceView(v);
+          switchWorkspaceView(v);
           if (!isSidebarPinned) setIsSidebarOpen(false);
         }}
         onSelectProject={(projId) => {
           handleSelectProject(projId);
-          if (projId) setActiveWorkspaceView('project_dashboard');
+          if (projId) switchWorkspaceView('project_dashboard', projId);
           if (!isSidebarPinned) setIsSidebarOpen(false);
         }}
         onNewChat={() => {
@@ -587,7 +638,7 @@ export function App() {
               projects={projects}
               onSelectProject={(projId) => {
                 handleSelectProject(projId);
-                setActiveWorkspaceView('project_dashboard');
+                switchWorkspaceView('project_dashboard', projId);
               }}
               onOpenNewProject={() => setShowNewProjectModal(true)}
               onDeleteProject={handleDeleteProject}
@@ -599,7 +650,7 @@ export function App() {
               project={activeProject}
               projectChats={projectChats}
               activeChatId={currentChatId}
-              onBackToProjects={() => setActiveWorkspaceView('projects')}
+              onBackToProjects={() => switchWorkspaceView('projects')}
               onSelectChat={handleSelectChat}
               onNewChat={(prompt) => handleNewChat(prompt, activeProject.id)}
               onDeleteChat={handleDeleteChat}
@@ -651,7 +702,7 @@ export function App() {
               projects={projects}
               onSelectProject={(projId) => {
                 handleSelectProject(projId);
-                setActiveWorkspaceView('project_dashboard');
+                switchWorkspaceView('project_dashboard', projId);
               }}
             />
           )}
@@ -664,7 +715,7 @@ export function App() {
             <CommunityView
               onSelectProject={(projId) => {
                 handleSelectProject(projId);
-                setActiveWorkspaceView('project_dashboard');
+                switchWorkspaceView('project_dashboard', projId);
               }}
               onRefreshProjects={loadProjects}
             />
@@ -687,7 +738,7 @@ export function App() {
         onClose={() => setShowUserProfileModal(false)}
         onSelectProject={(projId) => {
           handleSelectProject(projId);
-          setActiveWorkspaceView('project_dashboard');
+          switchWorkspaceView('project_dashboard', projId);
         }}
       />
       <ModelSwitchModal />

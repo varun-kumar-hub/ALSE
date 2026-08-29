@@ -1,5 +1,8 @@
 import { QueryIntent } from '../services/types';
-import { buildDynamicAgentActivities } from './thinkingTimeline';
+import {
+  buildDynamicAgentActivities,
+  generateDetailedThinkingStages,
+} from './thinkingTimeline';
 
 export interface DynamicActivityItem {
   id: string;
@@ -25,7 +28,7 @@ export function parseThinkingAndContent(
       ? buildDynamicAgentActivities(userQuery, intent, toolsUsed)
       : [];
     return {
-      thinking: '',
+      thinking: cleanAndFormatThinking('', userQuery, intent),
       content: '',
       isThinkingActive: false,
       activities: baseActivities.map((desc, idx) => ({
@@ -79,8 +82,10 @@ export function parseThinkingAndContent(
       const leadingText = rawText.slice(0, headerMatch.index).trim();
       const answerBody = rawText.slice(headerMatch.index).trim();
 
-      // If leading text contains meta/reasoning indicators or planning sentences
-      const isMonologue = /^(?:We'll|We need|Let's|I will|I need|First|According|Okay|Looking|The user|The system|Plan:|Steps:|Reasoning:)/i.test(leadingText) || leadingText.length < 500;
+      const isMonologue =
+        /^(?:We'll|We need|Let's|I will|I need|First|According|Okay|Looking|The user|The system|Plan:|Steps:|Reasoning:)/i.test(
+          leadingText
+        ) || leadingText.length < 500;
 
       if (isMonologue && leadingText.length > 0) {
         thinking = leadingText;
@@ -91,16 +96,18 @@ export function parseThinkingAndContent(
 
     // Case B: Monologue pattern at beginning of text with direct answer following
     if (!thinking) {
-      const monologuePrefix = /^(?:We'll|We need to|Let's see|Let's analyze|I will structure|I need to|First,\s+checking|Looking at the intent|The Educational Presentation|According to the system|The system explicitly|Most importantly:|Okay,\s+the\s+user|The user is asking|I should|I recall)/i;
+      const monologuePrefix =
+        /^(?:We'll|We need to|Let's see|Let's analyze|I will structure|I need to|First,\s+checking|Looking at the intent|The Educational Presentation|According to the system|The system explicitly|Most importantly:|Okay,\s+the\s+user|The user is asking|I should|I recall)/i;
 
       if (monologuePrefix.test(rawText.trim())) {
-        const answerMatch = rawText.match(/\n\s*(?:#+\s|Hello\b|Hi\b|Hey\b|Greetings\b|Thus\s+answer:\s*|Therefore:\s*|[A-Z][a-zA-Z\s]+:\s*\n)/i);
+        const answerMatch = rawText.match(
+          /\n\s*(?:#+\s|Hello\b|Hi\b|Hey\b|Greetings\b|Thus\s+answer:\s*|Therefore:\s*|[A-Z][a-zA-Z\s]+:\s*\n)/i
+        );
         if (answerMatch && answerMatch.index !== undefined && answerMatch.index > 0) {
           thinking = rawText.slice(0, answerMatch.index).trim();
           content = rawText.slice(answerMatch.index).replace(/^(?:Thus\s+answer:\s*|Therefore:\s*)/i, '').trim();
           isThinkingActive = false;
         } else {
-          // Model outputted pure reasoning
           thinking = rawText.trim();
           content = '';
           isThinkingActive = false;
@@ -149,7 +156,7 @@ export function parseThinkingAndContent(
   });
 
   return {
-    thinking: cleanAndFormatThinking(thinking, userQuery),
+    thinking: cleanAndFormatThinking(thinking, userQuery, intent),
     content: content.trim(),
     isThinkingActive,
     activities,
@@ -157,35 +164,44 @@ export function parseThinkingAndContent(
 }
 
 /**
- * Sanitizes and beautifully structures raw thinking text into clean conceptual steps.
+ * Sanitizes and beautifully structures raw thinking text into 2 clear cognitive stages:
+ * Stage 1: Intent & Content Strategy (What to Give)
+ * Stage 2: Pedagogical & Structural Execution (How to Give & What to Do)
  */
-export function cleanAndFormatThinking(rawThinking: string, userQuery?: string): string {
-  if (!rawThinking || !rawThinking.trim()) return '';
+export function cleanAndFormatThinking(
+  rawThinking: string,
+  userQuery?: string,
+  intent: QueryIntent = 'general'
+): string {
+  if (rawThinking && rawThinking.trim().length > 20) {
+    const cleaned = rawThinking
+      .replace(
+        /(?:We need to ensure we do not output|In the instruction:|The placeholder is|The text shows:|In the earlier system message|Thus we should put any internal thinking|keep it concise inside|Actually they said:|Actually they used backticks|They wrote:|Safer to not include any|Thus final answer:)[^\n.]*[.\n]?/gi,
+        ''
+      )
+      .replace(/<think>|<\/think>|<\?|\?>/g, '')
+      .replace(/```[\s\S]*?```/g, '')
+      .trim();
 
-  // Filter out model internal meta-instruction debates
-  const cleaned = rawThinking
-    .replace(/(?:We need to ensure we do not output|In the instruction:|The placeholder is|The text shows:|In the earlier system message|Thus we should put any internal thinking|keep it concise inside|Actually they said:|Actually they used backticks|They wrote:|Safer to not include any|Thus final answer:)[^\n.]*[.\n]?/gi, '')
-    .replace(/<think>|<\/think>|<\?|\?>/g, '')
-    .replace(/```[\s\S]*?```/g, '')
-    .trim();
+    const lines = cleaned
+      .split(/\n+/)
+      .map((l) => l.trim())
+      .filter((l) => l.length > 5 && !/^(?:Actually|The text shows|In the earlier|The placeholder)/i.test(l));
 
-  // Split into lines/sentences and filter out noise
-  const lines = cleaned
-    .split(/\n+/)
-    .map((l) => l.trim())
-    .filter((l) => l.length > 5 && !/^(?:Actually|The text shows|In the earlier|The placeholder)/i.test(l));
+    if (lines.length >= 2) {
+      const midpoint = Math.ceil(lines.length / 2);
+      const stage1 = lines
+        .slice(0, midpoint)
+        .map((l) => (l.startsWith('•') || l.startsWith('-') || /^[0-9]+\./.test(l) ? l : `• ${l}`));
+      const stage2 = lines
+        .slice(midpoint)
+        .map((l) => (l.startsWith('•') || l.startsWith('-') || /^[0-9]+\./.test(l) ? l : `• ${l}`));
 
-  if (lines.length > 0) {
-    return lines
-      .map((line) => (line.startsWith('-') || line.startsWith('•') || /^[0-9]+\./.test(line) ? line : `• ${line}`))
-      .join('\n');
+      return `### Stage 1: Intent & Content Strategy (What to Give)\n${stage1.join('\n')}\n\n### Stage 2: Pedagogical & Structural Execution (How to Give & What to Do)\n${stage2.join('\n')}`;
+    }
   }
 
-  // Fallback to high-yield pedagogical reasoning steps
-  const subject = userQuery ? `"${userQuery.slice(0, 40)}"` : 'the requested topic';
-  return [
-    `• Analyzed core objectives and conceptual domain for ${subject}.`,
-    `• Formulated authoritative definitions, operational mechanisms, and key principles.`,
-    `• Structured comparative insights and key takeaways for deep learner retention.`,
-  ].join('\n');
+  // Fallback: Generate structured 2-Stage cognitive thinking
+  const stages = generateDetailedThinkingStages(userQuery || '', intent);
+  return `### ${stages.stage1Title}\n${stages.stage1Thoughts.join('\n')}\n\n### ${stages.stage2Title}\n${stages.stage2Thoughts.join('\n')}`;
 }

@@ -233,3 +233,56 @@ This is also why `EXPLAIN` has a high cost (9 units) and a high payoff in the si
   distribution, and letter-as-object are among the most studied errors in algebra education.
 - **Every wrong answer carries information.** That is what makes M3 (misconception detection) a real
   model rather than a lookup, and what makes the whole system more than "adaptive difficulty".
+
+---
+
+## 8. Multi-Subject Domains & Dynamic Concept Graphs
+
+LearnForge supports generalized, multi-disciplinary concept tracking across 7 distinct academic disciplines:
+
+| Discipline Domain | Seeded / Analyzed Subjects | Prerequisite Graph Topology | Pedagogical Modality |
+| :--- | :--- | :--- | :--- |
+| **Mathematics** | Linear Equations, Calculus, Linear Algebra | Strict Hierarchical DAG (`C1 → ... → C10`) | Proof derivations & Balance models |
+| **Computer Science** | Operating Systems, Raft Consensus, Data Structures | Layered System DAG (`Kernel → Threads → Concurrency`) | Code trace & Concurrency debugging |
+| **Social Sciences** | History, Civics, Political Systems, Philosophy | Thematic & Chronological Graph (`Context → Sources → Dilemmas`) | Primary source & Historiographical debate |
+| **Natural Sciences** | Physics, Chemistry, Molecular Biology | Empirical Law DAG (`Axiom → Mechanism → Equilibrium`) | Experimental data & Laboratory anomaly review |
+| **Business & Finance** | Economics, Corporate Valuation, DCF | Strategic Tree (`Market → Financials → Valuation`) | Case study & Quantitative valuation |
+| **Languages** | Linguistics, Syntax, Rhetoric | Structural Grammar DAG (`Phonology → Syntax → Discourse`) | Contextual reading & Fluency composition |
+| **General Applied** | Cross-Disciplinary Modules | Modular Node Graph | Socratic inquiry & Diagnostic milestones |
+
+---
+
+## 9. Peer-to-Peer Sharing & Peer Inbox Architecture
+
+LearnForge incorporates a direct, decentralized peer-sharing protocol enabling learners, study groups, and instructors to exchange curated subjects and curricula seamlessly.
+
+```
+┌─────────────────────────┐          ┌───────────────────────────┐          ┌─────────────────────────┐
+│     Sender Learner      │          │     Transport Payload     │          │    Recipient Learner    │
+│                         │          │                           │          │                         │
+│  1. Selects Subject     │ ───────> │  • Subject Metadata       │ ───────> │  • Notified in Profile  │
+│  2. Inputs Recipient ID │          │  • Curriculum Milestones  │          │    Peer Inbox Tab       │
+│     (e.g. USR-4019-STAN)│          │  • Sender Notes & ID      │          │  • 1-Click "Import"     │
+│  3. Dispatches Module   │          │  • Domain Taxonomy        │          │  • Instantly in Sidebar │
+└─────────────────────────┘          └───────────────────────────┘          └─────────────────────────┘
+```
+
+### 9.1 Protocol Components
+
+1. **Unique Learner Addressing (`userId`):**
+   * Each user is issued a permanent, collision-resistant identifier (e.g. `USR-8842-FORGE`).
+   * This identifier acts as a public peer address for receiving curriculum transfers without exposing sensitive credentials.
+
+2. **Payload Encapsulation (`SharedSubjectItem`):**
+   * **Subject Core:** Name, academic topic, learning budget (15m–60m), goal statement, detailed description, and custom AI prompt instructions.
+   * **Sender Attribution:** Sender display name, sender user ID, and timestamp.
+   * **Personal Context:** Optional message/note from the sender explaining the module focus.
+
+3. **Peer Inbox Ingestion & Workspace Hydration:**
+   * Incoming modules arrive in the user's **Peer Inbox** (`learnforge_shared_inbox`).
+   * Upon clicking **"Import Subject"**:
+     1. The system invokes `addProject()` to register the new subject in the local SQLite/IndexedDB workspace.
+     2. `generateDefaultTasksForSubject()` immediately generates depth-scaled, domain-appropriate milestones.
+     3. The imported subject appears in the sidebar and project switcher for immediate study.
+     4. The item is marked as imported and removed from the active inbox queue.
+

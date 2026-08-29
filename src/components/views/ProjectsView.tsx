@@ -12,6 +12,7 @@ import {
 import { ProjectItem } from '../../services/database';
 import { ps6Db } from '../../services/ps6Database';
 import { ConceptMastery } from '../../services/ps6Types';
+import { getSubjectTaskStats } from '../../services/taskService';
 
 interface ProjectsViewProps {
   projects: ProjectItem[];
@@ -100,6 +101,7 @@ export const ProjectsView: React.FC<ProjectsViewProps> = ({
         {filteredProjects.map((proj) => {
           const concepts = ps6Db.getConcepts(proj.id);
           const masteryList = ps6Db.getAllMastery(proj.id);
+          const taskStats = getSubjectTaskStats(proj.id, proj);
 
           const avgMastery =
             masteryList.length > 0
@@ -166,13 +168,21 @@ export const ProjectsView: React.FC<ProjectsViewProps> = ({
                   </p>
                 )}
 
-                {/* Mastery & Progress Indicators */}
-                <div className="grid grid-cols-2 gap-3 bg-zinc-50 dark:bg-zinc-950/60 p-3 rounded-xl border border-zinc-200 dark:border-zinc-850">
+                {/* Mastery, Tasks & Progress Indicators */}
+                <div className="grid grid-cols-3 gap-2 bg-zinc-50 dark:bg-zinc-950/60 p-3 rounded-xl border border-zinc-200 dark:border-zinc-850">
                   <div>
                     <span className="text-[10px] font-mono text-zinc-500 uppercase block">
-                      Overall Mastery
+                      Mastery
                     </span>
                     <span className="text-sm font-bold text-emerald-600 dark:text-emerald-400">{avgMastery}%</span>
+                  </div>
+                  <div>
+                    <span className="text-[10px] font-mono text-zinc-500 uppercase block">
+                      Tasks
+                    </span>
+                    <span className="text-sm font-bold text-indigo-600 dark:text-indigo-400 font-mono">
+                      {taskStats.completed}/{taskStats.total}
+                    </span>
                   </div>
                   <div>
                     <span className="text-[10px] font-mono text-zinc-500 uppercase block">

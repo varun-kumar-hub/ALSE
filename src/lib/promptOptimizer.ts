@@ -19,14 +19,14 @@ export function buildRuntimeContextPrompt(
     year: 'numeric',
     month: 'long',
     day: 'numeric',
-  }); // e.g. "Wednesday, August 12, 2026"
-  const isoDate = now.toISOString().split('T')[0]; // "2026-08-12"
+  });
+  const isoDate = now.toISOString().split('T')[0];
   const timeStr = now.toLocaleTimeString('en-US', {
     hour: '2-digit',
     minute: '2-digit',
     second: '2-digit',
     hour12: true,
-  }); // "11:28:53 AM"
+  });
   const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone || 'Asia/Kolkata';
 
   const memoryBlock =
@@ -39,7 +39,7 @@ export function buildRuntimeContextPrompt(
 - Current Local Time: ${timeStr}
 - Timezone: ${timeZone}
 - Current Year: ${now.getFullYear()}
-- CRITICAL TEMPORAL ANCHOR: Today is ${fullDateStr}. All temporal reasoning (e.g. "latest", "current", "recent", "today", "this year", "upcoming") MUST be evaluated relative to TODAY's date (${isoDate}).
+- CRITICAL TEMPORAL ANCHOR: Today is ${fullDateStr}. All temporal reasoning MUST be evaluated relative to TODAY's date (${isoDate}).
 ${memoryBlock}
 
 [SYSTEM RUNTIME ENVIRONMENT]
@@ -51,56 +51,69 @@ ${memoryBlock}
 }
 
 export function optimizePrompt(
-  _userPrompt: string,
+  userPrompt: string,
   intent: QueryIntent,
-  assistantName = 'Nexus Agent',
+  assistantName = 'LearnForge Agent',
   contextOptions: RuntimeContextOptions = {},
   retrievedContext = '',
   memoryEpisodes: string[] = []
 ): string {
+  const cleanQuery = (userPrompt || '').trim();
+  const isGreeting = /^(hi|hello|hey|greetings|howdy|good\s+(morning|afternoon|evening|day)|sup|yo|what's\s+up|hi\s+there|hello\s+there)\b[!.?]*$/i.test(
+    cleanQuery
+  );
+
   let formatGuidance = '';
-  switch (intent) {
-    case 'biography':
-      formatGuidance = `
-Intent: Biography / Person / Entity Search.
+
+  if (isGreeting) {
+    formatGuidance = `
+[CONVERSATIONAL GREETING HANDLING]
+- The user sent a friendly greeting (${cleanQuery}).
+- Respond warmly, politely, and concisely as ${assistantName}.
+- Welcome the learner and ask how you can help them explore concepts, study subjects, solve problems, or prepare for assessments today.
+- STRICT RULE: NEVER output an unsolicited biographical article, random historical figure (such as Albert Einstein or any other entity), or a lengthy unprompted essay in response to a simple greeting.`;
+  } else {
+    switch (intent) {
+      case 'biography':
+        formatGuidance = `
+Intent: Biography / Historical Entity Analysis.
 Format your response with:
 1. Overview
 2. Early Life & Background
-3. Career & Major Achievements
+3. Career & Major Contributions
 4. Notable Works / Timeline
-5. Important Takeaways`;
-      break;
+5. Key Takeaways`;
+        break;
 
-    case 'coding':
-      formatGuidance = `
+      case 'coding':
+        formatGuidance = `
 Intent: Software Engineering & Optimized Code Implementation.
 Formatting & Engineering Standards:
 1. Complete, Fully Optimized Code Implementation:
-   - Provide the 100% complete, runnable, production-grade code in the requested programming language (e.g. Python, C++, Rust, Java, TypeScript, Go, etc.).
+   - Provide complete, runnable, production-grade code in the requested language (Python, TypeScript, C++, Rust, etc.).
    - Never truncate, omit functions, or use placeholders (never write "// rest of code", "/* TODO */", or "...").
-   - Implement maximal asymptotic and micro-architectural optimizations (e.g. branch prediction friendliness, memory locality, vectorized/SIMD operations, zero-copy, early exits).
 2. Algorithmic Complexity Breakdown:
-   - Detail the exact Big-O Time Complexity (Best, Average, Worst) and Space Complexity with mathematical notation.
-3. Verification & Usage Examples:
-   - Include test cases or main execution driver validating normal cases, boundary values, and edge cases.
-4. Key Engineering Insights & Optimizations:
-   - Clearly explain why this implementation is optimal and what specific architectural techniques are used.`;
-      break;
+   - Detail the exact Big-O Time and Space Complexity with mathematical notation.
+3. Verification & Test Scenarios:
+   - Include test cases validating normal behavior, boundary values, and edge cases.
+4. Key Engineering Insights & Optimization Rationale:
+   - Explain why this implementation is optimal.`;
+        break;
 
-    case 'debugging':
-      formatGuidance = `
+      case 'debugging':
+        formatGuidance = `
 Intent: Code Optimization & Debugging.
 Formatting & Engineering Standards:
 1. Root Cause & Inefficiency Analysis:
-   - Identify performance bottlenecks, edge-case hazards, or runtime flaws in the code.
+   - Identify bugs, edge-case hazards, or bottlenecks.
 2. Complete Fully Optimized Code:
-   - Provide the complete, drop-in replacement code with all fixes and optimizations applied.
-3. Performance & Correctness Comparison:
-   - Contrast the before vs. after complexities and behavior.`;
-      break;
+   - Provide the complete drop-in replacement code with fixes applied.
+3. Complexity & Correctness Contrast:
+   - Contrast before vs. after performance.`;
+        break;
 
-    case 'research':
-      formatGuidance = `
+      case 'research':
+        formatGuidance = `
 Intent: Deep Research.
 Format your response with:
 1. Executive Summary
@@ -109,170 +122,125 @@ Format your response with:
 4. Detailed Findings & Analysis
 5. Evidence & Alternative Views
 6. Key Takeaways & Sources`;
-      break;
+        break;
 
-    case 'comparison':
-      formatGuidance = `
+      case 'comparison':
+        formatGuidance = `
 Intent: Product / Concept Comparison.
 Format your response with:
 1. Quick Recommendation
 2. Comprehensive Comparison Table (in Markdown)
 3. Pros & Cons Analysis
 4. Performance & Trade-offs
-5. Who Should Choose Which Option`;
-      break;
+5. Ideal Use Cases`;
+        break;
 
-    case 'file-analysis':
-      formatGuidance = `
+      case 'file-analysis':
+        formatGuidance = `
 Intent: File / Document Analysis.
 Format your response with:
 1. Document Summary
 2. Key Topics & Core Findings
 3. Actionable Items
-4. Critical Observations
-5. References & Next Steps`;
-      break;
+4. Critical Observations`;
+        break;
 
-    case 'study-notes':
-      formatGuidance = `
+      case 'study-notes':
+        formatGuidance = `
 Intent: Study Notes.
 Format your response with:
 1. Topic Summary
-2. Key Concepts & Definitions
-3. Formulas & Step-by-Step Examples
-4. Common Exam Pitfalls
-5. Summary Checklist`;
-      break;
+2. Core Concepts & Definitions
+3. Key Formulas / Mechanisms
+4. Practice Questions & Retention Check`;
+        break;
 
-    case 'medical':
-      formatGuidance = `
-Intent: Health / Medical Info.
-Format your response with:
-1. General Disclaimer (Non-diagnostic guidance)
-2. Symptom / Concept Overview
-3. Potential Causes & Medical Context
-4. General Wellness Steps (Consult Healthcare Professional)`;
-      break;
-
-    case 'legal':
-      formatGuidance = `
-Intent: Legal / Compliance Analysis.
-Format your response with:
-1. Executive Context & Legal Scope
-2. Clause / Term Analysis
-3. Compliance & Liability Considerations
-4. Action Items`;
-      break;
-
-    case 'definition':
-      formatGuidance = `
-Intent: Definition & Fundamentals.
-Provide a clear definition and explain the core principles directly. Include key algorithms, types, or examples where appropriate to provide a complete, high-quality explanation.`;
-      break;
-
-    case 'explanation':
-      formatGuidance = `
-Intent: Concept Explanation.
-Explain clearly and thoroughly. Cover key algorithms, mechanics, and real-world examples.`;
-      break;
-
-    case 'summarization':
-      formatGuidance = `
-Intent: Summarization.
-Summarize the provided content without adding unrelated background. Keep duplicate points out.`;
-      break;
-
-    case 'translation':
-      formatGuidance = `
-Intent: Translation.
-Return the translation directly. Add a short note only if ambiguity matters.`;
-      break;
-
-    case 'mathematics':
-      formatGuidance = `
+      case 'mathematics':
+        formatGuidance = `
 Intent: Mathematics.
-Show the necessary reasoning, equations, and final answer clearly.`;
-      break;
+Show the necessary step-by-step reasoning, mathematical equations, and final answer clearly.`;
+        break;
 
-    case 'creative-writing':
-      formatGuidance = `
+      case 'creative-writing':
+        formatGuidance = `
 Intent: Creative Writing.
 Produce the requested creative text directly in the requested style and length.`;
-      break;
+        break;
 
-    case 'email-document':
-      formatGuidance = `
+      case 'email-document':
+        formatGuidance = `
 Intent: Email / Document Writing.
-Draft or revise the requested document directly. Keep formatting clean and practical.`;
-      break;
+Draft or revise the requested document directly with clean, practical formatting.`;
+        break;
 
-    case 'data-analysis':
-      formatGuidance = `
+      case 'data-analysis':
+        formatGuidance = `
 Intent: Data Analysis.
 Focus on observations, calculations, trends, and conclusions from the data provided.`;
-      break;
+        break;
 
-    case 'planning':
-      formatGuidance = `
+      case 'planning':
+        formatGuidance = `
 Intent: Planning.
 Format your response with:
 1. Core Objectives
 2. Actionable Tasks / Steps
 3. Estimated Timeline
 4. Potential Risks & Mitigation`;
-      break;
+        break;
 
-    case 'brainstorming':
-      formatGuidance = `
+      case 'brainstorming':
+        formatGuidance = `
 Intent: Brainstorming.
-Give a focused list of distinct ideas. Avoid repeating variants of the same idea.`;
-      break;
+Give a focused list of distinct ideas with actionable rationale.`;
+        break;
 
-    case 'image-analysis':
-      formatGuidance = `
+      case 'image-analysis':
+        formatGuidance = `
 Intent: Image / Diagram Analysis.
 Format your response with:
 1. Image Content Summary
 2. Visual Elements & Text Extracted
 3. Key Observations & Meaning`;
-      break;
+        break;
 
-    case 'documentation':
-      formatGuidance = `
+      case 'documentation':
+        formatGuidance = `
 Intent: Documentation / README.
 Format your response with:
 1. Overview & Purpose
 2. Quick Start / Installation
 3. API / Component Reference
 4. Usage Examples`;
-      break;
+        break;
 
-    case 'general':
-    default:
-      formatGuidance = `
-Intent: General Learning & Explanation.
-Explain directly and comprehensively with clear structure, key algorithms, and concepts.`;
-      break;
+      case 'general':
+      default:
+        formatGuidance = `
+Intent: Educational Mastery & Concept Explanation.
+Explain directly, accurately, and comprehensively with clear structure, key mechanisms, and concrete examples.`;
+        break;
+    }
   }
 
   const codingAndImplementationRule = `
 Coding & Implementation Capabilities:
-- You are a master educator in computer science, software engineering, machine learning, and systems.
-- You have full capability to write code, pseudocode, algorithms, data structures, and complete working implementations in Python, TypeScript, C++, Rust, Java, Go, SQL, CUDA, PyTorch, and all standard frameworks.
-- Whenever explaining computing topics, algorithms, or technical mechanisms, provide clean, idiomatic, well-commented code snippets or pseudocode alongside theoretical explanations.`;
+- You are a master educator in computer science, software engineering, mathematics, and systems.
+- When explaining computing topics, algorithms, or technical mechanisms, provide clean, idiomatic code snippets alongside theoretical explanations.`;
 
   const antiHallucinationRules = `
 Educational Delivery & Completeness:
-- Directly write the complete, full, rich educational explanation with all sections fully expanded.
-- NEVER output mere outlines, placeholder summaries, or plans of what you are going to say (e.g., never output "Definition: explain what it is...").
-- NEVER output system constraints, meta-monologues, or disclaimers like "I do not generate code" or "According to the protocol". Deliver the real content directly.
-- Combine your deep pre-trained knowledge with any provided reference context to deliver accurate, comprehensive, and well-structured teaching.`;
+- Directly write the complete educational explanation.
+- NEVER output mere outlines or placeholder summaries.
+- Deliver authoritative, well-structured teaching tailored precisely to the user's specific request.`;
 
-  const visualFormattingRules = `
+  const visualFormattingRules = isGreeting
+    ? ''
+    : `
 Educational Presentation Guidelines:
-- Begin directly with the topic title and definition (e.g. # Backpropagation in Deep Neural Networks, ## Definition).
-- For scientific diagrams, network architectures, flowcharts, circuits, state transitions, and biological/computing systems: ALWAYS include an interactive '\`\`\`mermaid ... \`\`\`' diagram to give the learner high-clarity visual intuition. In Mermaid node definitions, ALWAYS enclose node label text in double quotes (e.g. A["Source Code (.py)"] --> B["Compilation to Bytecode (.pyc)"] --> C["Python Virtual Machine (PVM)"]). Never place raw parentheses or special characters unquoted inside square brackets.
-- Include Markdown comparison tables when contrasting features, algorithms, or trade-offs.
+- Begin directly with the topic title and definition (e.g. # Backpropagation in Neural Networks, ## Definition).
+- For scientific diagrams, network architectures, flowcharts, and system state transitions: include an interactive '\`\`\`mermaid ... \`\`\`' diagram for visual intuition. In Mermaid node definitions, ALWAYS enclose node label text in double quotes (e.g. A["Client Request"] --> B["Server Node"]).
+- Include Markdown comparison tables when contrasting features or algorithms.
 - Conclude educational explanations with a concise "## Key Takeaways" section.`;
 
   const runtimeContext = buildRuntimeContextPrompt(contextOptions, memoryEpisodes);
@@ -286,14 +254,14 @@ ${visualFormattingRules.trim()}
 ${codingAndImplementationRule.trim()}
 ${antiHallucinationRules.trim()}
 
-Deliver direct, comprehensive, and authoritative conceptual mastery with clear definitions, math, diagrams, and working code where relevant.`;
+Deliver direct, comprehensive, and authoritative conceptual mastery tailored precisely to what the user asks.`;
 
   return systemMessage;
 }
 
 export function buildSystemPrompt(
   intent: QueryIntent,
-  assistantName = 'Nexus Agent',
+  assistantName = 'LearnForge Agent',
   contextOptions: RuntimeContextOptions = {},
   retrievedContext = '',
   memoryEpisodes: string[] = []

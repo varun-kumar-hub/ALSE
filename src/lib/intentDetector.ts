@@ -1,13 +1,18 @@
-
 import { QueryIntent } from '../services/types';
 
 /**
- * Classifies user intent from prompt content without needing an extra API call.
+ * Classifies user intent from prompt content accurately and deterministically.
  */
 export function detectQueryIntent(prompt: string): QueryIntent {
   const text = prompt.toLowerCase().trim();
 
   if (!text) return 'general';
+
+  // 1. Conversational Greetings & Pleasantries (Strictly General, never Biography)
+  const GREETING_REGEX = /^(hi|hello|hey|greetings|howdy|good\s+(morning|afternoon|evening|day)|sup|yo|what's\s+up|hi\s+there|hello\s+there|hey\s+there)\b[!.?]*$/i;
+  if (GREETING_REGEX.test(text) || ['hi', 'hello', 'hey', 'greetings', 'howdy', 'yo', 'sup'].includes(text)) {
+    return 'general';
+  }
 
   const hasCodeBlock = /```[\s\S]*```/.test(prompt);
   const hasQuestionShape = /^(who|what|when|where|why|how)\b/.test(text);
@@ -17,12 +22,11 @@ export function detectQueryIntent(prompt: string): QueryIntent {
     return 'research';
   }
 
-  // Person / biography / entity requests must win over generic fallbacks.
+  // 2. Specific Person / Biography / Entity Requests
   if (
-    /\b(who is|who was|tell me about|short description of|brief description of|bio(?:graphy)? of|profile of)\b/.test(text) ||
-    /\b(give me|provide|write)\b.*\b(short|brief)?\s*(description|bio|biography)\b.*\b(of|about)\b/.test(text) ||
-    /\b(who invented|founder of|creator of|invented by|created by)\b/.test(text) ||
-    /^[a-z0-9]{2,6}$/i.test(text) // E.g., "ntr", "srk", "kcr", "ysr", "balayya"
+    /\b(who is|who was|biography of|bio of|life of|filmography of)\b/i.test(text) ||
+    /\b(give me|provide|write)\b.*\b(short|brief)?\s*(biography|bio|life story)\b.*\b(of|about)\b/i.test(text) ||
+    /\b(who invented|founder of|creator of|invented by|created by)\b/i.test(text)
   ) {
     return 'biography';
   }

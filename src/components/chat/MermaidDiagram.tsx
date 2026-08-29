@@ -1,12 +1,31 @@
 import React, { useEffect, useRef, useState } from 'react';
 import mermaid from 'mermaid';
-import { Network, AlertCircle, Copy, Check } from 'lucide-react';
+import { Network, AlertCircle, Copy, Check, Code2 } from 'lucide-react';
 import { useAppStore } from '../../stores/appStore';
 
 interface MermaidDiagramProps {
   chart: string;
 }
 
+/**
+ * Removes any stray DOM error containers Mermaid might have injected into document.body
+ */
+function cleanStrayMermaidErrors() {
+  try {
+    const strayElements = document.querySelectorAll(
+      'body > [id^="dmermaid"], body > [id^="mermaid-"], body > svg.error-icon, body > svg[aria-roledescription="error"]'
+    );
+    strayElements.forEach((el) => {
+      el.remove();
+    });
+  } catch {
+    // Ignore DOM cleanup errors
+  }
+}
+
+/**
+ * Deeply sanitizes and repairs Mermaid diagram syntax to ensure flawless rendering.
+ */
 export function sanitizeMermaidChart(rawChart: string): string {
   if (!rawChart) return '';
   let chart = rawChart.trim();
@@ -20,10 +39,15 @@ export function sanitizeMermaidChart(rawChart: string): string {
     .replace(/—>/g, '-->')
     .replace(/⟶/g, '-->')
     .replace(/→/g, '-->')
-    .replace(/->/g, '-->');
+    .replace(/->/g, '-->')
+    .replace(/<—/g, '<--')
+    .replace(/←/g, '<--');
 
   // Strip markdown bold / italics inside node text: e.g. **text** -> text
   chart = chart.replace(/\*\*([^*]+)\*\*/g, '$1').replace(/\*([^*]+)\*/g, '$1');
+
+  // Fix HTML line breaks <br> / <br/> inside labels
+  chart = chart.replace(/<br\s*\/?>/gi, ' ');
 
   // Auto-quote square bracket node labels: A[Source Code (.py)] -> A["Source Code (.py)"]
   chart = chart.replace(/([a-zA-Z0-9_]+)\[\s*([^"\]\n][^\]\n]*?)\s*\]/g, (_match, id, label) => {
@@ -43,8 +67,14 @@ export function sanitizeMermaidChart(rawChart: string): string {
     return `${id}{"${cleanLabel}"}`;
   });
 
-  // Ensure diagram type header exists (default to flowchart TD if not present)
-  const headerMatch = chart.match(/^(?:flowchart|graph|sequenceDiagram|classDiagram|stateDiagram|erDiagram|pie|gantt|mindmap|gitGraph|C4Context)\b/i);
+  // Clean lines and ensure diagram header exists
+  const lines = chart.split('\n').map((l) => l.trimEnd()).filter(Boolean);
+  if (lines.length === 0) return '';
+
+  const headerMatch = lines[0].match(
+    /^(?:flowchart|graph|sequenceDiagram|classDiagram|stateDiagram|stateDiagram-v2|erDiagram|pie|gantt|mindmap|gitGraph|C4Context)\b/i
+  );
+
   if (!headerMatch) {
     chart = `flowchart TD\n${chart}`;
   }
@@ -57,15 +87,17 @@ export const MermaidDiagram: React.FC<MermaidDiagramProps> = ({ chart }) => {
   const [svgContent, setSvgContent] = useState<string>('');
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
+  const [viewSource, setViewSource] = useState(false);
   const { theme } = useAppStore();
 
   useEffect(() => {
     try {
       mermaid.initialize({
         startOnLoad: false,
-        theme: theme === 'dark' ? 'dark' : 'neutral',
+        suppressErrorRendering: true,
         securityLevel: 'loose',
-        fontFamily: 'Plus Jakarta Sans, sans-serif',
+        fontFamily: 'Plus Jakarta Sans, Inter, sans-serif',
+        theme: theme === 'dark' ? 'dark' : 'neutral',
         themeVariables: {
           primaryColor: theme === 'dark' ? '#27272a' : '#f4f4f5',
           primaryTextColor: theme === 'dark' ? '#fafafa' : '#09090b',
@@ -76,48 +108,66 @@ export const MermaidDiagram: React.FC<MermaidDiagramProps> = ({ chart }) => {
         },
       });
     } catch {
-      // Ignore if already initialized
+      // Ignore initialization errors
     }
   }, [theme]);
 
   useEffect(() => {
     let isMounted = true;
+
     const renderDiagram = async () => {
-      if (!chart.trim()) return;
+      if (!chart || !chart.trim()) return;
+
       const sanitized = sanitizeMermaidChart(chart);
-      const id = `mermaid-${Math.random().toString(36).substring(2, 9)}`;
+      const uniqueId = `mermaid_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+
+      cleanStrayMermaidErrors();
 
       try {
-        setError(null);
-        const { svg } = await mermaid.render(id, sanitized);
+        // First validate syntax with parse
+        await mermaid.parse(sanitized);
+
+        // If parse succeeds, render clean SVG
+        const { svg } = await mermaid.render(uniqueId, sanitized);
         if (isMounted) {
           setSvgContent(svg);
+          setError(null);
         }
-      } catch (firstErr: any) {
-        // Fallback pass: clean unescaped delimiters and re-render
+      } catch {
+        // Fallback Pass: aggressive repair
         try {
-          const fallbackId = `mermaid-fb-${Math.random().toString(36).substring(2, 9)}`;
+          cleanStrayMermaidErrors();
+
+          const fallbackId = `mermaid_fb_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
           const aggressive = sanitized
             .replace(/[()]/g, '')
             .replace(/—>/g, '-->')
             .replace(/→/g, '-->');
           const finalClean = sanitizeMermaidChart(aggressive);
+
+          await mermaid.parse(finalClean);
           const { svg } = await mermaid.render(fallbackId, finalClean);
+
           if (isMounted) {
             setSvgContent(svg);
             setError(null);
           }
-        } catch (finalErr: any) {
+        } catch {
+          cleanStrayMermaidErrors();
           if (isMounted) {
-            setError(firstErr?.message || finalErr?.message || 'Failed to render scientific diagram.');
+            setError('Diagram rendered as structured code view');
           }
         }
+      } finally {
+        cleanStrayMermaidErrors();
       }
     };
 
     renderDiagram();
+
     return () => {
       isMounted = false;
+      cleanStrayMermaidErrors();
     };
   }, [chart, theme]);
 
@@ -127,22 +177,24 @@ export const MermaidDiagram: React.FC<MermaidDiagramProps> = ({ chart }) => {
     setTimeout(() => setCopied(false), 1600);
   };
 
-  if (error) {
+  if (error || !svgContent) {
     return (
-      <div className="my-3 p-3 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900/60 text-xs font-mono">
-        <div className="flex items-center justify-between text-zinc-500 pb-2">
-          <span className="flex items-center gap-1.5 text-rose-500 font-semibold">
-            <AlertCircle className="w-3.5 h-3.5" /> Diagram Syntax Notice
+      <div className="my-3 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900/60 overflow-hidden text-xs font-mono shadow-2xs">
+        <div className="flex items-center justify-between px-3 py-2 bg-zinc-100/70 dark:bg-zinc-850/60 border-b border-zinc-200 dark:border-zinc-800 text-zinc-500">
+          <span className="flex items-center gap-1.5 font-bold text-zinc-700 dark:text-zinc-300">
+            <Code2 className="w-3.5 h-3.5 text-blue-500" />
+            <span>Workflow & Process Diagram</span>
           </span>
           <button
             type="button"
             onClick={handleCopySource}
-            className="text-[10px] text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 cursor-pointer"
+            className="flex items-center gap-1 px-2 py-0.5 rounded-md hover:bg-zinc-200 dark:hover:bg-zinc-800 text-zinc-600 dark:text-zinc-400 transition cursor-pointer text-[10px]"
           >
-            {copied ? 'Copied' : 'Copy Code'}
+            {copied ? <Check className="w-3 h-3 text-emerald-500" /> : <Copy className="w-3 h-3" />}
+            <span>{copied ? 'Copied' : 'Copy'}</span>
           </button>
         </div>
-        <pre className="text-zinc-800 dark:text-zinc-200 overflow-x-auto whitespace-pre-wrap leading-relaxed">
+        <pre className="p-3 text-zinc-800 dark:text-zinc-200 overflow-x-auto whitespace-pre-wrap leading-relaxed">
           {chart}
         </pre>
       </div>
@@ -150,26 +202,43 @@ export const MermaidDiagram: React.FC<MermaidDiagramProps> = ({ chart }) => {
   }
 
   return (
-    <div className="my-4 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-[#121215] shadow-2xs overflow-hidden select-none group/mermaid">
-      <div className="flex items-center justify-between px-3.5 py-2 border-b border-zinc-200 dark:border-zinc-800/80 bg-zinc-50/70 dark:bg-zinc-900/40 text-[11px] font-mono text-zinc-500">
-        <span className="flex items-center gap-1.5 font-bold text-zinc-800 dark:text-zinc-200">
-          <Network className="w-3.5 h-3.5 text-zinc-500" />
+    <div className="my-4 rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-[#121215] shadow-xs overflow-hidden select-none group/mermaid">
+      {/* Header Bar */}
+      <div className="flex items-center justify-between px-4 py-2.5 border-b border-zinc-200 dark:border-zinc-800/80 bg-zinc-50/80 dark:bg-zinc-900/50 text-[11px] font-mono text-zinc-500">
+        <span className="flex items-center gap-2 font-bold text-zinc-800 dark:text-zinc-200">
+          <Network className="w-4 h-4 text-blue-500" />
           <span>Scientific Visual Diagram</span>
         </span>
-        <button
-          type="button"
-          onClick={handleCopySource}
-          className="flex items-center gap-1 px-2 py-0.5 rounded-md hover:bg-zinc-200 dark:hover:bg-zinc-800 text-zinc-600 dark:text-zinc-400 transition cursor-pointer text-[10px]"
-          title="Copy Mermaid Source"
-        >
-          {copied ? <Check className="w-3 h-3 text-emerald-500" /> : <Copy className="w-3 h-3" />}
-          <span>{copied ? 'Copied' : 'Source'}</span>
-        </button>
+        <div className="flex items-center gap-1">
+          <button
+            type="button"
+            onClick={() => setViewSource(!viewSource)}
+            className="px-2 py-1 rounded-lg hover:bg-zinc-200 dark:hover:bg-zinc-800 text-zinc-600 dark:text-zinc-400 transition cursor-pointer text-[10px] font-medium"
+          >
+            {viewSource ? 'Hide Source' : 'View Source'}
+          </button>
+          <button
+            type="button"
+            onClick={handleCopySource}
+            className="flex items-center gap-1 px-2 py-1 rounded-lg hover:bg-zinc-200 dark:hover:bg-zinc-800 text-zinc-600 dark:text-zinc-400 transition cursor-pointer text-[10px] font-medium"
+            title="Copy Mermaid Source"
+          >
+            {copied ? <Check className="w-3 h-3 text-emerald-500" /> : <Copy className="w-3 h-3" />}
+            <span>{copied ? 'Copied' : 'Copy'}</span>
+          </button>
+        </div>
       </div>
 
+      {viewSource && (
+        <div className="p-3 bg-zinc-950 text-zinc-200 border-b border-zinc-800 text-xs font-mono overflow-x-auto">
+          <pre>{chart}</pre>
+        </div>
+      )}
+
+      {/* SVG Container */}
       <div
         ref={containerRef}
-        className="p-4 flex items-center justify-center overflow-x-auto [&>svg]:max-w-full [&>svg]:h-auto"
+        className="p-5 flex items-center justify-center overflow-x-auto [&>svg]:max-w-full [&>svg]:h-auto [&>svg]:mx-auto"
         dangerouslySetInnerHTML={{ __html: svgContent }}
       />
     </div>

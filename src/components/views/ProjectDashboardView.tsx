@@ -28,6 +28,8 @@ import { shareSubjectToUserId } from '../../services/userService';
 import { KnowledgeView } from './KnowledgeView';
 import { AnalyticsView } from './AnalyticsView';
 import { StoryChallengeView } from './StoryChallengeView';
+import { SubjectTaskTracker } from '../tasks/SubjectTaskTracker';
+import { getSubjectTaskStats } from '../../services/taskService';
 import { Chat } from '../../services/types';
 
 interface ProjectDashboardViewProps {
@@ -52,7 +54,7 @@ export const ProjectDashboardView: React.FC<ProjectDashboardViewProps> = ({
   onDeleteChat,
   onOpenAssessment,
 }) => {
-  const [activeTab, setActiveTab] = useState<'chats' | 'sources' | 'analytics' | 'challenges'>('chats');
+  const [activeTab, setActiveTab] = useState<'tasks' | 'chats' | 'sources' | 'analytics' | 'challenges'>('tasks');
   const [quickInput, setQuickInput] = useState('');
   const [chatSearchQuery, setChatSearchQuery] = useState('');
   const [showShareModal, setShowShareModal] = useState(false);
@@ -67,12 +69,14 @@ export const ProjectDashboardView: React.FC<ProjectDashboardViewProps> = ({
   const [copiedAnki, setCopiedAnki] = useState(false);
   const [isPublic, setIsPublic] = useState(project.is_public || false);
 
-  // Load subject mastery stats
+  // Load subject mastery stats & task stats
   const masteryList: ConceptMastery[] = ps6Db.getAllMastery(project.id);
   const avgMastery =
     masteryList.length > 0
       ? Math.round((masteryList.reduce((acc, m) => acc + m.mastery, 0) / masteryList.length) * 100)
       : 0;
+
+  const taskStats = getSubjectTaskStats(project.id, project);
 
   const handleQuickSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -252,13 +256,25 @@ export const ProjectDashboardView: React.FC<ProjectDashboardViewProps> = ({
         </form>
 
         {/* Tab Switcher Pills */}
-        <div className="flex items-center gap-1.5 border-b border-zinc-200 dark:border-zinc-800 pb-3">
+        <div className="flex items-center gap-1.5 border-b border-zinc-200 dark:border-zinc-800 pb-3 overflow-x-auto">
+          <button
+            type="button"
+            onClick={() => setActiveTab('tasks')}
+            className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold font-sans transition cursor-pointer flex items-center gap-1.5 shrink-0 ${
+              activeTab === 'tasks'
+                ? 'bg-zinc-950 dark:bg-white text-white dark:text-zinc-950 shadow-2xs font-bold'
+                : 'text-zinc-500 hover:text-zinc-950 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-zinc-850'
+            }`}
+          >
+            <span>🎯 Tasks ({taskStats.completed}/{taskStats.total})</span>
+          </button>
+
           <button
             type="button"
             onClick={() => setActiveTab('chats')}
-            className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold font-sans transition cursor-pointer ${
+            className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold font-sans transition cursor-pointer shrink-0 ${
               activeTab === 'chats'
-                ? 'bg-zinc-950 dark:bg-white text-white dark:text-zinc-950 shadow-2xs'
+                ? 'bg-zinc-950 dark:bg-white text-white dark:text-zinc-950 shadow-2xs font-bold'
                 : 'text-zinc-500 hover:text-zinc-950 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-zinc-850'
             }`}
           >
@@ -268,9 +284,9 @@ export const ProjectDashboardView: React.FC<ProjectDashboardViewProps> = ({
           <button
             type="button"
             onClick={() => setActiveTab('sources')}
-            className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold font-sans transition cursor-pointer ${
+            className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold font-sans transition cursor-pointer shrink-0 ${
               activeTab === 'sources'
-                ? 'bg-zinc-950 dark:bg-white text-white dark:text-zinc-950 shadow-2xs'
+                ? 'bg-zinc-950 dark:bg-white text-white dark:text-zinc-950 shadow-2xs font-bold'
                 : 'text-zinc-500 hover:text-zinc-950 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-zinc-850'
             }`}
           >
@@ -280,9 +296,9 @@ export const ProjectDashboardView: React.FC<ProjectDashboardViewProps> = ({
           <button
             type="button"
             onClick={() => setActiveTab('analytics')}
-            className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold font-sans transition cursor-pointer ${
+            className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold font-sans transition cursor-pointer shrink-0 ${
               activeTab === 'analytics'
-                ? 'bg-zinc-950 dark:bg-white text-white dark:text-zinc-950 shadow-2xs'
+                ? 'bg-zinc-950 dark:bg-white text-white dark:text-zinc-950 shadow-2xs font-bold'
                 : 'text-zinc-500 hover:text-zinc-950 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-zinc-850'
             }`}
           >
@@ -292,15 +308,33 @@ export const ProjectDashboardView: React.FC<ProjectDashboardViewProps> = ({
           <button
             type="button"
             onClick={() => setActiveTab('challenges')}
-            className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold font-sans transition cursor-pointer ${
+            className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold font-sans transition cursor-pointer shrink-0 ${
               activeTab === 'challenges'
-                ? 'bg-zinc-950 dark:bg-white text-white dark:text-zinc-950 shadow-2xs'
+                ? 'bg-zinc-950 dark:bg-white text-white dark:text-zinc-950 shadow-2xs font-bold'
                 : 'text-zinc-500 hover:text-zinc-950 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-zinc-850'
             }`}
           >
             Adaptive Tutor
           </button>
         </div>
+
+        {/* TAB 0: TASKS & CURRICULUM MILESTONES */}
+        {activeTab === 'tasks' && (
+          <SubjectTaskTracker
+            project={project}
+            onStartTaskAction={(payload) => {
+              if (payload.type === 'story') {
+                setActiveTab('challenges');
+              } else if (payload.type === 'assessment' && onOpenAssessment) {
+                onOpenAssessment();
+              } else {
+                onNewChat(payload.prompt);
+              }
+            }}
+            onOpenStoryChallenge={() => setActiveTab('challenges')}
+            onOpenAssessment={onOpenAssessment}
+          />
+        )}
 
         {/* TAB 1: CHATS LIST */}
         {activeTab === 'chats' && (

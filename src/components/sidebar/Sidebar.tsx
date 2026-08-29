@@ -847,156 +847,163 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
         {/* SUBJECTS Section */}
         <div className="space-y-1 pt-1 border-t border-zinc-200 dark:border-zinc-850">
-          <div className="flex items-center justify-between px-3 py-1.5">
-            <button
-              type="button"
-              onClick={() => setIsProjectsExpanded(!isProjectsExpanded)}
-              className="flex items-center gap-1.5 text-left group cursor-pointer"
+          <div>
+            <div
+              onClick={() => {
+                setIsProjectsExpanded(!isProjectsExpanded);
+              }}
+              className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-medium transition cursor-pointer group ${
+                activeView === 'projects'
+                  ? 'bg-zinc-100 dark:bg-zinc-850 text-zinc-950 dark:text-white font-semibold'
+                  : 'text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-900'
+              }`}
             >
-              <span className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider font-mono group-hover:text-zinc-950 dark:group-hover:text-white">
-                SUBJECTS ({projects.length})
-              </span>
-              <span className="text-zinc-400 group-hover:text-zinc-700 dark:group-hover:text-zinc-300">
+              <div className="flex items-center gap-2.5">
+                <BookOpen className="w-4 h-4 text-zinc-500 dark:text-zinc-400" />
+                <span>Subjects ({projects.length})</span>
+              </div>
+
+              <div className="flex items-center gap-1">
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onOpenNewProject();
+                  }}
+                  className="p-1 rounded-lg text-zinc-400 hover:text-blue-500 hover:bg-zinc-200 dark:hover:bg-zinc-800 transition cursor-pointer"
+                  title="Create New Subject"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                </button>
                 {isProjectsExpanded ? (
-                  <ChevronDown className="w-3 h-3" />
+                  <ChevronDown className="w-3.5 h-3.5 text-zinc-400" />
                 ) : (
-                  <ChevronRight className="w-3 h-3" />
+                  <ChevronRight className="w-3.5 h-3.5 text-zinc-400" />
                 )}
-              </span>
-            </button>
+              </div>
+            </div>
 
-            <button
-              type="button"
-              onClick={onOpenNewProject}
-              className="p-1 rounded-lg text-zinc-400 hover:text-blue-500 hover:bg-zinc-100 dark:hover:bg-zinc-900 transition cursor-pointer"
-              title="Create New Subject"
-            >
-              <Plus className="w-3.5 h-3.5" />
-            </button>
-          </div>
+            {isProjectsExpanded && (
+              <div className="space-y-1 mt-1">
+                {projects.map((proj) => {
+                  const isSelected = activeProjectId === proj.id;
+                  const isExpanded = isSubjectExpanded(proj.id);
+                  const projChats = chats.filter(
+                    (c) => c.project_id === proj.id && c.title.toLowerCase().includes(sidebarSearch.toLowerCase())
+                  );
+                  const projPinned = projChats.filter((c) => c.pinned);
+                  const projUnpinned = projChats.filter((c) => !c.pinned);
 
-          {isProjectsExpanded && (
-            <div className="space-y-1">
-              {projects.map((proj) => {
-                const isSelected = activeProjectId === proj.id;
-                const isExpanded = isSubjectExpanded(proj.id);
-                const projChats = chats.filter(
-                  (c) => c.project_id === proj.id && c.title.toLowerCase().includes(sidebarSearch.toLowerCase())
-                );
-                const projPinned = projChats.filter((c) => c.pinned);
-                const projUnpinned = projChats.filter((c) => !c.pinned);
-
-                return (
-                  <div key={proj.id} className="space-y-1">
-                    <div
-                      onClick={() => {
-                        if (isSelected && isExpanded) {
-                          setExpandedSubjectIds((prev) => ({ ...prev, [proj.id]: false }));
-                        } else {
+                  return (
+                    <div key={proj.id} className="space-y-1">
+                      <div
+                        onClick={() => {
                           onSelectProject(proj.id);
                           onSelectView('project_dashboard');
-                          setExpandedSubjectIds((prev) => ({ ...prev, [proj.id]: true }));
-                        }
-                      }}
-                      className={`group flex items-center justify-between px-3 py-2 rounded-xl text-xs font-medium transition cursor-pointer ${
-                        isSelected
-                          ? 'bg-zinc-100 dark:bg-zinc-850 text-zinc-950 dark:text-white font-semibold border-l-2 border-blue-500'
-                          : 'text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-900'
-                      }`}
-                    >
-                      <div className="flex items-center gap-1.5 min-w-0 flex-1">
-                        <button
-                          type="button"
-                          onClick={(e) => toggleSubjectExpanded(proj.id, e)}
-                          className="p-0.5 rounded text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 transition cursor-pointer"
-                          title={isExpanded ? 'Collapse subject conversations' : 'Expand subject conversations'}
-                        >
-                          {isExpanded ? (
-                            <ChevronDown className="w-3.5 h-3.5" />
-                          ) : (
-                            <ChevronRight className="w-3.5 h-3.5" />
+                        }}
+                        className={`group flex items-center justify-between px-3 py-2 rounded-xl text-xs font-medium transition cursor-pointer ${
+                          isSelected
+                            ? 'bg-zinc-100 dark:bg-zinc-850 text-zinc-950 dark:text-white font-semibold border-l-2 border-blue-500'
+                            : 'text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-900'
+                        }`}
+                      >
+                        <div className="flex items-center gap-2 min-w-0 flex-1">
+                          <span className="text-sm shrink-0">{proj.icon || '📘'}</span>
+                          <span className="truncate">{proj.name}</span>
+                        </div>
+
+                        <div className="flex items-center gap-1">
+                          {/* Plus button directly on Subject row */}
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onSelectProject(proj.id);
+                              setExpandedSubjectIds((prev) => ({ ...prev, [proj.id]: true }));
+                              onNewChat();
+                            }}
+                            className="p-1 rounded-lg text-zinc-400 hover:text-blue-500 hover:bg-zinc-200 dark:hover:bg-zinc-800 transition cursor-pointer"
+                            title={`Start new chat in ${proj.name}`}
+                          >
+                            <Plus className="w-3.5 h-3.5" />
+                          </button>
+
+                          {/* Expand/Collapse Chevron */}
+                          <button
+                            type="button"
+                            onClick={(e) => toggleSubjectExpanded(proj.id, e)}
+                            className="p-1 rounded-lg text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 transition cursor-pointer"
+                            title={isExpanded ? 'Collapse subject conversations' : 'Expand subject conversations'}
+                          >
+                            {isExpanded ? (
+                              <ChevronDown className="w-3.5 h-3.5 text-zinc-400" />
+                            ) : (
+                              <ChevronRight className="w-3.5 h-3.5 text-zinc-400" />
+                            )}
+                          </button>
+
+                          {/* Delete Action on hover */}
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              if (confirm(`Delete subject "${proj.name}"?`)) {
+                                onDeleteProject(proj.id);
+                              }
+                            }}
+                            className="hidden group-hover:block p-1 text-zinc-400 hover:text-rose-500 cursor-pointer"
+                            title="Delete Subject"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Per-Subject Chats Container */}
+                      {isExpanded && (
+                        <div className="pl-2 ml-3 border-l border-zinc-200 dark:border-zinc-850 my-1 space-y-1">
+                          {projPinned.length > 0 && (
+                            <div className="space-y-0.5 mb-2">
+                              <span className="text-[10px] font-mono text-amber-500 font-bold uppercase px-3 block">
+                                📌 PINNED
+                              </span>
+                              {projPinned.map(renderChatItem)}
+                            </div>
                           )}
-                        </button>
-                        <span className="text-xs">{proj.icon || '📘'}</span>
-                        <span className="truncate">{proj.name}</span>
-                      </div>
-
-                      <div className="flex items-center gap-1">
-                        {/* Plus button directly on Subject row */}
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            onSelectProject(proj.id);
-                            setExpandedSubjectIds((prev) => ({ ...prev, [proj.id]: true }));
-                            onNewChat();
-                          }}
-                          className="p-1 rounded-lg text-zinc-400 hover:text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-950/40 transition cursor-pointer"
-                          title={`Start new chat in ${proj.name}`}
-                        >
-                          <Plus className="w-3.5 h-3.5" />
-                        </button>
-
-                        {/* Delete Action */}
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            if (confirm(`Delete subject "${proj.name}"?`)) {
-                              onDeleteProject(proj.id);
-                            }
-                          }}
-                          className="hidden group-hover:block p-1 text-zinc-400 hover:text-rose-500 cursor-pointer"
-                          title="Delete Subject"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </button>
-                      </div>
+                          {projUnpinned.map(renderChatItem)}
+                          {projChats.length === 0 && (
+                            <div className="px-2 py-2">
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  onSelectProject(proj.id);
+                                  onNewChat();
+                                }}
+                                className="w-full py-2 px-3 text-center rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-dashed border-zinc-300 dark:border-zinc-850 text-zinc-600 dark:text-zinc-400 hover:text-blue-500 hover:border-blue-500/50 text-xs font-semibold flex items-center justify-center gap-1.5 transition cursor-pointer"
+                              >
+                                <Plus className="w-3.5 h-3.5" />
+                                <span>Start First Chat</span>
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      )}
                     </div>
+                  );
+                })}
 
-                    {/* Per-Subject Chats Container */}
-                    {isExpanded && (
-                      <div className="pl-2 ml-3 border-l border-zinc-200 dark:border-zinc-850 my-1 space-y-1">
-                        {projPinned.length > 0 && (
-                          <div className="space-y-0.5 mb-2">
-                            <span className="text-[10px] font-mono text-amber-500 font-bold uppercase px-3 block">
-                              📌 PINNED
-                            </span>
-                            {projPinned.map(renderChatItem)}
-                          </div>
-                        )}
-                        {projUnpinned.map(renderChatItem)}
-                        {projChats.length === 0 && (
-                          <div className="px-2 py-2">
-                            <button
-                              type="button"
-                              onClick={() => {
-                                onSelectProject(proj.id);
-                                onNewChat();
-                              }}
-                              className="w-full py-2 px-3 text-center rounded-xl bg-blue-50/50 dark:bg-blue-950/20 border border-dashed border-blue-200 dark:border-blue-800/60 text-blue-600 dark:text-blue-400 hover:bg-blue-100/60 dark:hover:bg-blue-900/40 text-xs font-semibold flex items-center justify-center gap-1.5 transition cursor-pointer"
-                            >
-                              <Plus className="w-3.5 h-3.5" />
-                              <span>+ Start Chat in {proj.name}</span>
-                            </button>
-                          </div>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
-
-              {/* + New Subject Action Button */}
-              <button
-                onClick={onOpenNewProject}
-                className="w-full flex items-center justify-center gap-2 py-2 px-3 rounded-xl text-xs font-semibold text-zinc-700 dark:text-zinc-300 hover:text-zinc-950 dark:hover:text-white bg-zinc-100 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-850 transition mt-2 shadow-xs cursor-pointer"
-              >
-                <FolderPlus className="w-3.5 h-3.5 text-blue-500" />
-                <span>+ New Subject</span>
-              </button>
-            </div>
-          )}
+                {/* + New Subject Action Button */}
+                <button
+                  type="button"
+                  onClick={onOpenNewProject}
+                  className="w-full flex items-center justify-center gap-2 py-2 px-3 rounded-xl text-xs font-semibold text-zinc-700 dark:text-zinc-300 hover:text-zinc-950 dark:hover:text-white bg-zinc-100 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-850 hover:bg-zinc-200 dark:hover:bg-zinc-850 transition mt-2 shadow-2xs cursor-pointer"
+                >
+                  <FolderPlus className="w-3.5 h-3.5 text-blue-500" />
+                  <span>+ New Subject</span>
+                </button>
+              </div>
+            )}
+          </div>
         </div>
 
         {/* WORKSPACE TOOLS Section */}
