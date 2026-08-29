@@ -8,6 +8,7 @@ import {
   ArrowRight,
 } from 'lucide-react';
 import { useAppStore } from '../../stores/appStore';
+import { LearnForgeLogo } from '../ui/LearnForgeLogo';
 
 interface OSDashboardProps {
   onNewChat: () => void;
@@ -21,26 +22,26 @@ export const OSDashboard: React.FC<OSDashboardProps> = ({ onNewChat, onOpenSetti
   } = useAppStore();
 
   return (
-    <div className="flex-1 h-full overflow-y-auto bg-[#f6f8fb] dark:bg-[#0b0d10] p-8 select-none space-y-8 animate-in fade-in duration-200 text-zinc-900 dark:text-zinc-100 font-sans transition-colors">
+    <div className="flex-1 h-full overflow-y-auto bg-[#fafafa] dark:bg-[#09090b] p-8 select-none space-y-8 animate-in fade-in duration-150 text-zinc-900 dark:text-zinc-100 font-sans transition-colors">
       {/* Top Welcome Header Card (Hero Primary Feature Surface) */}
-      <div className="max-w-4xl mx-auto rounded-2xl bg-gradient-to-br from-white via-white to-blue-50/50 dark:from-[#151922] dark:via-[#151922] dark:to-[#1b2029] p-8 border border-blue-100 dark:border-zinc-800 shadow-sm flex flex-col md:flex-row items-start md:items-center justify-between gap-6 transition-colors">
+      <div className="max-w-4xl mx-auto rounded-xl bg-white dark:bg-[#121215] p-8 border border-zinc-200 dark:border-zinc-800 shadow-2xs flex flex-col md:flex-row items-start md:items-center justify-between gap-6 transition-colors">
         <div className="space-y-3 max-w-lg">
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-50 dark:bg-zinc-800 text-blue-700 dark:text-zinc-300 font-bold text-xs border border-blue-100 dark:border-zinc-700 font-mono">
-            <Brain className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+          <div className="inline-flex items-center gap-2 px-2.5 py-1 rounded-lg bg-zinc-100 dark:bg-zinc-850 text-zinc-900 dark:text-zinc-100 font-bold text-xs border border-zinc-200 dark:border-zinc-800 font-mono">
+            <LearnForgeLogo size={16} />
             <span>LearnForge Adaptive Learning Agent</span>
           </div>
-          <h1 className="text-2xl md:text-3xl font-extrabold text-zinc-950 dark:text-white tracking-tight">
+          <h1 className="text-xl md:text-2xl font-bold text-zinc-950 dark:text-white tracking-tight">
             Welcome to LearnForge
           </h1>
-          <p className="text-xs md:text-sm text-zinc-600 dark:text-zinc-400 leading-relaxed font-mono">
-            ChatGPT-like conversational AI coupled with real-time learner modeling, knowledge graph extraction, and adaptive PS6 intervention ranking.
+          <p className="text-xs md:text-sm text-zinc-600 dark:text-zinc-400 leading-relaxed font-sans">
+            High-performance AI tutor with real-time concept extraction, Bayesian knowledge tracing, and personalized mastery paths.
           </p>
         </div>
 
         <div className="flex items-center gap-2 w-full md:w-auto">
           <button
             onClick={onNewChat}
-            className="flex-1 md:flex-initial flex items-center justify-center gap-2 px-5 py-3 rounded-xl bg-blue-600 dark:bg-white text-white dark:text-zinc-950 font-bold text-xs shadow-sm hover:bg-blue-500 dark:hover:bg-zinc-200 transition cursor-pointer"
+            className="flex-1 md:flex-initial flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg bg-zinc-950 dark:bg-white text-white dark:text-zinc-950 font-bold text-xs shadow-2xs hover:bg-zinc-800 dark:hover:bg-zinc-200 transition cursor-pointer active:scale-98"
           >
             <Plus className="w-4 h-4" />
             <span>Start Learning Session</span>
@@ -52,10 +53,10 @@ export const OSDashboard: React.FC<OSDashboardProps> = ({ onNewChat, onOpenSetti
       <div className="max-w-4xl mx-auto grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
         <div
           onClick={onNewChat}
-          className="p-5 rounded-2xl bg-white dark:bg-[#151922] border border-zinc-200 dark:border-zinc-800/80 hover:border-blue-500/40 shadow-xs hover:shadow-md hover:-translate-y-0.5 transition-all cursor-pointer space-y-3 group"
+          className="p-5 rounded-xl bg-white dark:bg-[#121215] border border-zinc-200 dark:border-zinc-800 hover:border-zinc-400 dark:hover:border-zinc-600 shadow-2xs transition-all cursor-pointer space-y-3 group active:scale-98"
         >
-          <div className="w-10 h-10 rounded-xl bg-blue-50 dark:bg-zinc-800 border border-blue-100 dark:border-zinc-700 flex items-center justify-center text-blue-600 dark:text-white group-hover:scale-105 transition-transform">
-            <Brain className="w-5 h-5" />
+          <div className="w-9 h-9 rounded-lg bg-zinc-100 dark:bg-zinc-850 border border-zinc-200 dark:border-zinc-800 flex items-center justify-center text-zinc-900 dark:text-white transition-transform">
+            <Brain className="w-4 h-4" />
           </div>
           <div>
             <h3 className="text-xs font-bold text-zinc-950 dark:text-white">Ask Anything</h3>
@@ -65,10 +66,10 @@ export const OSDashboard: React.FC<OSDashboardProps> = ({ onNewChat, onOpenSetti
 
         <div
           onClick={onNewChat}
-          className="p-5 rounded-2xl bg-white dark:bg-zinc-900/60 border border-zinc-200 dark:border-zinc-850 hover:border-blue-500/40 dark:hover:border-zinc-700 shadow-xs transition cursor-pointer space-y-3 group"
+          className="p-5 rounded-xl bg-white dark:bg-[#121215] border border-zinc-200 dark:border-zinc-800 hover:border-zinc-400 dark:hover:border-zinc-600 shadow-2xs transition cursor-pointer space-y-3 group active:scale-98"
         >
-          <div className="w-10 h-10 rounded-xl bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-750 flex items-center justify-center text-blue-500 dark:text-white group-hover:scale-105 transition-transform">
-            <Compass className="w-5 h-5" />
+          <div className="w-9 h-9 rounded-lg bg-zinc-100 dark:bg-zinc-850 border border-zinc-200 dark:border-zinc-800 flex items-center justify-center text-zinc-900 dark:text-white transition-transform">
+            <Compass className="w-4 h-4" />
           </div>
           <div>
             <h3 className="text-xs font-bold text-zinc-950 dark:text-white">Deep Research</h3>
@@ -78,23 +79,23 @@ export const OSDashboard: React.FC<OSDashboardProps> = ({ onNewChat, onOpenSetti
 
         <div
           onClick={onNewChat}
-          className="p-5 rounded-2xl bg-white dark:bg-zinc-900/60 border border-zinc-200 dark:border-zinc-850 hover:border-blue-500/40 dark:hover:border-zinc-700 shadow-xs transition cursor-pointer space-y-3 group"
+          className="p-5 rounded-xl bg-white dark:bg-[#121215] border border-zinc-200 dark:border-zinc-800 hover:border-zinc-400 dark:hover:border-zinc-600 shadow-2xs transition cursor-pointer space-y-3 group active:scale-98"
         >
-          <div className="w-10 h-10 rounded-xl bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-750 flex items-center justify-center text-blue-500 dark:text-white group-hover:scale-105 transition-transform">
-            <Zap className="w-5 h-5 text-amber-500" />
+          <div className="w-9 h-9 rounded-lg bg-zinc-100 dark:bg-zinc-850 border border-zinc-200 dark:border-zinc-800 flex items-center justify-center text-zinc-900 dark:text-white transition-transform">
+            <Zap className="w-4 h-4" />
           </div>
           <div>
             <h3 className="text-xs font-bold text-zinc-950 dark:text-white">Story Challenge</h3>
-            <p className="text-[11px] text-zinc-500 dark:text-zinc-400 mt-0.5 font-mono">5-10 adaptive decision points</p>
+            <p className="text-[11px] text-zinc-500 dark:text-zinc-400 mt-0.5 font-mono">Adaptive decision scenarios</p>
           </div>
         </div>
 
         <div
           onClick={onNewChat}
-          className="p-5 rounded-2xl bg-white dark:bg-zinc-900/60 border border-zinc-200 dark:border-zinc-850 hover:border-blue-500/40 dark:hover:border-zinc-700 shadow-xs transition cursor-pointer space-y-3 group"
+          className="p-5 rounded-xl bg-white dark:bg-[#121215] border border-zinc-200 dark:border-zinc-800 hover:border-zinc-400 dark:hover:border-zinc-600 shadow-2xs transition cursor-pointer space-y-3 group active:scale-98"
         >
-          <div className="w-10 h-10 rounded-xl bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-750 flex items-center justify-center text-purple-500 dark:text-white group-hover:scale-105 transition-transform">
-            <Network className="w-5 h-5" />
+          <div className="w-9 h-9 rounded-lg bg-zinc-100 dark:bg-zinc-850 border border-zinc-200 dark:border-zinc-800 flex items-center justify-center text-zinc-900 dark:text-white transition-transform">
+            <Network className="w-4 h-4" />
           </div>
           <div>
             <h3 className="text-xs font-bold text-zinc-950 dark:text-white">Knowledge Graph</h3>
@@ -104,14 +105,14 @@ export const OSDashboard: React.FC<OSDashboardProps> = ({ onNewChat, onOpenSetti
       </div>
 
       {/* System Runtime Status */}
-      <div className="max-w-4xl mx-auto rounded-2xl bg-white dark:bg-zinc-900/40 p-6 border border-zinc-200 dark:border-zinc-850 space-y-4 shadow-xs">
+      <div className="max-w-4xl mx-auto rounded-xl bg-white dark:bg-[#121215] p-6 border border-zinc-200 dark:border-zinc-800 space-y-4 shadow-2xs">
         <div className="flex items-center justify-between">
           <span className="text-xs font-bold text-zinc-950 dark:text-white flex items-center gap-2 font-mono uppercase tracking-wider">
             Active Runtime Execution
           </span>
           <button
             onClick={onOpenSettings}
-            className="text-xs font-semibold text-zinc-500 dark:text-zinc-400 hover:text-blue-500 transition flex items-center gap-1 cursor-pointer font-mono"
+            className="text-xs font-semibold text-zinc-500 dark:text-zinc-400 hover:text-zinc-950 dark:hover:text-white transition flex items-center gap-1 cursor-pointer font-mono"
           >
             <span>Configure Runtime Settings</span>
             <ArrowRight className="w-3.5 h-3.5" />

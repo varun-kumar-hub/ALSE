@@ -38,20 +38,28 @@ export const CloudSettings: React.FC<CloudSettingsProps> = ({
   };
 
   const initialProviderId = React.useMemo(() => {
-    const activeProvider = providerConfigs.find(
+    const currentDefaultProvider = useAppStore.getState().defaultProvider;
+    if (currentDefaultProvider && providerConfigs.some((p) => p.id === currentDefaultProvider)) {
+      return currentDefaultProvider;
+    }
+
+    const matchingModelProvider = providerConfigs.find(
       (p) =>
         p.kind === 'cloud' &&
-        p.enabled &&
         (p.defaultModel === selectedModel || p.discoveredModels?.includes(selectedModel))
     );
-    if (activeProvider) return activeProvider.id;
+    if (matchingModelProvider) return matchingModelProvider.id;
 
-    const configured = providerConfigs.find(
-      (p) => p.kind === 'cloud' && Boolean(p.apiKey && p.apiKey.trim().length > 0)
+    if (selectedModel && (selectedModel.toLowerCase().includes('nemotron') || selectedModel.toLowerCase().startsWith('nvidia/'))) {
+      return 'nvidia';
+    }
+
+    const enabledProvider = providerConfigs.find(
+      (p) => p.kind === 'cloud' && p.enabled && Boolean(p.apiKey && p.apiKey.trim().length > 0)
     );
-    if (configured) return configured.id;
+    if (enabledProvider) return enabledProvider.id;
 
-    return 'gemini';
+    return 'nvidia';
   }, [providerConfigs, selectedModel]);
 
   const [activeProviderId, setActiveProviderId] = useState(initialProviderId);
@@ -82,27 +90,24 @@ export const CloudSettings: React.FC<CloudSettingsProps> = ({
   };
 
   const handleMakeActiveModel = (cfg: ProviderConfig, targetModelOverride?: string) => {
-    const modelToActivate = targetModelOverride || cfg.defaultModel || (cfg.discoveredModels && cfg.discoveredModels[0]) || 'gemini-2.5-flash';
+    const modelToActivate = targetModelOverride || cfg.defaultModel || (cfg.discoveredModels && cfg.discoveredModels[0]) || 'nvidia/nemotron-3-super-120b-a12b';
     const store = useAppStore.getState();
-    const currentActiveModel = store.selectedModel;
-    const currentActiveProvider = store.providerConfigs.find(p => p.defaultModel === currentActiveModel)?.name || 'Default';
 
-    if (currentActiveModel && currentActiveModel !== modelToActivate) {
-      store.openModelSwitchModal({
-        isOpen: true,
-        actionType: 'switch_active_model',
-        providerId: cfg.id,
-        providerName: cfg.name,
-        targetModel: modelToActivate,
-        currentActiveModel,
-        currentActiveProvider,
-      });
-      return;
-    }
+    // Exclusively enable this provider and disable others
+    providerConfigs.forEach((p) => {
+      if (p.kind === 'cloud') {
+        const isTarget = p.id === cfg.id;
+        updateProviderConfig(p.id, {
+          enabled: isTarget,
+          ...(isTarget ? { defaultModel: modelToActivate } : {}),
+        });
+      }
+    });
 
-    updateProviderConfig(cfg.id, { enabled: true, defaultModel: modelToActivate });
-    useAppStore.getState().setSelectedModel(modelToActivate);
-    useAppStore.getState().updateSetting('defaultModel', modelToActivate);
+    store.setSelectedModel(modelToActivate);
+    store.setDefaultProvider(cfg.id);
+    store.updateSetting('defaultModel', modelToActivate);
+    store.updateSetting('defaultProvider', cfg.id);
   };
 
   const handleValidateProvider = async (cfg: ProviderConfig) => {
@@ -111,19 +116,36 @@ export const CloudSettings: React.FC<CloudSettingsProps> = ({
     setValidatingId(null);
 
     if (result.connected) {
-      const activeModel = (cfg.defaultModel && result.models.includes(cfg.defaultModel))
-        ? cfg.defaultModel
-        : (result.models.length > 0 ? result.models[0] : cfg.defaultModel || 'gpt-5.6-sol');
+      let activeModel = cfg.defaultModel;
+      if (!activeModel || !result.models.includes(activeModel)) {
+        activeModel =
+          result.models.find((m) => m.toLowerCase().includes('nemotron')) ||
+          (result.models.length > 0 ? result.models[0] : cfg.defaultModel || 'nvidia/nemotron-3-super-120b-a12b');
+      }
 
-      updateProviderConfig(cfg.id, {
-        apiKeySet: true,
-        enabled: true,
-        discoveredModels: result.models,
-        capabilities: result.capabilities,
-        defaultModel: activeModel,
+      // Exclusively enable verified provider
+      providerConfigs.forEach((p) => {
+        if (p.kind === 'cloud') {
+          const isTarget = p.id === cfg.id;
+          updateProviderConfig(p.id, {
+            enabled: isTarget,
+            ...(isTarget
+              ? {
+                  apiKeySet: true,
+                  discoveredModels: result.models,
+                  capabilities: result.capabilities,
+                  defaultModel: activeModel,
+                }
+              : {}),
+          });
+        }
       });
-      useAppStore.getState().setSelectedModel(activeModel);
-      useAppStore.getState().updateSetting('defaultModel', activeModel);
+
+      const store = useAppStore.getState();
+      store.setSelectedModel(activeModel);
+      store.setDefaultProvider(cfg.id);
+      store.updateSetting('defaultModel', activeModel);
+      store.updateSetting('defaultProvider', cfg.id);
 
       setValidationResult((prev) => ({
         ...prev,
@@ -155,7 +177,7 @@ export const CloudSettings: React.FC<CloudSettingsProps> = ({
   };
 
   const regItem = PROVIDER_REGISTRY[activeProviderConfig?.id || ''];
-  const currentModelsList =
+  const rawModelsList =
     activeProviderConfig?.id === 'opencode'
       ? OPENCODE_ZEN_CATALOG
       : activeProviderConfig?.id === 'gemini'
@@ -170,6 +192,28 @@ export const CloudSettings: React.FC<CloudSettingsProps> = ({
       : activeProviderConfig?.discoveredModels && activeProviderConfig.discoveredModels.length > 0
       ? activeProviderConfig.discoveredModels
       : regItem?.supportedModels || [activeProviderConfig?.defaultModel || 'gemini-2.5-flash'];
+
+  const currentModelsList = React.useMemo(() => {
+    if (activeProviderConfig?.id === 'nvidia') {
+      const guaranteedNemotron = [
+        'nvidia/nemotron-3-super-120b-a12b',
+        'nvidia/llama-3.1-nemotron-70b-instruct',
+        'nvidia/nemotron-4-340b-instruct',
+        'nvidia/nemotron-mini-4b-instruct',
+        'nvidia/nemotron-3-ultra-550b-a55b',
+        'nvidia/nemotron-3-nano-30b-a3b',
+      ];
+      const merged = Array.from(new Set([...guaranteedNemotron, ...rawModelsList]));
+      return merged.sort((a, b) => {
+        const aIsNemotron = a.toLowerCase().includes('nemotron') || a.toLowerCase().startsWith('nvidia/');
+        const bIsNemotron = b.toLowerCase().includes('nemotron') || b.toLowerCase().startsWith('nvidia/');
+        if (aIsNemotron && !bIsNemotron) return -1;
+        if (!aIsNemotron && bIsNemotron) return 1;
+        return a.localeCompare(b);
+      });
+    }
+    return rawModelsList;
+  }, [rawModelsList, activeProviderConfig?.id]);
 
   const isActiveCurrent = isProviderActive(activeProviderConfig);
   const hasKeyCurrent = activeProviderConfig?.apiKeySet || Boolean(activeProviderConfig?.apiKey && activeProviderConfig.apiKey.trim().length > 0);
@@ -209,21 +253,21 @@ export const CloudSettings: React.FC<CloudSettingsProps> = ({
                   key={p.id}
                   type="button"
                   onClick={() => setActiveProviderId(p.id)}
-                  className={`px-3.5 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap transition flex items-center gap-1.5 cursor-pointer ${
+                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition flex items-center gap-1.5 cursor-pointer ${
                     activeProviderId === p.id
-                      ? 'bg-blue-600 text-white font-bold shadow-xs'
+                      ? 'bg-zinc-950 text-white dark:bg-white dark:text-zinc-950 font-bold shadow-2xs'
                       : isActive
-                      ? 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30'
+                      ? 'bg-zinc-200 dark:bg-zinc-800 text-zinc-950 dark:text-white border border-zinc-300 dark:border-zinc-700'
                       : isConfigured
-                      ? 'bg-blue-500/10 text-blue-700 dark:text-blue-300 border border-blue-500/30 hover:bg-blue-500/20'
-                      : 'bg-zinc-100 dark:bg-zinc-900 text-zinc-700 dark:text-zinc-400 border border-zinc-200 dark:border-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-850 hover:text-zinc-900 dark:hover:text-zinc-200'
+                      ? 'bg-zinc-100 dark:bg-zinc-850 text-zinc-900 dark:text-zinc-100 border border-zinc-200 dark:border-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-800'
+                      : 'bg-transparent text-zinc-600 dark:text-zinc-400 border border-zinc-200 dark:border-zinc-800 hover:bg-zinc-100 dark:hover:bg-zinc-850 hover:text-zinc-900 dark:hover:text-zinc-100'
                   }`}
                 >
                   {p.name}
                   {isActive ? (
-                    <span className="w-2 h-2 rounded-full bg-emerald-500 ring-2 ring-emerald-500/40 inline-block animate-pulse" title="Active Connected Model" />
+                    <span className="w-1.5 h-1.5 rounded-full bg-zinc-950 dark:bg-white inline-block" title="Active Connected Model" />
                   ) : isConfigured ? (
-                    <span className="w-1.5 h-1.5 rounded-full bg-blue-500 inline-block" title="Key Configured" />
+                    <span className="w-1.5 h-1.5 rounded-full bg-zinc-400 dark:text-zinc-500 inline-block" title="Key Configured" />
                   ) : null}
                 </button>
               );
@@ -233,35 +277,35 @@ export const CloudSettings: React.FC<CloudSettingsProps> = ({
 
         {/* Unified Configuration Card */}
         {activeProviderConfig && (
-          <div className="p-5 rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-zinc-50/60 dark:bg-zinc-900/60 space-y-4">
+          <div className="p-5 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-zinc-50/50 dark:bg-[#151518] space-y-4">
             <div className="flex items-center justify-between border-b border-zinc-200 dark:border-zinc-800 pb-3">
               <div className="flex items-center gap-2">
                 <span className="font-bold text-sm text-zinc-950 dark:text-white">{activeProviderConfig.name}</span>
                 {detectedPatternBadge && (
-                  <span className="text-[10px] px-2.5 py-0.5 rounded-full bg-purple-500/10 border border-purple-500/30 text-purple-700 dark:text-purple-300 font-mono font-bold">
+                  <span className="text-[10px] px-2 py-0.5 rounded-md bg-zinc-100 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 text-zinc-800 dark:text-zinc-200 font-mono font-bold">
                     {detectedPatternBadge}
                   </span>
                 )}
                 {validationResult[activeProviderConfig.id] ? (
                   validationResult[activeProviderConfig.id].success ? (
-                    <span className="text-[10px] px-2.5 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-700 dark:text-emerald-400 font-mono font-bold flex items-center gap-1">
-                      <CheckCircle2 className="w-3 h-3 text-emerald-500" /> Connected & Active
+                    <span className="text-[10px] px-2 py-0.5 rounded-md bg-zinc-100 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 text-zinc-900 dark:text-white font-mono font-bold flex items-center gap-1">
+                      <CheckCircle2 className="w-3 h-3 text-zinc-900 dark:text-white" /> Connected & Active
                     </span>
                   ) : (
-                    <span className="text-[10px] px-2.5 py-0.5 rounded-full bg-rose-500/10 border border-rose-500/30 text-rose-700 dark:text-rose-400 font-mono font-bold flex items-center gap-1">
+                    <span className="text-[10px] px-2 py-0.5 rounded-md bg-rose-500/10 border border-rose-500/30 text-rose-700 dark:text-rose-400 font-mono font-bold flex items-center gap-1">
                       <AlertCircle className="w-3 h-3 text-rose-500" /> Auth Failed
                     </span>
                   )
                 ) : isActiveCurrent ? (
-                  <span className="text-[10px] px-2.5 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-700 dark:text-emerald-400 font-mono font-bold flex items-center gap-1">
-                    <Zap className="w-3 h-3 text-emerald-500" /> Active Model Provider
+                  <span className="text-[10px] px-2 py-0.5 rounded-md bg-zinc-200 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 text-zinc-900 dark:text-white font-mono font-bold flex items-center gap-1">
+                    <Zap className="w-3 h-3 text-zinc-900 dark:text-white" /> Active Model Provider
                   </span>
                 ) : hasKeyCurrent ? (
-                  <span className="text-[10px] px-2.5 py-0.5 rounded-full bg-blue-500/10 border border-blue-500/30 text-blue-700 dark:text-blue-300 font-mono font-semibold flex items-center gap-1">
-                    <CheckCircle2 className="w-3 h-3 text-blue-500" /> Key Configured (Ready)
+                  <span className="text-[10px] px-2 py-0.5 rounded-md bg-zinc-100 dark:bg-zinc-850 border border-zinc-200 dark:border-zinc-800 text-zinc-800 dark:text-zinc-200 font-mono font-semibold flex items-center gap-1">
+                    <CheckCircle2 className="w-3 h-3 text-zinc-600 dark:text-zinc-400" /> Key Configured
                   </span>
                 ) : (
-                  <span className="text-[10px] px-2.5 py-0.5 rounded-full bg-zinc-200 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 text-zinc-600 dark:text-zinc-400 font-mono">
+                  <span className="text-[10px] px-2 py-0.5 rounded-md bg-zinc-100 dark:bg-zinc-850 border border-zinc-200 dark:border-zinc-800 text-zinc-500 font-mono">
                     Not Configured
                   </span>
                 )}
@@ -284,13 +328,15 @@ export const CloudSettings: React.FC<CloudSettingsProps> = ({
                   {activeProviderConfig.enabled ? 'Provider Enabled' : 'Provider Disabled'}
                 </span>
                 <div
-                  className={`relative inline-flex h-5 w-9 shrink-0 items-center rounded-full p-0.5 transition-colors duration-200 ease-in-out focus:outline-none ${
-                    activeProviderConfig.enabled ? 'bg-blue-600' : 'bg-zinc-300 dark:bg-zinc-700'
+                  className={`relative inline-flex h-4 w-8 shrink-0 items-center rounded-full p-0.5 transition-colors duration-150 ease-in-out focus:outline-none ${
+                    activeProviderConfig.enabled ? 'bg-zinc-950 dark:bg-white' : 'bg-zinc-300 dark:bg-zinc-700'
                   }`}
                 >
                   <span
-                    className={`inline-block h-4 w-4 transform rounded-full bg-white shadow-sm ring-0 transition duration-200 ease-in-out ${
-                      activeProviderConfig.enabled ? 'translate-x-4' : 'translate-x-0'
+                    className={`inline-block h-3 w-3 transform rounded-full transition duration-150 ease-in-out ${
+                      activeProviderConfig.enabled
+                        ? 'translate-x-4 bg-white dark:bg-zinc-950'
+                        : 'translate-x-0 bg-white dark:bg-zinc-400'
                     }`}
                   />
                 </div>
@@ -308,7 +354,7 @@ export const CloudSettings: React.FC<CloudSettingsProps> = ({
                   onChange={(e) =>
                     updateProviderConfig(activeProviderConfig.id, { baseUrl: e.target.value })
                   }
-                  className="w-full bg-white dark:bg-zinc-950 border border-zinc-300 dark:border-zinc-700 rounded-xl px-3 py-2 text-xs text-zinc-900 dark:text-white font-mono focus:outline-none focus:border-blue-500 transition"
+                  className="w-full bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 rounded-lg px-3 py-1.5 text-xs text-zinc-900 dark:text-white font-mono focus:outline-none focus:border-zinc-500 transition"
                 />
               </div>
             )}
@@ -322,7 +368,7 @@ export const CloudSettings: React.FC<CloudSettingsProps> = ({
                     href={(activeProviderConfig as any).apiKeyDocsUrl || '#'}
                     target="_blank"
                     rel="noreferrer"
-                    className="text-blue-600 dark:text-blue-400 hover:underline"
+                    className="text-zinc-900 dark:text-white underline hover:opacity-80"
                   >
                     Get Key
                   </a>
@@ -332,7 +378,7 @@ export const CloudSettings: React.FC<CloudSettingsProps> = ({
                   placeholder="Enter API key..."
                   value={activeProviderConfig.apiKey || ''}
                   onChange={(e) => handleApiKeyChange(activeProviderConfig.id, e.target.value)}
-                  className="w-full bg-white dark:bg-zinc-950 border border-zinc-300 dark:border-zinc-700 rounded-xl px-3 py-2 text-xs text-zinc-900 dark:text-white placeholder-zinc-400 font-mono focus:outline-none focus:border-blue-500 transition"
+                  className="w-full bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 rounded-lg px-3 py-1.5 text-xs text-zinc-900 dark:text-white placeholder-zinc-400 font-mono focus:outline-none focus:border-zinc-500 transition"
                 />
               </div>
 
@@ -342,7 +388,7 @@ export const CloudSettings: React.FC<CloudSettingsProps> = ({
                 <select
                   value={activeProviderConfig.defaultModel || currentModelsList[0]}
                   onChange={(e) => handleMakeActiveModel(activeProviderConfig, e.target.value)}
-                  className="w-full bg-white dark:bg-zinc-950 border border-zinc-300 dark:border-zinc-700 rounded-xl px-3 py-2 text-xs text-zinc-900 dark:text-white font-mono focus:outline-none focus:border-blue-500 transition"
+                  className="w-full bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 rounded-lg px-3 py-1.5 text-xs text-zinc-900 dark:text-white font-mono focus:outline-none focus:border-zinc-500 transition"
                 >
                   {currentModelsList.map((m) => (
                     <option key={m} value={m} className="bg-white dark:bg-zinc-900 text-zinc-900 dark:text-white">
@@ -359,7 +405,7 @@ export const CloudSettings: React.FC<CloudSettingsProps> = ({
                 type="button"
                 onClick={() => handleValidateProvider(activeProviderConfig)}
                 disabled={validatingId === activeProviderConfig.id}
-                className="px-4 py-2 bg-blue-600 dark:bg-blue-500 hover:bg-blue-700 dark:hover:bg-blue-600 disabled:opacity-50 text-white font-bold text-xs rounded-xl shadow-xs transition flex items-center gap-1.5 cursor-pointer"
+                className="px-3.5 py-1.5 bg-zinc-950 dark:bg-white hover:bg-zinc-800 dark:hover:bg-zinc-200 disabled:opacity-50 text-white dark:text-zinc-950 font-bold text-xs rounded-lg shadow-2xs transition flex items-center gap-1.5 cursor-pointer active:scale-98"
               >
                 <RefreshCw className={`w-3.5 h-3.5 ${validatingId === activeProviderConfig.id ? 'animate-spin' : ''}`} />
                 <span>{validatingId === activeProviderConfig.id ? 'Testing...' : 'Verify Credentials & Endpoint'}</span>
@@ -368,7 +414,7 @@ export const CloudSettings: React.FC<CloudSettingsProps> = ({
               <button
                 type="button"
                 onClick={() => handleSave(activeProviderConfig.id)}
-                className="px-4 py-2 bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 text-zinc-700 dark:text-zinc-200 border border-zinc-300 dark:border-zinc-700 font-semibold text-xs rounded-xl transition cursor-pointer"
+                className="px-3.5 py-1.5 bg-zinc-100 dark:bg-zinc-850 hover:bg-zinc-200 dark:hover:bg-zinc-800 text-zinc-800 dark:text-zinc-200 border border-zinc-200 dark:border-zinc-750 font-semibold text-xs rounded-lg transition cursor-pointer"
               >
                 {savedProviderId === activeProviderConfig.id ? 'Saved!' : 'Save Config'}
               </button>

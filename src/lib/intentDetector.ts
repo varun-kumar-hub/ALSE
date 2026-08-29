@@ -47,14 +47,20 @@ export function detectQueryIntent(prompt: string): QueryIntent {
     return 'mathematics';
   }
 
-  if (/\b(debug|stack trace|traceback|exception|runtime error|compile error|failing test|why.*error|fix.*bug)\b/.test(text) || hasCodeBlock) {
+  if (
+    /\b(debug|stack trace|traceback|exception|runtime error|compile error|failing test|why.*error|fix.*bug)\b/.test(text) ||
+    hasCodeBlock ||
+    /^(def |class |import |const |let |function |fn |pub |public |struct |void )/m.test(prompt)
+  ) {
     return 'debugging';
   }
 
   const explicitCodingPatterns = [
-    /\b(write|generate|create|build|implement|refactor|modify|update)\b.*\b(code|function|script|component|class|method|api|endpoint|query|regex|program|app)\b/,
-    /\b(write|generate|create|build|implement)\b.*\b(python|javascript|typescript|react|rust|sql|html|css|java|go|c\+\+|c#)\b/,
+    /\b(write|generate|create|build|implement|refactor|modify|update|optimize|show|give)\b.*\b(code|algorithm|function|script|component|class|method|api|endpoint|query|regex|program|app|implementation)\b/,
+    /\b(write|generate|create|build|implement|show|give|in)\b.*\b(python|javascript|typescript|react|rust|sql|html|css|java|go|golang|c\+\+|c#|cpp|c|kotlin|swift|cuda)\b/,
     /\b(create|build)\b.*\b(react component|api|endpoint|cli|web app|tauri app)\b/,
+    /\b(linear search|binary search|bfs|dfs|quicksort|mergesort|dijkstra|dynamic programming|backpropagation|concurrency|multithreading|simd)\b/,
+    /\b(optimized code|optimize code|code for|pseudocode for|full code|code snippet)\b/,
   ];
   if (explicitCodingPatterns.some((pattern) => pattern.test(text))) {
     return 'coding';

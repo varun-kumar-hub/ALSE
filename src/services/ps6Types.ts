@@ -99,12 +99,14 @@ export interface StoryDecisionPoint {
   id: number;
   title: string;
   scenario: string;
+  explanation?: string;
   options: {
     id: string;
     text: string;
     is_correct: boolean;
     concept_id: string;
     misconception_flag?: string;
+    explanation?: string;
     next_point_id?: number;
   }[];
 }

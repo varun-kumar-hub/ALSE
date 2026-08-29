@@ -1,28 +1,34 @@
 import React from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+import remarkMath from 'remark-math';
+import rehypeKatex from 'rehype-katex';
 import rehypeHighlight from 'rehype-highlight';
 import {
   User,
   Bot,
   Copy,
   Check,
+  Edit2,
   BookOpen,
   AlertCircle,
   Lightbulb,
   AlertTriangle,
   Award,
+  Zap,
 } from 'lucide-react';
 import { ChatMessage as ChatMessageType } from '../../services/types';
 import { ResponseActions } from './ResponseActions';
 import { ThinkingCard } from './ThinkingCard';
 import { parseThinkingAndContent } from '../../lib/thoughtExtractor';
 import { cleanEducationalContent } from '../../lib/responseFilter';
+import { MermaidDiagram } from './MermaidDiagram';
 
 interface ChatMessageProps {
   message: ChatMessageType;
   onRegenerate?: () => void;
   onExport?: () => void;
+  onEditMessage?: (messageId: string, newContent: string) => void;
   isStreaming?: boolean;
 }
 
@@ -35,9 +41,49 @@ function extractNodeText(node: React.ReactNode): string {
   return '';
 }
 
+function preprocessLaTeX(content: string): string {
+  if (!content) return '';
+  let processed = content;
+
+  // 1. Convert \[ ... \] to $$ ... $$ for block math
+  processed = processed.replace(/\\\[([\s\S]*?)\\\]/g, (_match, eq) => `\n$$\n${eq.trim()}\n$$\n`);
+
+  // 2. Convert \( ... \) to $ ... $ for inline math
+  processed = processed.replace(/\\\(([\s\S]*?)\\\)/g, (_match, eq) => `$${eq.trim()}$`);
+
+  // 3. Convert standalone bracketed LaTeX expressions [ \frac... ] to $$ \frac... $$
+  processed = processed.replace(/(?:^|\n)\s*\[\s*(\\frac|\\partial|\\sum|\\prod|\\int|\\begin|\\matrix|\\nabla|\\cdot|\\alpha|\\beta|\\gamma|\\theta|\\sigma|\\omega|\\mathbf|\\mathcal|\\sqrt|\\hat|\\bar|\\Delta|\\lambda)([\s\S]*?)\]\s*(?=\n|$)/g, (_match, cmd, rest) => {
+    return `\n$$\n${cmd}${rest.trim()}\n$$\n`;
+  });
+
+  return processed;
+}
+
 const CodeBlock: React.FC<React.HTMLAttributes<HTMLPreElement>> = ({ children, ...props }) => {
   const [copied, setCopied] = React.useState(false);
   const code = extractNodeText(children);
+
+  // Check if this is a Mermaid scientific/system diagram
+  const isMermaid = React.useMemo(() => {
+    const trimmed = code.trim();
+    return (
+      trimmed.startsWith('graph ') ||
+      trimmed.startsWith('flowchart ') ||
+      trimmed.startsWith('sequenceDiagram') ||
+      trimmed.startsWith('classDiagram') ||
+      trimmed.startsWith('stateDiagram') ||
+      trimmed.startsWith('erDiagram') ||
+      trimmed.startsWith('pie') ||
+      trimmed.startsWith('gantt') ||
+      trimmed.startsWith('mindmap') ||
+      trimmed.startsWith('C4Context') ||
+      trimmed.startsWith('gitGraph')
+    );
+  }, [code]);
+
+  if (isMermaid) {
+    return <MermaidDiagram chart={code} />;
+  }
 
   const handleCopy = async () => {
     await navigator.clipboard.writeText(code);
@@ -165,12 +211,12 @@ const CustomTd: React.FC<React.TdHTMLAttributes<HTMLTableCellElement>> = ({ chil
 );
 
 const MarkdownContent: React.FC<{ content: string }> = ({ content }) => {
-  const cleaned = React.useMemo(() => cleanEducationalContent(content), [content]);
+  const cleaned = React.useMemo(() => preprocessLaTeX(cleanEducationalContent(content)), [content]);
 
   return (
     <ReactMarkdown
-      remarkPlugins={[remarkGfm]}
-      rehypePlugins={[rehypeHighlight]}
+      remarkPlugins={[remarkGfm, remarkMath]}
+      rehypePlugins={[rehypeHighlight, rehypeKatex]}
       components={{
         pre: CodeBlock,
         blockquote: CustomBlockquote,
@@ -196,9 +242,12 @@ export const ChatMessageComponent: React.FC<ChatMessageProps> = ({
   message,
   onRegenerate,
   onExport,
+  onEditMessage,
   isStreaming = false,
 }) => {
   const [copiedQuery, setCopiedQuery] = React.useState(false);
+  const [isEditing, setIsEditing] = React.useState(false);
+  const [editText, setEditText] = React.useState(message.content);
   const isUser = message.role === 'user';
 
   const parsed = React.useMemo(() => {
@@ -206,10 +255,23 @@ export const ChatMessageComponent: React.FC<ChatMessageProps> = ({
     return parseThinkingAndContent(message.content);
   }, [message.content, isUser]);
 
+  React.useEffect(() => {
+    setEditText(message.content);
+  }, [message.content]);
+
   const handleCopyQuery = async () => {
     await navigator.clipboard.writeText(message.content);
     setCopiedQuery(true);
     setTimeout(() => setCopiedQuery(false), 1600);
+  };
+
+  const handleSaveEdit = () => {
+    if (editText.trim() && editText.trim() !== message.content) {
+      if (onEditMessage && message.id) {
+        onEditMessage(message.id, editText.trim());
+      }
+    }
+    setIsEditing(false);
   };
 
   return (
@@ -219,18 +281,18 @@ export const ChatMessageComponent: React.FC<ChatMessageProps> = ({
       }`}
     >
       <div
-        className={`max-w-[92%] sm:max-w-[82%] flex gap-3 items-start p-4 rounded-2xl transition-all ${
+        className={`max-w-[92%] sm:max-w-[82%] flex gap-3 items-start p-4 rounded-xl transition-all ${
           isUser
-            ? 'bg-blue-600 text-white rounded-tr-xs shadow-xs font-sans'
-            : 'bg-white dark:bg-[#151922] text-zinc-900 dark:text-zinc-100 border border-zinc-200 dark:border-zinc-800/80 rounded-tl-xs shadow-2xs font-sans'
+            ? 'bg-blue-600 text-white dark:bg-blue-600 dark:text-white border border-blue-500/80 rounded-tr-xs shadow-xs font-sans'
+            : 'bg-white dark:bg-[#121215] text-zinc-900 dark:text-zinc-100 border border-zinc-200 dark:border-zinc-800 rounded-tl-xs shadow-2xs font-sans'
         }`}
       >
         {/* Avatar */}
         <div
           className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 border select-none ${
             isUser
-              ? 'bg-blue-500 border-blue-400 text-white'
-              : 'bg-blue-50 dark:bg-zinc-800 text-blue-600 dark:text-white border-blue-100 dark:border-zinc-700 font-bold'
+              ? 'bg-blue-700 border-blue-400 text-white font-bold'
+              : 'bg-zinc-100 dark:bg-zinc-850 text-zinc-900 dark:text-white border-zinc-200 dark:border-zinc-800 font-bold'
           }`}
         >
           {isUser ? <User className="w-3.5 h-3.5 text-white" /> : <Bot className="w-3.5 h-3.5" />}
@@ -242,21 +304,34 @@ export const ChatMessageComponent: React.FC<ChatMessageProps> = ({
           <div className="flex items-center justify-between select-none pb-0.5">
             <span
               className={`text-xs font-bold ${
-                isUser ? 'text-blue-50' : 'text-zinc-950 dark:text-white'
+                isUser ? 'text-blue-100' : 'text-zinc-950 dark:text-white'
               }`}
             >
               {isUser ? 'You' : 'LearnForge Agent'}
             </span>
             {isUser ? (
-              <button
-                type="button"
-                onClick={handleCopyQuery}
-                className="opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1 text-[10px] font-mono text-blue-100 hover:text-white bg-blue-700/60 px-2 py-0.5 rounded-lg cursor-pointer"
-                title="Copy query text"
-              >
-                {copiedQuery ? <Check className="w-3 h-3 text-emerald-300" /> : <Copy className="w-3 h-3 text-blue-200" />}
-                <span>{copiedQuery ? 'Copied' : 'Copy'}</span>
-              </button>
+              <div className="opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1.5">
+                {onEditMessage && !isEditing && (
+                  <button
+                    type="button"
+                    onClick={() => setIsEditing(true)}
+                    className="flex items-center gap-1 text-[10px] font-mono text-blue-100 hover:text-white bg-blue-700/80 hover:bg-blue-700 px-2 py-0.5 rounded-md cursor-pointer transition"
+                    title="Edit and re-send question"
+                  >
+                    <Edit2 className="w-3 h-3 text-blue-200" />
+                    <span>Edit</span>
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={handleCopyQuery}
+                  className="flex items-center gap-1 text-[10px] font-mono text-blue-100 hover:text-white bg-blue-700/80 hover:bg-blue-700 px-2 py-0.5 rounded-md cursor-pointer transition"
+                  title="Copy question text"
+                >
+                  {copiedQuery ? <Check className="w-3 h-3 text-emerald-300" /> : <Copy className="w-3 h-3 text-blue-200" />}
+                  <span>{copiedQuery ? 'Copied' : 'Copy'}</span>
+                </button>
+              </div>
             ) : (
               <ResponseActions
                 content={parsed.content || message.content}
@@ -268,9 +343,49 @@ export const ChatMessageComponent: React.FC<ChatMessageProps> = ({
 
           {/* User Message */}
           {isUser ? (
-            <p className="text-[14px] text-white whitespace-pre-wrap leading-relaxed select-text font-sans font-medium">
-              {message.content}
-            </p>
+            isEditing ? (
+              <div className="space-y-2 pt-1">
+                <textarea
+                  value={editText}
+                  onChange={(e) => setEditText(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
+                      e.preventDefault();
+                      handleSaveEdit();
+                    }
+                  }}
+                  className="w-full p-2.5 rounded-lg bg-blue-700/90 border border-blue-400 text-white outline-none text-[13px] font-sans resize-none placeholder-blue-200"
+                  rows={Math.min(6, Math.max(2, editText.split('\n').length))}
+                  autoFocus
+                />
+                <div className="flex items-center justify-between text-xs pt-0.5">
+                  <span className="text-[10px] font-mono text-blue-200">Ctrl+Enter to submit</span>
+                  <div className="flex items-center gap-1.5">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setEditText(message.content);
+                        setIsEditing(false);
+                      }}
+                      className="px-2.5 py-1 rounded bg-blue-700/60 hover:bg-blue-700 text-white text-xs font-medium cursor-pointer transition"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleSaveEdit}
+                      className="px-3 py-1 rounded bg-white text-blue-700 hover:bg-blue-50 text-xs font-bold shadow-xs cursor-pointer transition active:scale-95"
+                    >
+                      Save & Submit
+                    </button>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <p className="text-[14px] text-white whitespace-pre-wrap leading-relaxed select-text font-sans font-normal">
+                {message.content}
+              </p>
+            )
           ) : (
             /* Assistant Message */
             <div className="space-y-3 select-text text-[14px] text-zinc-900 dark:text-zinc-100 leading-relaxed font-sans">
@@ -282,6 +397,14 @@ export const ChatMessageComponent: React.FC<ChatMessageProps> = ({
                 />
               ) : null}
               {parsed.content ? <MarkdownContent content={parsed.content} /> : null}
+              {!isStreaming && parsed.content && (
+                <div className="pt-2 flex items-center">
+                  <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-lg bg-zinc-100 dark:bg-zinc-850 border border-zinc-200 dark:border-zinc-800 text-zinc-800 dark:text-zinc-200 font-mono text-[11px] font-bold select-none shadow-2xs">
+                    <Zap className="w-3 h-3 text-zinc-500 fill-zinc-500" />
+                    <span>~{Math.max(1, Math.ceil(parsed.content.length / 3.8))} tokens</span>
+                  </span>
+                </div>
+              )}
               {isStreaming && parsed.isThinkingActive && !parsed.content && (
                 <div className="flex items-center gap-2 text-xs text-zinc-500 dark:text-zinc-400 py-1 font-mono">
                   <span className="inline-block w-2 h-2 rounded-full bg-blue-500 animate-pulse" />
@@ -303,6 +426,7 @@ export const ChatMessage = React.memo(ChatMessageComponent, (prev, next) => {
     prev.message.content === next.message.content &&
     prev.isStreaming === next.isStreaming &&
     prev.onRegenerate === next.onRegenerate &&
-    prev.onExport === next.onExport
+    prev.onExport === next.onExport &&
+    prev.onEditMessage === next.onEditMessage
   );
 });

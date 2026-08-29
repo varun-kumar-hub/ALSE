@@ -9,6 +9,7 @@ import {
   RefreshCw,
   Clock,
   Sparkles,
+  HelpCircle,
 } from 'lucide-react';
 import {
   AssessmentQuestion,
@@ -42,7 +43,7 @@ export const AssessmentModal: React.FC<AssessmentModalProps> = ({
 
   useEffect(() => {
     if (isOpen) {
-      const generated = generateAdaptiveAssessment(topicTitle, extractedConcepts);
+      const generated = generateAdaptiveAssessment(topicTitle, extractedConcepts, 8);
       setQuestions(generated);
       setCurrentIndex(0);
       setSelectedAnswers({});
@@ -50,7 +51,7 @@ export const AssessmentModal: React.FC<AssessmentModalProps> = ({
       setResults(null);
       setQuestionStartTime(Date.now());
     }
-  }, [isOpen, topicTitle]);
+  }, [isOpen, topicTitle, extractedConcepts.join('|')]);
 
   if (!isOpen) return null;
 
@@ -203,48 +204,95 @@ export const AssessmentModal: React.FC<AssessmentModalProps> = ({
                 </p>
               </div>
 
-              {/* Concept Mastery Breakdown */}
+              {/* Concept Mastery & Question Review Breakdown */}
               <div className="space-y-3">
                 <span className="text-xs font-mono font-bold text-zinc-500 uppercase tracking-wider block">
-                  Concept Mastery Adjustments
+                  Question Review & Concept Adjustments
                 </span>
                 <div className="space-y-2">
-                  {Object.entries(results.conceptBreakdown).map(([cId, item]) => (
-                    <div
-                      key={cId}
-                      className="p-3 rounded-xl bg-zinc-50 dark:bg-zinc-900/60 border border-zinc-200 dark:border-zinc-800 flex items-center justify-between text-xs font-mono"
-                    >
-                      <div className="flex items-center gap-2">
-                        {item.correct ? (
-                          <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0" />
-                        ) : (
-                          <XCircle className="w-4 h-4 text-rose-500 shrink-0" />
-                        )}
-                        <span className="font-semibold text-zinc-900 dark:text-zinc-200">{item.concept_name}</span>
-                      </div>
-                      <span
-                        className={`font-bold ${
-                          item.masteryChange >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-500'
-                        }`}
+                  {questions.map((q, qIdx) => {
+                    const chosenIdx = selectedAnswers[q.id];
+                    const isCorrect = chosenIdx === q.correct_index;
+                    const chosenOptText = chosenIdx !== undefined ? q.options[chosenIdx] : 'Unanswered';
+                    const correctOptText = q.options[q.correct_index];
+
+                    return (
+                      <div
+                        key={q.id}
+                        className="p-3.5 rounded-xl bg-zinc-50 dark:bg-zinc-900/60 border border-zinc-200 dark:border-zinc-800 space-y-2.5 text-xs font-sans"
                       >
-                        {item.masteryChange >= 0 ? `+${(item.masteryChange * 100).toFixed(0)}%` : `${(item.masteryChange * 100).toFixed(0)}%`}
-                      </span>
-                    </div>
-                  ))}
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="flex items-start gap-2.5">
+                            {isCorrect ? (
+                              <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0 mt-0.5" />
+                            ) : (
+                              <XCircle className="w-4 h-4 text-rose-500 shrink-0 mt-0.5" />
+                            )}
+                            <div>
+                              <p className="font-semibold text-zinc-900 dark:text-zinc-100">
+                                Q{qIdx + 1}. {q.question}
+                              </p>
+                              <p className="text-[11px] text-zinc-500 font-mono mt-0.5">
+                                Concept: {q.concept_name}
+                              </p>
+                            </div>
+                          </div>
+
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const prompt = `I have a doubt on Question ${qIdx + 1} from my assessment on "${topicTitle}":\n\n**Question**: ${q.question}\n- **My Answer**: ${chosenOptText}\n- **Correct Answer**: ${correctOptText}\n- **Explanation**: ${q.explanation}\n\nCan you break down why the correct answer is right, explain the core mechanism step-by-step, and clarify why my choice was a pitfall?`;
+                              onStartRemediationChat(prompt);
+                              onClose();
+                            }}
+                            className="px-2.5 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-[10px] font-bold font-mono transition cursor-pointer shrink-0 shadow-2xs flex items-center gap-1"
+                            title="Open a new chat in this subject to explain this question"
+                          >
+                            <HelpCircle className="w-3 h-3" />
+                            <span>Explain in Subject Chat</span>
+                          </button>
+                        </div>
+
+                        {!isCorrect && (
+                          <div className="pl-6 space-y-1 text-[11px] font-mono text-zinc-600 dark:text-zinc-400">
+                            <p className="text-rose-600 dark:text-rose-400">
+                              Your answer: <span className="line-through">{chosenOptText}</span>
+                            </p>
+                            <p className="text-emerald-600 dark:text-emerald-400">
+                              Correct answer: {correctOptText}
+                            </p>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
 
               {/* Detected Misconceptions */}
               {results.detectedMisconceptions.length > 0 && (
-                <div className="p-4 rounded-2xl bg-amber-500/10 border border-amber-500/30 space-y-2">
+                <div className="p-4 rounded-xl bg-amber-500/10 border border-amber-500/30 space-y-2">
                   <div className="flex items-center gap-2 text-amber-600 dark:text-amber-400 font-bold text-xs font-mono">
                     <AlertTriangle className="w-4 h-4" />
                     <span>Identified Misconception Flags</span>
                   </div>
                   {results.detectedMisconceptions.map((m, idx) => (
-                    <p key={idx} className="text-xs text-amber-900 dark:text-amber-200 pl-6 leading-relaxed">
-                      • {m}
-                    </p>
+                    <div key={idx} className="flex items-center justify-between gap-3 pl-6">
+                      <p className="text-xs text-amber-900 dark:text-amber-200 leading-relaxed font-mono">
+                        • {m}
+                      </p>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const prompt = `During my assessment on "${topicTitle}", I encountered this misconception: "${m}". Can you provide a clear conceptual breakdown and an intuitive counter-example to resolve this misconception?`;
+                          onStartRemediationChat(prompt);
+                          onClose();
+                        }}
+                        className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-amber-500/20 text-amber-900 dark:text-amber-200 hover:bg-amber-500/30 transition cursor-pointer shrink-0"
+                      >
+                        Explain Misconception
+                      </button>
+                    </div>
                   ))}
                 </div>
               )}

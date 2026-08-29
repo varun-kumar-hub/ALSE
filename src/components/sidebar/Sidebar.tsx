@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import {
   MessageSquare,
-  Brain,
   Network,
   Compass,
   Zap,
@@ -27,10 +26,13 @@ import {
   Moon,
   ArrowRight,
   Award,
+  Globe,
 } from 'lucide-react';
 import { Chat } from '../../services/types';
 import { ProjectItem, moveChatToProject, moveChatToGroup, toggleChatReadStatus } from '../../services/database';
+import { getUserProfile } from '../../services/userService';
 import { useAppStore } from '../../stores/appStore';
+import { LearnForgeLogo } from '../ui/LearnForgeLogo';
 
 interface SidebarProps {
   chats: Chat[];
@@ -48,6 +50,7 @@ interface SidebarProps {
   onDeleteChat: (id: string) => void;
   onDeleteProject: (id: string) => void;
   onOpenSettings: () => void;
+  onOpenProfile?: () => void;
   onRefreshData?: () => void;
   isOpen?: boolean;
   onClose?: () => void;
@@ -71,6 +74,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onDeleteChat,
   onDeleteProject,
   onOpenSettings,
+  onOpenProfile,
   onRefreshData,
   isOpen = true,
   onClose,
@@ -78,16 +82,49 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onTogglePinSidebar,
 }) => {
   const { theme, setTheme } = useAppStore();
+  const userProfile = getUserProfile();
   const [isGeneralExpanded, setIsGeneralExpanded] = useState(true);
   const [isProjectsExpanded, setIsProjectsExpanded] = useState(true);
   const [isToolsExpanded, setIsToolsExpanded] = useState(true);
   const [expandedSubjectIds, setExpandedSubjectIds] = useState<Record<string, boolean>>({});
+
+  // Resizable sidebar width
+  const [sidebarWidth, setSidebarWidth] = useState<number>(() => {
+    const saved = localStorage.getItem('learnforge_sidebar_width');
+    return saved ? Math.max(220, Math.min(650, parseInt(saved, 10))) : 270;
+  });
+  const [_isResizing, setIsResizing] = useState(false);
 
   const [editingChatId, setEditingChatId] = useState<string | null>(null);
   const [editingTitle, setEditingTitle] = useState('');
   const [activeMenuChatId, setActiveMenuChatId] = useState<string | null>(null);
   const [activeSubmenu, setActiveSubmenu] = useState<'project' | 'group' | null>(null);
   const [sidebarSearch, setSidebarSearch] = useState('');
+  const [isHovered, setIsHovered] = useState(false);
+
+  const isExpanded = isPinned || isHovered;
+
+  const handleResizeMouseDown = (e: React.MouseEvent) => {
+    e.preventDefault();
+    setIsResizing(true);
+    const startX = e.clientX;
+    const startWidth = sidebarWidth;
+
+    const handleMouseMove = (moveEvent: MouseEvent) => {
+      const newWidth = Math.max(220, Math.min(650, startWidth + (moveEvent.clientX - startX)));
+      setSidebarWidth(newWidth);
+      localStorage.setItem('learnforge_sidebar_width', String(newWidth));
+    };
+
+    const handleMouseUp = () => {
+      setIsResizing(false);
+      window.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('mouseup', handleMouseUp);
+    };
+
+    window.addEventListener('mousemove', handleMouseMove);
+    window.addEventListener('mouseup', handleMouseUp);
+  };
 
   const activeProject = projects.find((p) => p.id === activeProjectId);
 
@@ -116,28 +153,66 @@ export const Sidebar: React.FC<SidebarProps> = ({
     return () => window.removeEventListener('click', handleGlobalClick);
   }, []);
 
-  const handleStartRename = (c: Chat) => {
-    setEditingChatId(c.id);
-    setEditingTitle(c.title);
+  // Keyboard shortcuts P, U, R, D when context menu is active
+  useEffect(() => {
+    if (!activeMenuChatId) return;
+    const activeChatObj = chats.find((c) => c.id === activeMenuChatId);
+    if (!activeChatObj) return;
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (document.activeElement?.tagName === 'INPUT' || document.activeElement?.tagName === 'TEXTAREA') return;
+
+      const key = e.key.toLowerCase();
+      if (key === 'p') {
+        e.preventDefault();
+        onTogglePin(activeChatObj.id, activeChatObj.pinned);
+        setActiveMenuChatId(null);
+      } else if (key === 'u') {
+        e.preventDefault();
+        handleToggleRead(activeChatObj.id, activeChatObj.is_read);
+      } else if (key === 'r') {
+        e.preventDefault();
+        handleStartRename(activeChatObj);
+      } else if (key === 'd') {
+        e.preventDefault();
+        if (confirm(`Delete chat "${activeChatObj.title}"?`)) {
+          onDeleteChat(activeChatObj.id);
+          setActiveMenuChatId(null);
+        }
+      } else if (key === 'escape') {
+        setActiveMenuChatId(null);
+        setActiveSubmenu(null);
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [activeMenuChatId, chats]);
+
+  const handleStartRename = (chat: Chat) => {
+    setEditingChatId(chat.id);
+    setEditingTitle(chat.title);
     setActiveMenuChatId(null);
   };
 
-  const handleFinishRename = (id: string) => {
+  const handleFinishRename = (chatId: string) => {
     if (editingTitle.trim()) {
-      onRenameChat(id, editingTitle.trim());
+      onRenameChat(chatId, editingTitle.trim());
     }
     setEditingChatId(null);
   };
 
-  const handleMoveToProject = async (chatId: string, targetProjectId: string | null) => {
-    await moveChatToProject(chatId, targetProjectId);
+  const handleMoveToProject = async (chatId: string, projectId: string | null) => {
+    await moveChatToProject(chatId, projectId);
     setActiveMenuChatId(null);
+    setActiveSubmenu(null);
     if (onRefreshData) onRefreshData();
   };
 
   const handleMoveToGroup = async (chatId: string, groupName: string | null) => {
     await moveChatToGroup(chatId, groupName);
     setActiveMenuChatId(null);
+    setActiveSubmenu(null);
     if (onRefreshData) onRefreshData();
   };
 
@@ -163,8 +238,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
         }}
         className={`group relative flex items-center justify-between px-3 py-2 rounded-xl text-xs font-mono transition cursor-pointer select-none ${
           isActive
-            ? 'bg-zinc-800 dark:bg-zinc-850 text-white font-semibold border-l-2 border-blue-500 shadow-xs'
-            : 'text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-900 hover:text-zinc-900 dark:hover:text-zinc-100'
+            ? 'bg-blue-600 text-white font-bold shadow-xs border border-blue-500'
+            : 'text-zinc-700 dark:text-zinc-300 hover:bg-blue-50/60 dark:hover:bg-blue-950/30 hover:text-blue-600 dark:hover:text-blue-400'
         }`}
       >
         {isEditing ? (
@@ -376,12 +451,237 @@ export const Sidebar: React.FC<SidebarProps> = ({
       )}
 
       <aside
-        className={`h-screen w-64 bg-white dark:bg-[#101318] border-r border-zinc-200 dark:border-zinc-800/80 flex flex-col shrink-0 select-none z-50 font-sans text-zinc-900 dark:text-zinc-100 shadow-xs transition-all duration-200 ${
+        onMouseEnter={() => setIsHovered(true)}
+        onMouseLeave={() => setIsHovered(false)}
+        style={{ width: isExpanded ? `${sidebarWidth}px` : '56px' }}
+        className={`h-screen bg-white dark:bg-[#0f0f12] border-r border-zinc-200 dark:border-zinc-800 flex flex-col shrink-0 select-none z-50 font-sans text-zinc-900 dark:text-zinc-100 transition-[width] duration-75 relative ${
           isOpen ? 'fixed inset-y-0 left-0 md:static' : 'hidden md:flex'
         }`}
       >
+        {/* Draggable Resize Handle */}
+        {isExpanded && (
+          <div
+            onMouseDown={handleResizeMouseDown}
+            className="absolute top-0 right-0 w-1.5 h-full cursor-col-resize hover:bg-blue-500/50 active:bg-blue-600 transition-colors z-40"
+            title="Drag to resize sidebar"
+          />
+        )}
+        {!isExpanded ? (
+          /* Collapsed Mini Rail View */
+          <div className="flex flex-col items-center py-3 h-full justify-between overflow-hidden select-none">
+            {/* Top: Home, New Chat, Workspace & Subjects */}
+            <div className="flex flex-col items-center space-y-1.5 w-full px-2 shrink-0">
+              {/* Home */}
+              <button
+                type="button"
+                onClick={() => {
+                  onSelectProject(null);
+                  onSelectView('welcome');
+                }}
+                className="w-8 h-8 rounded-lg flex items-center justify-center cursor-pointer hover:opacity-85 transition shrink-0"
+                title="LearnForge Home"
+              >
+                <LearnForgeLogo size={24} />
+              </button>
+
+              {/* New Chat */}
+              <button
+                type="button"
+                onClick={onNewChat}
+                className="w-8 h-8 rounded-lg bg-zinc-950 text-white dark:bg-white dark:text-zinc-950 flex items-center justify-center hover:bg-zinc-800 dark:hover:bg-zinc-200 shadow-2xs cursor-pointer transition active:scale-95 shrink-0"
+                title="New Chat"
+              >
+                <Plus className="w-4 h-4" />
+              </button>
+
+              <div className="w-6 h-px bg-zinc-200 dark:border-zinc-800 my-1 shrink-0" />
+
+              {/* General Workspace Chat */}
+              <button
+                type="button"
+                onClick={() => {
+                  onSelectProject(null);
+                  onSelectView('chat');
+                }}
+                className={`w-8 h-8 rounded-lg flex items-center justify-center transition cursor-pointer shrink-0 ${
+                  activeView === 'chat' && !activeProjectId
+                    ? 'bg-zinc-950 text-white dark:bg-white dark:text-zinc-950 font-bold shadow-2xs'
+                    : 'text-zinc-500 hover:text-zinc-950 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-zinc-850'
+                }`}
+                title="General Chat"
+              >
+                <MessageSquare className="w-4 h-4" />
+              </button>
+
+              {/* Subjects Workspace */}
+              <button
+                type="button"
+                onClick={() => onSelectView('project_dashboard')}
+                className={`w-8 h-8 rounded-lg flex items-center justify-center transition cursor-pointer shrink-0 ${
+                  activeView === 'project_dashboard' || activeView === 'projects' || Boolean(activeProjectId)
+                    ? 'bg-zinc-950 text-white dark:bg-white dark:text-zinc-950 font-bold shadow-2xs'
+                    : 'text-zinc-500 hover:text-zinc-950 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-zinc-850'
+                }`}
+                title={`Subjects Workspace (${projects.length} subjects)`}
+              >
+                <BookOpen className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Middle / Down: Adaptive Tools Section (Order identical to expanded sidebar) */}
+            <div className="flex flex-col items-center space-y-1.5 w-full px-2 overflow-y-auto scrollbar-none my-auto py-2 border-t border-b border-zinc-200 dark:border-zinc-800">
+              {/* Adaptive Mastery Dashboard */}
+              <button
+                type="button"
+                onClick={() => onSelectView('dashboard')}
+                className={`w-8 h-8 rounded-lg flex items-center justify-center transition cursor-pointer shrink-0 ${
+                  activeView === 'dashboard'
+                    ? 'bg-zinc-950 text-white dark:bg-white dark:text-zinc-950 font-bold shadow-2xs'
+                    : 'text-zinc-500 hover:text-zinc-950 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-zinc-850'
+                }`}
+                title="Adaptive Mastery Dashboard"
+              >
+                <BarChart3 className="w-4 h-4" />
+              </button>
+
+              {/* Custom Topic Assessments */}
+              <button
+                type="button"
+                onClick={() => onSelectView('custom_assessment')}
+                className={`w-8 h-8 rounded-lg flex items-center justify-center transition cursor-pointer shrink-0 ${
+                  activeView === 'custom_assessment'
+                    ? 'bg-zinc-950 text-white dark:bg-white dark:text-zinc-950 font-bold shadow-2xs'
+                    : 'text-zinc-500 hover:text-zinc-950 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-zinc-850'
+                }`}
+                title="Assessments (Custom Topics)"
+              >
+                <Award className="w-4 h-4" />
+              </button>
+
+              {/* Knowledge Graph */}
+              <button
+                type="button"
+                onClick={() => onSelectView('knowledge')}
+                className={`w-8 h-8 rounded-lg flex items-center justify-center transition cursor-pointer shrink-0 ${
+                  activeView === 'knowledge'
+                    ? 'bg-zinc-950 text-white dark:bg-white dark:text-zinc-950 font-bold shadow-2xs'
+                    : 'text-zinc-500 hover:text-zinc-950 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-zinc-850'
+                }`}
+                title="Knowledge Graph"
+              >
+                <Network className="w-4 h-4" />
+              </button>
+
+              {/* Deep Research */}
+              <button
+                type="button"
+                onClick={() => onSelectView('research')}
+                className={`w-8 h-8 rounded-lg flex items-center justify-center transition cursor-pointer shrink-0 ${
+                  activeView === 'research'
+                    ? 'bg-zinc-950 text-white dark:bg-white dark:text-zinc-950 font-bold shadow-2xs'
+                    : 'text-zinc-500 hover:text-zinc-950 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-zinc-850'
+                }`}
+                title="Deep Research"
+              >
+                <Compass className="w-4 h-4" />
+              </button>
+
+              {/* Story Challenge */}
+              <button
+                type="button"
+                onClick={() => onSelectView('story_challenge')}
+                className={`w-8 h-8 rounded-lg flex items-center justify-center transition cursor-pointer shrink-0 ${
+                  activeView === 'story_challenge'
+                    ? 'bg-zinc-950 text-white dark:bg-white dark:text-zinc-950 font-bold shadow-2xs'
+                    : 'text-zinc-500 hover:text-zinc-950 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-zinc-850'
+                }`}
+                title="Story Challenge"
+              >
+                <Zap className="w-4 h-4" />
+              </button>
+
+              {/* Evaluation Lab */}
+              <button
+                type="button"
+                onClick={() => onSelectView('evaluation_lab')}
+                className={`w-8 h-8 rounded-lg flex items-center justify-center transition cursor-pointer shrink-0 ${
+                  activeView === 'evaluation_lab'
+                    ? 'bg-zinc-950 text-white dark:bg-white dark:text-zinc-950 font-bold shadow-2xs'
+                    : 'text-zinc-500 hover:text-zinc-950 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-zinc-850'
+                }`}
+                title="Evaluation Lab"
+              >
+                <FlaskConical className="w-4 h-4" />
+              </button>
+
+              {/* LLM-as-a-Judge */}
+              <button
+                type="button"
+                onClick={() => onSelectView('judge_control')}
+                className={`w-8 h-8 rounded-lg flex items-center justify-center transition cursor-pointer shrink-0 ${
+                  activeView === 'judge_control'
+                    ? 'bg-zinc-950 text-white dark:bg-white dark:text-zinc-950 font-bold shadow-2xs'
+                    : 'text-zinc-500 hover:text-zinc-950 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-zinc-850'
+                }`}
+                title="LLM-as-a-Judge Control"
+              >
+                <Eye className="w-4 h-4" />
+              </button>
+
+              {/* Community Hub */}
+              <button
+                type="button"
+                onClick={() => onSelectView('community')}
+                className={`w-8 h-8 rounded-lg flex items-center justify-center transition cursor-pointer shrink-0 ${
+                  activeView === 'community'
+                    ? 'bg-zinc-950 text-white dark:bg-white dark:text-zinc-950 font-bold shadow-2xs'
+                    : 'text-zinc-500 hover:text-zinc-950 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-zinc-850'
+                }`}
+                title="Community Hub"
+              >
+                <Globe className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Bottom Controls */}
+            <div className="flex flex-col items-center space-y-1.5 w-full px-2 pt-2 border-t border-zinc-200 dark:border-zinc-800 shrink-0">
+              {onTogglePinSidebar && (
+                <button
+                  type="button"
+                  onClick={onTogglePinSidebar}
+                  className="w-8 h-8 rounded-lg text-zinc-400 hover:text-zinc-900 dark:hover:text-white flex items-center justify-center hover:bg-zinc-100 dark:hover:bg-zinc-850 transition cursor-pointer shrink-0"
+                  title={isPinned ? 'Unpin Sidebar (Auto-collapse on mouse leave)' : 'Pin Sidebar (Keep Always Open)'}
+                >
+                  {isPinned ? <Pin className="w-4 h-4 text-zinc-900 dark:text-white" /> : <PinOff className="w-4 h-4" />}
+                </button>
+              )}
+
+              {onOpenProfile && (
+                <button
+                  type="button"
+                  onClick={onOpenProfile}
+                  className="w-8 h-8 rounded-lg text-zinc-600 dark:text-zinc-300 hover:text-zinc-950 dark:hover:text-white flex items-center justify-center hover:bg-zinc-100 dark:hover:bg-zinc-850 transition cursor-pointer shrink-0 text-sm"
+                  title={`Profile: ${userProfile.displayName} (${userProfile.userId})`}
+                >
+                  <span>{userProfile.avatarEmoji}</span>
+                </button>
+              )}
+
+              <button
+                type="button"
+                onClick={onOpenSettings}
+                className="w-8 h-8 rounded-lg text-zinc-400 hover:text-zinc-900 dark:hover:text-white flex items-center justify-center hover:bg-zinc-100 dark:hover:bg-zinc-850 transition cursor-pointer shrink-0"
+                title="Settings & Model Configuration"
+              >
+                <Settings className="w-4 h-4" />
+              </button>
+            </div>
+          </div>
+        ) : (
+          /* Full Expanded Sidebar View */
+          <>
         {/* Product Title Header */}
-        <div className="p-4 border-b border-zinc-200 dark:border-zinc-800/80 flex items-center justify-between">
+        <div className="p-4 border-b border-zinc-200 dark:border-zinc-800 flex items-center justify-between">
           <div>
             <button
               type="button"
@@ -389,52 +689,51 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 onSelectProject(null);
                 onSelectView('welcome');
               }}
-              className="text-base font-extrabold text-zinc-950 dark:text-white tracking-tight flex items-center gap-2 hover:opacity-80 transition cursor-pointer text-left"
+              className="text-sm font-bold text-zinc-950 dark:text-white tracking-tight flex items-center gap-2.5 hover:opacity-80 transition cursor-pointer text-left"
               title="Go to Welcome / Home"
             >
-              <span className="w-2.5 h-2.5 rounded-full bg-blue-500 inline-block shadow-xs"></span>
-              LearnForge
+              <LearnForgeLogo size={20} />
+              <span>LearnForge</span>
             </button>
             {activeProject ? (
               <button
                 type="button"
                 onClick={() => onSelectView('project_dashboard')}
-                className="group/subj inline-flex items-center gap-1 text-[10px] font-mono text-blue-600 dark:text-blue-400 hover:underline mt-0.5 cursor-pointer text-left"
+                className="group/subj inline-flex items-center gap-1 text-[11px] font-mono text-zinc-600 dark:text-zinc-300 hover:underline mt-0.5 cursor-pointer text-left font-medium"
                 title={`Open ${activeProject.name} Workspace`}
               >
                 <span>Subject: {activeProject.name}</span>
                 <ArrowRight className="w-2.5 h-2.5 opacity-0 group-hover/subj:opacity-100 transition" />
               </button>
             ) : (
-              <span className="text-[10px] text-zinc-500 dark:text-zinc-400 font-mono block mt-0.5">
+              <span className="text-[10px] text-zinc-400 dark:text-zinc-500 font-mono block mt-0.5">
                 General Workspace
               </span>
             )}
           </div>
 
           <div className="flex items-center gap-1">
+            <button
+              type="button"
+              onClick={onNewChat}
+              className="p-1.5 rounded-lg text-zinc-600 dark:text-zinc-300 hover:text-zinc-950 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-zinc-850 transition cursor-pointer"
+              title="Start New Chat"
+            >
+              <Plus className="w-4 h-4" />
+            </button>
+
             {onTogglePinSidebar && (
               <button
+                type="button"
                 onClick={onTogglePinSidebar}
-                className="p-1 rounded-lg text-zinc-400 hover:text-blue-500 transition cursor-pointer"
+                className="p-1.5 rounded-lg text-zinc-400 hover:text-zinc-950 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-zinc-850 transition cursor-pointer"
                 title={isPinned ? 'Unpin Sidebar (Collapsible)' : 'Pin Sidebar'}
               >
-                {isPinned ? <Pin className="w-3.5 h-3.5 text-blue-500" /> : <PinOff className="w-3.5 h-3.5 text-zinc-400" />}
+                {isPinned ? <Pin className="w-3.5 h-3.5 text-zinc-950 dark:text-white" /> : <PinOff className="w-3.5 h-3.5 text-zinc-400" />}
               </button>
             )}
           </div>
         </div>
-
-      {/* New Chat Primary Action Button */}
-      <div className="p-3 border-b border-zinc-200 dark:border-zinc-800/80">
-        <button
-          onClick={onNewChat}
-          className="w-full py-2.5 px-3 bg-blue-600 dark:bg-white text-white dark:text-zinc-950 font-bold rounded-xl hover:bg-blue-500 dark:hover:bg-zinc-200 transition text-xs flex items-center justify-center gap-2 shadow-sm cursor-pointer"
-        >
-          <Plus className="w-4 h-4" />
-          <span>{activeProject ? `New Chat in ${activeProject.name}` : 'New General Chat'}</span>
-        </button>
-      </div>
 
       {/* Quick Search Bar */}
       <div className="px-3 pt-3">
@@ -445,7 +744,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
             placeholder="Search chats & subjects..."
             value={sidebarSearch}
             onChange={(e) => setSidebarSearch(e.target.value)}
-            className="w-full bg-zinc-50 dark:bg-[#11151b] border border-zinc-200 dark:border-zinc-800/80 rounded-xl pl-8 pr-3 py-1.5 text-xs text-zinc-900 dark:text-white placeholder-zinc-400 focus:outline-none focus:border-blue-500 transition"
+            className="w-full bg-zinc-100/60 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-lg pl-8 pr-3 py-1.5 text-xs text-zinc-900 dark:text-white placeholder-zinc-400 focus:outline-none focus:border-zinc-400 dark:focus:border-zinc-600 transition font-sans"
           />
         </div>
       </div>
@@ -725,13 +1024,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 [
                   { id: 'dashboard', label: 'Adaptive Dashboard', icon: BarChart3 },
                   { id: 'custom_assessment', label: 'Assessments', icon: Award },
-                  { id: 'learn', label: 'Learn', icon: Brain },
-                  { id: 'knowledge', label: 'Knowledge', icon: Network },
-                  { id: 'research', label: 'Research', icon: Compass },
+                  { id: 'knowledge', label: 'Knowledge Graph', icon: Network },
+                  { id: 'research', label: 'Deep Research', icon: Compass },
                   { id: 'story_challenge', label: 'Story Challenge', icon: Zap },
-                  { id: 'analytics', label: 'Analytics', icon: BarChart3 },
                   { id: 'evaluation_lab', label: 'Evaluation Lab', icon: FlaskConical },
                   { id: 'judge_control', label: 'Judge Control', icon: Eye },
+                  { id: 'community', label: 'Community Hub', icon: Globe },
                 ] as const
               ).map((tool) => {
                 const ToolIcon = tool.icon;
@@ -756,24 +1054,40 @@ export const Sidebar: React.FC<SidebarProps> = ({
         </div>
       </div>
 
-      {/* Footer Settings & Theme Toggle */}
-      <div className="p-3 border-t border-zinc-200 dark:border-zinc-850 flex items-center justify-between gap-2">
+      {/* Footer Settings, Profile & Theme Toggle */}
+      <div className="p-3 border-t border-zinc-200 dark:border-zinc-850 flex items-center justify-between gap-1.5">
+        {onOpenProfile && (
+          <button
+            type="button"
+            onClick={onOpenProfile}
+            className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs font-semibold text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-900 transition cursor-pointer shrink-0"
+            title={`Open Profile & Peer ID: ${userProfile.userId}`}
+          >
+            <span className="text-sm">{userProfile.avatarEmoji}</span>
+            <span className="truncate max-w-[80px] text-[11px] font-mono font-bold text-zinc-950 dark:text-white">
+              {userProfile.userId.split('-')[1] || 'PROFILE'}
+            </span>
+          </button>
+        )}
+
         <button
           onClick={onOpenSettings}
-          className="flex-1 flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-medium text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-900 transition cursor-pointer"
+          className="flex-1 flex items-center gap-2 px-2 py-1.5 rounded-lg text-xs font-medium text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-900 transition cursor-pointer truncate"
         >
-          <Settings className="w-4 h-4 text-zinc-500 dark:text-zinc-400" />
-          <span>Settings</span>
+          <Settings className="w-4 h-4 text-zinc-500 dark:text-zinc-400 shrink-0" />
+          <span className="truncate">Settings</span>
         </button>
 
         <button
           onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
-          className="p-2 rounded-xl bg-zinc-100 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-zinc-700 dark:text-zinc-300 hover:text-blue-500 transition cursor-pointer"
+          className="p-1.5 rounded-lg bg-zinc-100 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-zinc-700 dark:text-zinc-300 hover:text-blue-500 transition cursor-pointer shrink-0"
           title={`Switch to ${theme === 'dark' ? 'Light' : 'Dark'} Theme`}
         >
           {theme === 'dark' ? <Sun className="w-4 h-4 text-amber-400" /> : <Moon className="w-4 h-4 text-blue-500" />}
         </button>
       </div>
+      </>
+      )}
     </aside>
   </>
 );

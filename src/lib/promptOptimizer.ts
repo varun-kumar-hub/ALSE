@@ -59,9 +59,6 @@ export function optimizePrompt(
   memoryEpisodes: string[] = []
 ): string {
   let formatGuidance = '';
-  const noExtraCodeRule = `
-Only answer the user's actual request. Do not add code, pseudocode, JSON, API examples, tutorials, or implementation suggestions unless the user explicitly asks for code or the intent is Coding/Debugging. Do not repeat facts or add speculative extra sections.`;
-
   switch (intent) {
     case 'biography':
       formatGuidance = `
@@ -76,23 +73,30 @@ Format your response with:
 
     case 'coding':
       formatGuidance = `
-Intent: Coding.
-Format your response with:
-1. Overview & Architecture
-2. Recommended Solution
-3. Code Implementation (clean syntax highlighting)
-4. Line-by-line Explanation
-5. Best Practices & Edge-case Pitfalls`;
+Intent: Software Engineering & Optimized Code Implementation.
+Formatting & Engineering Standards:
+1. Complete, Fully Optimized Code Implementation:
+   - Provide the 100% complete, runnable, production-grade code in the requested programming language (e.g. Python, C++, Rust, Java, TypeScript, Go, etc.).
+   - Never truncate, omit functions, or use placeholders (never write "// rest of code", "/* TODO */", or "...").
+   - Implement maximal asymptotic and micro-architectural optimizations (e.g. branch prediction friendliness, memory locality, vectorized/SIMD operations, zero-copy, early exits).
+2. Algorithmic Complexity Breakdown:
+   - Detail the exact Big-O Time Complexity (Best, Average, Worst) and Space Complexity with mathematical notation.
+3. Verification & Usage Examples:
+   - Include test cases or main execution driver validating normal cases, boundary values, and edge cases.
+4. Key Engineering Insights & Optimizations:
+   - Clearly explain why this implementation is optimal and what specific architectural techniques are used.`;
       break;
 
     case 'debugging':
       formatGuidance = `
-Intent: Debugging.
-Format your response with:
-1. Root Cause Analysis
-2. Minimal Fix Code
-3. Detailed Explanation
-4. Prevention Recommendations`;
+Intent: Code Optimization & Debugging.
+Formatting & Engineering Standards:
+1. Root Cause & Inefficiency Analysis:
+   - Identify performance bottlenecks, edge-case hazards, or runtime flaws in the code.
+2. Complete Fully Optimized Code:
+   - Provide the complete, drop-in replacement code with all fixes and optimizations applied.
+3. Performance & Correctness Comparison:
+   - Contrast the before vs. after complexities and behavior.`;
       break;
 
     case 'research':
@@ -251,42 +255,38 @@ Explain directly and comprehensively with clear structure, key algorithms, and c
       break;
   }
 
+  const codingAndImplementationRule = `
+Coding & Implementation Capabilities:
+- You are a master educator in computer science, software engineering, machine learning, and systems.
+- You have full capability to write code, pseudocode, algorithms, data structures, and complete working implementations in Python, TypeScript, C++, Rust, Java, Go, SQL, CUDA, PyTorch, and all standard frameworks.
+- Whenever explaining computing topics, algorithms, or technical mechanisms, provide clean, idiomatic, well-commented code snippets or pseudocode alongside theoretical explanations.`;
+
   const antiHallucinationRules = `
-Factual Accuracy & Educational Depth:
-- Combine your deep pre-trained knowledge with any provided reference context to deliver accurate, rich, and well-rounded explanations.
-- When asked for algorithms, mechanisms, or principles, provide the standard, well-established industry methods in detail.
-- Never output meta-deliberations or recite prompt constraints.`;
+Educational Delivery & Completeness:
+- Directly write the complete, full, rich educational explanation with all sections fully expanded.
+- NEVER output mere outlines, placeholder summaries, or plans of what you are going to say (e.g., never output "Definition: explain what it is...").
+- NEVER output system constraints, meta-monologues, or disclaimers like "I do not generate code" or "According to the protocol". Deliver the real content directly.
+- Combine your deep pre-trained knowledge with any provided reference context to deliver accurate, comprehensive, and well-structured teaching.`;
 
   const visualFormattingRules = `
-Educational Presentation Protocol:
-- For educational and concept queries, begin directly with the topic title and definition (e.g. # Supervised Learning, ## Definition).
-- For casual greetings, conversational inquiries, or brief questions, respond naturally, warmly, and directly without forced heading boilerplate.
-- Keep all internal planning strictly inside <think>...</think> tags. Never output meta-commentary (do NOT write "We need to answer...", "According to guidelines...", "Thus answer:").
-- Include Markdown comparison tables ONLY when contrasting multiple features, algorithms, or components where a table adds clarity.
-- Include flowcharts, diagrams, or code blocks ONLY when necessary and relevant.
+Educational Presentation Guidelines:
+- Begin directly with the topic title and definition (e.g. # Backpropagation in Deep Neural Networks, ## Definition).
+- For scientific diagrams, network architectures, flowcharts, circuits, state transitions, and biological/computing systems: ALWAYS include an interactive '\`\`\`mermaid ... \`\`\`' diagram to give the learner high-clarity visual intuition. In Mermaid node definitions, ALWAYS enclose node label text in double quotes (e.g. A["Source Code (.py)"] --> B["Compilation to Bytecode (.pyc)"] --> C["Python Virtual Machine (PVM)"]). Never place raw parentheses or special characters unquoted inside square brackets.
+- Include Markdown comparison tables when contrasting features, algorithms, or trade-offs.
 - Conclude educational explanations with a concise "## Key Takeaways" section.`;
-
-  const thinkingProcessRules = `
-Cognitive Planning & Educational Response Protocol:
-- If you formulate internal thoughts or a plan, keep it concise inside <think>...</think> tags.
-- Output the complete, structured, and learner-focused educational markdown response directly.`;
 
   const runtimeContext = buildRuntimeContextPrompt(contextOptions, memoryEpisodes);
 
-  const systemMessage = `You are ${assistantName}, an advanced AI educational tutor and adaptive learning assistant.
+  const systemMessage = `You are ${assistantName}, an elite AI educational tutor and adaptive learning guide.
 ${runtimeContext}
 
 ${retrievedContext ? `[RETRIEVED REFERENCE CONTEXT]\n${retrievedContext.trim()}\n` : ''}
-${thinkingProcessRules.trim()}
 ${formatGuidance.trim()}
 ${visualFormattingRules.trim()}
-${noExtraCodeRule.trim()}
+${codingAndImplementationRule.trim()}
 ${antiHallucinationRules.trim()}
 
-CRITICAL PEDAGOGICAL GUIDANCE:
-- Focus entirely on clear, conceptual explanations tailored to the learner.
-- Deliver structured, beautiful Markdown with definitions, examples, comparison tables, and key takeaways.
-- Never output meta-reasoning outside the <think> block.`;
+Deliver direct, comprehensive, and authoritative conceptual mastery with clear definitions, math, diagrams, and working code where relevant.`;
 
   return systemMessage;
 }

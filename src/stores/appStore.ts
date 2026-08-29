@@ -159,7 +159,8 @@ export const useAppStore = create<AppState>((set) => ({
     }
     set({ activeProjectId: id });
   },
-  setSelectedModel: (model) =>
+  setSelectedModel: (model) => {
+    localStorage.setItem('selected_model', model);
     set((state) => ({
       selectedModel: model,
       executionConfig: buildAuthoritativeExecutionConfig(
@@ -168,7 +169,8 @@ export const useAppStore = create<AppState>((set) => ({
         state.providerConfigs,
         state.isBackendReady
       ),
-    })),
+    }));
+  },
   setAssistantName: (name) => set({ assistantName: name }),
   setAiMode: (mode) =>
     set((state) => {
@@ -265,9 +267,10 @@ export const useAppStore = create<AppState>((set) => ({
       settings.providerConfigs.find((p) => p.id === 'opencode');
     const cloudDefaultModel = configuredCloudConfig?.defaultModel || 'gpt-5.6-sol';
 
-    const initialModel = isCloudMode
+    const storedModel = localStorage.getItem('selected_model');
+    const initialModel = storedModel || (isCloudMode
       ? settings.defaultModel || cloudDefaultModel
-      : settings.defaultModel || (availableModels.length > 0 ? availableModels[0].name : 'qwen3:8b');
+      : settings.defaultModel || (availableModels.length > 0 ? availableModels[0].name : 'qwen3:8b'));
 
     set({
       assistantName: settings.assistantName,

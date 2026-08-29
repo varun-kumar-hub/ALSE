@@ -25,7 +25,9 @@ const META_PATTERNS = [
   /^The search results (show|indicate|contain).+?\n/gim,
   /^Based on (the provided|my reasoning|the search results).+?\n/gim,
   /^Since the provided search results.+?\n/gim,
-  /^Let me (analyze|break down|explain|structure|think about).+?\n/gim,
+  /^Make sure not to add code.+?\n/gim,
+  /^Just text[.\n]/gim,
+  /^I do not:?\s*(?:Generate code.+?)?\n/gim,
   /\\think[\s\S]*?\\endthink/gi,
 ];
 

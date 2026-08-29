@@ -133,8 +133,20 @@ export const ThinkingCard: React.FC<ThinkingCardProps> = ({
           )}
 
           {thinking && (
-            <div className="pt-2 text-xs text-zinc-600 dark:text-zinc-400 font-sans leading-relaxed whitespace-pre-wrap select-text border-t border-zinc-100 dark:border-zinc-800 mt-2">
-              {thinking}
+            <div className="mt-3 p-3.5 rounded-xl bg-zinc-50/80 dark:bg-[#13161c] border border-zinc-200 dark:border-zinc-800/90 space-y-2 select-text shadow-2xs">
+              <div className="flex items-center gap-2">
+                <span className="w-2 h-2 rounded-full bg-blue-500/80 inline-block" />
+                <span className="text-[11px] font-bold text-zinc-700 dark:text-zinc-300 font-mono">
+                  Internal Reasoning Notes
+                </span>
+              </div>
+              <div className="space-y-1 text-xs text-zinc-600 dark:text-zinc-400 font-sans leading-relaxed">
+                {thinking.split('\n').map((line, idx) => (
+                  <p key={idx} className="pl-1">
+                    {line}
+                  </p>
+                ))}
+              </div>
             </div>
           )}
         </div>

@@ -193,6 +193,12 @@ class OpenAICompatibleProvider implements AiProvider {
     }
 
     // Try Tauri native streaming command first (bypasses browser CORS completely)
+    const cleanApiKey = this.config.apiKey.trim();
+    let effectiveEndpoint = this.endpoint;
+    if (cleanApiKey.startsWith('sk-or-') && !effectiveEndpoint.includes('openrouter.ai')) {
+      effectiveEndpoint = 'https://openrouter.ai/api/v1/chat/completions';
+    }
+
     if (typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window) {
       try {
         const channel = new Channel<{ done: boolean; content?: string; error?: string }>();
@@ -219,9 +225,9 @@ class OpenAICompatibleProvider implements AiProvider {
         };
 
         await invoke('cloud_chat_stream', {
-          endpoint: this.endpoint,
+          endpoint: effectiveEndpoint,
           model: model || this.config.defaultModel,
-          apiKey: this.config.apiKey.trim(),
+          apiKey: cleanApiKey,
           messages: messages.map((m) => ({ role: m.role, content: m.content })),
           onChunk: channel,
         });
@@ -253,11 +259,11 @@ class OpenAICompatibleProvider implements AiProvider {
         requestPayload.chat_template_kwargs = { enable_thinking: true };
       }
 
-      const response = await fetchWithCorsProxy(this.endpoint, {
+      const response = await fetchWithCorsProxy(effectiveEndpoint, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${this.config.apiKey.trim()}`,
+          Authorization: `Bearer ${cleanApiKey}`,
         },
         body: JSON.stringify(requestPayload),
       });
@@ -282,6 +288,8 @@ class OpenAICompatibleProvider implements AiProvider {
       const decoder = new TextDecoder('utf-8');
       let buffer = '';
 
+      let isInsideReasoning = false;
+
       while (true) {
         const { done, value } = await reader.read();
         if (done) break;
@@ -295,17 +303,47 @@ class OpenAICompatibleProvider implements AiProvider {
           if (trimmed.startsWith('data: ')) {
             const dataStr = trimmed.slice(6);
             if (dataStr === '[DONE]') {
+              if (isInsideReasoning) {
+                onChunk({
+                  done: false,
+                  message: { role: 'assistant', content: '\n</think>\n\n' },
+                });
+                isInsideReasoning = false;
+              }
               onChunk({ done: true });
               return;
             }
             try {
               const json = JSON.parse(dataStr);
               const deltaObj = json.choices?.[0]?.delta;
-              const deltaContent = deltaObj?.content || deltaObj?.reasoning_content || '';
-              if (deltaContent) {
+              const reasoningText = deltaObj?.reasoning_content || '';
+              const contentText = deltaObj?.content || '';
+
+              if (reasoningText) {
+                if (!isInsideReasoning) {
+                  onChunk({
+                    done: false,
+                    message: { role: 'assistant', content: '<think>\n' },
+                  });
+                  isInsideReasoning = true;
+                }
                 onChunk({
                   done: false,
-                  message: { role: 'assistant', content: deltaContent },
+                  message: { role: 'assistant', content: reasoningText },
+                });
+              }
+
+              if (contentText) {
+                if (isInsideReasoning) {
+                  onChunk({
+                    done: false,
+                    message: { role: 'assistant', content: '\n</think>\n\n' },
+                  });
+                  isInsideReasoning = false;
+                }
+                onChunk({
+                  done: false,
+                  message: { role: 'assistant', content: contentText },
                 });
               }
             } catch {
@@ -313,6 +351,14 @@ class OpenAICompatibleProvider implements AiProvider {
             }
           }
         }
+      }
+
+      if (isInsideReasoning) {
+        onChunk({
+          done: false,
+          message: { role: 'assistant', content: '\n</think>\n\n' },
+        });
+        isInsideReasoning = false;
       }
 
       onChunk({ done: true });
@@ -851,13 +897,28 @@ function sortByKind(
 export function getProviderIdForModel(modelName: string): string | null {
   if (!modelName) return null;
   const lower = modelName.toLowerCase();
+
+  // 1. Direct match against all registered provider catalogs
+  for (const [id, reg] of Object.entries(PROVIDER_REGISTRY)) {
+    if (reg.supportedModels?.some((m) => m.toLowerCase() === lower || lower.includes(m.toLowerCase()))) {
+      return id;
+    }
+  }
+
+  // 2. Keyword-based matching
+  if (lower.includes('nemotron') || lower.includes('nvidia') || lower.includes('nvapi')) return 'nvidia';
+  if (lower.includes('01-ai') || lower.includes('yi-') || lower.includes('ox-')) return 'ox';
   if (lower.includes('opencode') || lower.includes('zen-coder') || lower.includes('sol') || lower.includes('terra') || lower.includes('luna')) return 'opencode';
   if (lower.includes('gpt-4') || lower.includes('gpt-3') || lower.includes('openai') || lower.includes('o1-') || lower.includes('o3-')) return 'openai';
   if (lower.includes('claude') || lower.includes('anthropic')) return 'anthropic';
   if (lower.includes('gemini') || lower.includes('google')) return 'gemini';
   if (lower.includes('groq')) return 'groq';
   if (lower.includes('openrouter')) return 'openrouter';
-  if (lower.includes('qwen') || lower.includes('llama') || lower.includes('mistral') || lower.includes('phi')) return 'ollama';
+  if (lower.includes('qwen') || lower.includes('mistral') || lower.includes('phi')) return 'ollama';
+  if (lower.includes('llama')) {
+    if (lower.includes('/') || lower.includes('versatile')) return 'nvidia';
+    return 'ollama';
+  }
   return null;
 }
 

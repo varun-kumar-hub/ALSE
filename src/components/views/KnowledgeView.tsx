@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { ps6Db } from '../../services/ps6Database';
+import { getProjects } from '../../services/database';
 import { ConceptMastery, Misconception } from '../../services/ps6Types';
 import { Network, Database, AlertTriangle } from 'lucide-react';
 
@@ -11,14 +12,86 @@ export const KnowledgeView: React.FC<KnowledgeViewProps> = ({ projectId }) => {
   const [masteries, setMasteries] = useState<ConceptMastery[]>([]);
   const [misconceptions, setMisconceptions] = useState<Misconception[]>([]);
   const [selectedConcept, setSelectedConcept] = useState<ConceptMastery | null>(null);
+  const [subjectName, setSubjectName] = useState<string>('');
 
   useEffect(() => {
-    const loadedMasteries = ps6Db.getAllMastery(projectId).filter((m) => (m.evidence_count || 0) > 0);
-    const loadedMisc = ps6Db.getMisconceptions(projectId);
-    setMasteries(loadedMasteries);
-    setMisconceptions(loadedMisc);
-    if (loadedMasteries.length > 0) setSelectedConcept(loadedMasteries[0]);
-    else setSelectedConcept(null);
+    const loadKnowledge = async () => {
+      let subj = 'General Workspace';
+      if (projectId) {
+        const projs = await getProjects();
+        const found = projs.find((p) => p.id === projectId);
+        if (found) subj = found.name;
+      }
+      setSubjectName(subj);
+
+      let loadedMasteries = ps6Db.getAllMastery(projectId).filter((m) => (m.evidence_count || 0) > 0);
+      const loadedMisc = ps6Db.getMisconceptions(projectId);
+
+      // If no interactive evidence recorded yet, populate subject-specific curriculum milestones
+      if (loadedMasteries.length === 0 && projectId) {
+        const norm = subj.toLowerCase();
+        let defaultConcepts: { id: string; name: string }[] = [];
+
+        if (norm.includes('deep learning') || norm.includes('backpropagation') || norm.includes('neural')) {
+          defaultConcepts = [
+            { id: 'chain_rule', name: 'Multivariate Chain Rule & Backprop' },
+            { id: 'activation_functions', name: 'Non-linear Activations (ReLU/GELU)' },
+            { id: 'vanishing_gradients', name: 'Vanishing & Exploding Gradients' },
+            { id: 'weight_initialization', name: 'He & Xavier Normal Initialization' },
+            { id: 'optimizers', name: 'Adaptive Optimizers (Adam / RMSprop)' },
+            { id: 'batch_norm', name: 'Batch Normalization & Covariate Shift' },
+            { id: 'regularization', name: 'L2 Weight Decay & Dropout' },
+            { id: 'loss_functions', name: 'Softmax Cross-Entropy Gradients' },
+          ];
+        } else if (norm.includes('network') || norm.includes('tcp') || norm.includes('protocol')) {
+          defaultConcepts = [
+            { id: 'osi_layers', name: 'OSI Model & TCP/IP Layering' },
+            { id: 'tcp_handshake', name: 'TCP 3-Way Handshake & State Machine' },
+            { id: 'congestion_control', name: 'AIMD Congestion Control & Slow Start' },
+            { id: 'subnetting', name: 'Subnetting & CIDR Address Masks' },
+            { id: 'dns_architecture', name: 'DNS Recursive vs Iterative Queries' },
+            { id: 'http_protocols', name: 'HTTP/2 vs HTTP/3 QUIC Multiplexing' },
+            { id: 'routing_algorithms', name: 'Distance Vector vs Link State Routing' },
+            { id: 'nat_architecture', name: 'NAT & Port Address Translation' },
+          ];
+        } else if (norm.includes('operating system') || norm.includes('os') || norm.includes('concurrency')) {
+          defaultConcepts = [
+            { id: 'processes_vs_threads', name: 'Processes vs Threads & Memory Spaces' },
+            { id: 'cpu_scheduling', name: 'CPU Scheduling (SJF / Round-Robin)' },
+            { id: 'race_conditions', name: 'Race Conditions & Mutex Locks' },
+            { id: 'deadlock_conditions', name: 'Coffman\'s Four Deadlock Conditions' },
+            { id: 'virtual_memory', name: 'Virtual Memory & LRU Page Replacement' },
+            { id: 'synchronization', name: 'Semaphores & Condition Variables' },
+            { id: 'file_systems', name: 'Unix Inodes & Directory Tables' },
+          ];
+        } else {
+          defaultConcepts = [
+            { id: 'core_foundations', name: `Core Architectural Foundations of ${subj}` },
+            { id: 'operational_mechanics', name: 'Operational Mechanics & Pipelining' },
+            { id: 'fault_resilience', name: 'Fault Tolerance & Error Recovery' },
+            { id: 'scalability_patterns', name: 'Scalability & Resource Partitioning' },
+            { id: 'advanced_synthesis', name: 'Advanced Production Synthesis' },
+          ];
+        }
+
+        loadedMasteries = defaultConcepts.map((c) => ({
+          concept_id: c.id,
+          concept_name: c.name,
+          mastery: 0.25,
+          confidence: 0.35,
+          evidence_count: 0,
+          last_interaction: new Date().toISOString(),
+          status: 'learning' as const,
+        }));
+      }
+
+      setMasteries(loadedMasteries);
+      setMisconceptions(loadedMisc);
+      if (loadedMasteries.length > 0) setSelectedConcept(loadedMasteries[0]);
+      else setSelectedConcept(null);
+    };
+
+    loadKnowledge();
   }, [projectId]);
 
   return (
@@ -28,11 +101,11 @@ export const KnowledgeView: React.FC<KnowledgeViewProps> = ({ projectId }) => {
         <div className="border-b border-zinc-200 dark:border-zinc-800/80 pb-4">
           <h1 className="text-xl font-bold text-zinc-950 dark:text-white flex items-center gap-2.5">
             <Network className="w-5 h-5 text-blue-500" />
-            Knowledge Graph & Concept Mastery
+            Knowledge Graph & Concept Mastery {subjectName ? `— ${subjectName}` : ''}
           </h1>
           <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-1 font-mono">
             {projectId
-              ? 'Concept nodes, prerequisite linkages, and mastery confidence for this subject.'
+              ? `Concept nodes, prerequisite linkages, and mastery confidence for ${subjectName}.`
               : 'Global visualization across all tracked concepts and subjects.'}
           </p>
         </div>

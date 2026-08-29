@@ -51,19 +51,34 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ onClose }) => {
 
     const activeProvider =
       providerConfigs.find(
-        (p) => p.kind === (aiMode === 'local' ? 'local' : 'cloud') && p.enabled && (p.apiKeySet || p.kind === 'local')
-      ) || providerConfigs.find((p) => p.id === 'opencode');
+        (p) => p.kind === (aiMode === 'local' ? 'local' : 'cloud') && p.enabled
+      ) ||
+      providerConfigs.find(
+        (p) => p.id === store.defaultProvider
+      ) ||
+      providerConfigs.find(
+        (p) => p.kind === (aiMode === 'local' ? 'local' : 'cloud') && Boolean(p.apiKey && p.apiKey.trim().length > 0)
+      ) ||
+      providerConfigs[0];
 
-    if (activeProvider && activeProvider.defaultModel) {
-      store.setSelectedModel(activeProvider.defaultModel);
-      await updateSetting('defaultModel', activeProvider.defaultModel);
+    if (activeProvider) {
+      const activeModel =
+        activeProvider.defaultModel ||
+        (activeProvider.discoveredModels && activeProvider.discoveredModels[0]) ||
+        'nvidia/nemotron-3-super-120b-a12b';
+
+      store.setSelectedModel(activeModel);
+      store.setDefaultProvider(activeProvider.id);
+      await updateSetting('defaultModel', activeModel);
+      await updateSetting('defaultProvider', activeProvider.id);
+      localStorage.setItem('selected_model', activeModel);
     }
 
     setSavedSuccess(true);
     setTimeout(() => {
       setSavedSuccess(false);
       onClose();
-    }, 400);
+    }, 300);
   };
 
   const handleSaveProvider = async () => {
@@ -88,17 +103,17 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ onClose }) => {
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200 select-none text-zinc-900 dark:text-zinc-100 font-sans">
-      <div className="relative w-full max-w-3xl bg-white dark:bg-[#12161f] border border-zinc-200 dark:border-zinc-800 rounded-2xl shadow-2xl overflow-hidden max-h-[90vh] flex flex-col">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-in fade-in duration-150 select-none text-zinc-900 dark:text-zinc-100 font-sans">
+      <div className="relative w-full max-w-3xl bg-white dark:bg-[#121215] border border-zinc-200 dark:border-zinc-800 rounded-xl shadow-2xl overflow-hidden max-h-[90vh] flex flex-col">
         {/* Modal Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-zinc-200 dark:border-zinc-800 bg-zinc-50/50 dark:bg-[#12161f]">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-zinc-200 dark:border-zinc-800 bg-zinc-50/50 dark:bg-[#121215]">
           <div>
-            <h2 className="text-base font-bold text-zinc-950 dark:text-white tracking-tight">LearnForge Settings</h2>
+            <h2 className="text-sm font-bold text-zinc-950 dark:text-white tracking-tight">LearnForge Settings</h2>
             <p className="text-xs text-zinc-500 dark:text-zinc-400 font-mono">Models, Runtime & API Configuration</p>
           </div>
           <button
             onClick={onClose}
-            className="p-1.5 rounded-lg text-zinc-400 hover:text-zinc-900 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-zinc-800 transition cursor-pointer"
+            className="p-1.5 rounded-lg text-zinc-400 hover:text-zinc-900 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-zinc-850 transition cursor-pointer"
           >
             <X className="w-4 h-4" />
           </button>
@@ -119,18 +134,18 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ onClose }) => {
                   setAiMode('local');
                   updateSetting('aiMode', 'local');
                 }}
-                className={`p-4 rounded-2xl border text-left flex justify-between transition-all cursor-pointer ${
+                className={`p-3.5 rounded-lg border text-left flex justify-between transition-all cursor-pointer ${
                   aiMode === 'local'
-                    ? 'border-emerald-500 bg-emerald-50/60 dark:bg-emerald-950/20 text-emerald-950 dark:text-white shadow-xs'
+                    ? 'border-zinc-950 dark:border-white bg-zinc-100 dark:bg-zinc-850 text-zinc-950 dark:text-white shadow-2xs font-semibold'
                     : 'border-zinc-200 dark:border-zinc-800 hover:border-zinc-300 dark:hover:border-zinc-700 bg-white dark:bg-zinc-900/40 text-zinc-600 dark:text-zinc-400'
                 }`}
               >
                 <div>
-                  <ShieldCheck className={`w-5 h-5 mb-2 ${aiMode === 'local' ? 'text-emerald-500' : 'text-zinc-400'}`} />
-                  <p className="font-bold text-zinc-950 dark:text-white text-sm">Local Mode</p>
-                  <p className="text-[10px] text-zinc-500 dark:text-zinc-400">Offline Ollama execution</p>
+                  <ShieldCheck className={`w-4 h-4 mb-1.5 ${aiMode === 'local' ? 'text-zinc-950 dark:text-white' : 'text-zinc-400'}`} />
+                  <p className="font-bold text-zinc-950 dark:text-white text-xs">Local Mode</p>
+                  <p className="text-[10px] text-zinc-500 dark:text-zinc-400 font-sans">Offline Ollama execution</p>
                 </div>
-                {aiMode === 'local' && <Check className="w-4 h-4 text-emerald-500" />}
+                {aiMode === 'local' && <Check className="w-4 h-4 text-zinc-950 dark:text-white" />}
               </button>
 
               <button
@@ -139,18 +154,18 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ onClose }) => {
                   setAiMode('cloud');
                   updateSetting('aiMode', 'cloud');
                 }}
-                className={`p-4 rounded-2xl border text-left flex justify-between transition-all cursor-pointer ${
+                className={`p-3.5 rounded-lg border text-left flex justify-between transition-all cursor-pointer ${
                   aiMode === 'cloud'
-                    ? 'border-blue-500 bg-blue-50/60 dark:bg-blue-950/20 text-blue-950 dark:text-white shadow-xs'
+                    ? 'border-zinc-950 dark:border-white bg-zinc-100 dark:bg-zinc-850 text-zinc-950 dark:text-white shadow-2xs font-semibold'
                     : 'border-zinc-200 dark:border-zinc-800 hover:border-zinc-300 dark:hover:border-zinc-700 bg-white dark:bg-zinc-900/40 text-zinc-600 dark:text-zinc-400'
                 }`}
               >
                 <div>
-                  <Cloud className={`w-5 h-5 mb-2 ${aiMode === 'cloud' ? 'text-blue-500' : 'text-zinc-400'}`} />
-                  <p className="font-bold text-zinc-950 dark:text-white text-sm">Cloud Mode</p>
-                  <p className="text-[10px] text-zinc-500 dark:text-zinc-400">Cloud AI Providers</p>
+                  <Cloud className={`w-5 h-5 mb-1.5 ${aiMode === 'cloud' ? 'text-zinc-950 dark:text-white' : 'text-zinc-400'}`} />
+                  <p className="font-bold text-zinc-950 dark:text-white text-xs">Cloud Mode</p>
+                  <p className="text-[10px] text-zinc-500 dark:text-zinc-400 font-sans">Cloud AI Providers</p>
                 </div>
-                {aiMode === 'cloud' && <Check className="w-4 h-4 text-blue-500" />}
+                {aiMode === 'cloud' && <Check className="w-4 h-4 text-zinc-950 dark:text-white" />}
               </button>
             </div>
           </div>
@@ -173,7 +188,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ onClose }) => {
         </div>
 
         {/* Modal Footer */}
-        <div className="flex items-center justify-between px-6 py-4 border-t border-zinc-200 dark:border-zinc-800 bg-zinc-50/50 dark:bg-[#12161f]">
+        <div className="flex items-center justify-between px-6 py-4 border-t border-zinc-200 dark:border-zinc-800 bg-zinc-50/50 dark:bg-[#121215]">
           <button
             type="button"
             onClick={async () => {
@@ -185,28 +200,28 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ onClose }) => {
                 window.location.reload();
               }
             }}
-            className="px-3 py-1.5 text-xs font-mono font-bold text-rose-500 hover:bg-rose-500/10 rounded-xl transition cursor-pointer"
+            className="px-2.5 py-1 text-xs font-mono font-bold text-rose-500 hover:bg-rose-500/10 rounded-lg transition cursor-pointer"
           >
-            🗑 Reset All Data & Start Fresh
+            🗑 Reset Data & Start Fresh
           </button>
 
           <div className="flex items-center gap-2">
             {savedSuccess && (
-              <span className="text-xs font-mono font-semibold text-emerald-500 flex items-center gap-1">
-                <Check className="w-4 h-4" /> Saved!
+              <span className="text-xs font-mono font-semibold text-zinc-900 dark:text-white flex items-center gap-1">
+                <Check className="w-3.5 h-3.5" /> Saved!
               </span>
             )}
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2 bg-zinc-100 dark:bg-zinc-900 hover:bg-zinc-200 dark:hover:bg-zinc-850 text-zinc-700 dark:text-zinc-300 font-semibold text-xs rounded-xl transition cursor-pointer"
+              className="px-3 py-1.5 bg-zinc-100 dark:bg-zinc-850 hover:bg-zinc-200 dark:hover:bg-zinc-800 text-zinc-700 dark:text-zinc-300 font-semibold text-xs rounded-lg transition cursor-pointer"
             >
               Cancel
             </button>
             <button
               type="button"
               onClick={handleSave}
-              className="px-4 py-2 bg-blue-600 dark:bg-white hover:bg-blue-500 dark:hover:bg-zinc-200 text-white dark:text-zinc-950 font-bold text-xs rounded-xl shadow-xs transition cursor-pointer"
+              className="px-3.5 py-1.5 bg-zinc-950 dark:bg-white hover:bg-zinc-800 dark:hover:bg-zinc-200 text-white dark:text-zinc-950 font-bold text-xs rounded-lg shadow-2xs transition cursor-pointer active:scale-98"
             >
               Save Settings
             </button>

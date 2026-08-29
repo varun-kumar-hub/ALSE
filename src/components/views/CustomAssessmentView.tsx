@@ -1,15 +1,16 @@
 import React, { useState } from 'react';
 import {
   Award,
-  Sparkles,
-  ArrowRight,
-  BookOpen,
-  CheckCircle2,
-  Clock,
   Target,
   Brain,
   Sliders,
   Zap,
+  CheckCircle2,
+  XCircle,
+  MessageSquare,
+  HelpCircle,
+  Lightbulb,
+  AlertTriangle,
 } from 'lucide-react';
 import {
   AssessmentQuestion,
@@ -22,24 +23,12 @@ interface CustomAssessmentViewProps {
   onStartRemediationChat?: (prompt: string) => void;
 }
 
-const PRESET_TOPICS = [
-  'Deep Learning & Neural Networks',
-  'Operating Systems & Concurrency',
-  'Computer Networks & TCP/IP',
-  'Data Structures & Algorithms (DSA)',
-  'Machine Learning Fundamentals',
-  'Database Management & SQL Optimizations',
-  'Cloud Architecture & Microservices',
-  'Rust Memory Safety & Lifetimes',
-];
-
 export const CustomAssessmentView: React.FC<CustomAssessmentViewProps> = ({
   onStartRemediationChat,
 }) => {
   const [topic, setTopic] = useState('');
-  const [customInput, setCustomInput] = useState('');
   const [difficulty, setDifficulty] = useState<'beginner' | 'intermediate' | 'advanced'>('intermediate');
-  const [questionCount, setQuestionCount] = useState<number>(3);
+  const [questionCount, setQuestionCount] = useState<number>(8);
 
   // Active quiz state
   const [isQuizActive, setIsQuizActive] = useState(false);
@@ -47,42 +36,42 @@ export const CustomAssessmentView: React.FC<CustomAssessmentViewProps> = ({
   const [currentIndex, setCurrentIndex] = useState(0);
   const [selectedAnswers, setSelectedAnswers] = useState<Record<string, number>>({});
   const [responseTimes, setResponseTimes] = useState<Record<string, number>>({});
-  const [startTime, setStartTime] = useState<number>(Date.now());
+  const [questionStartTime, setQuestionStartTime] = useState<number>(Date.now());
   const [results, setResults] = useState<AssessmentResult | null>(null);
 
-  const activeTopic = topic || customInput.trim() || 'Custom Knowledge Assessment';
+  const activeTopic = topic.trim() || 'Custom Knowledge Assessment';
 
   const handleStartQuiz = () => {
-    const selectedTopic = customInput.trim() || topic || 'General Computer Science';
-    const generated = generateAdaptiveAssessment(selectedTopic, [selectedTopic]);
-    setQuestions(generated.slice(0, questionCount));
+    const selectedTopic = topic.trim() || 'General Engineering & Computing';
+    const count = Math.max(8, questionCount || 8);
+    const generated = generateAdaptiveAssessment(selectedTopic, [selectedTopic], count);
+    setQuestions(generated);
     setCurrentIndex(0);
     setSelectedAnswers({});
     setResponseTimes({});
+    setQuestionStartTime(Date.now());
     setResults(null);
-    setStartTime(Date.now());
     setIsQuizActive(true);
   };
 
-  const handleSelectOption = (optionIndex: number) => {
-    if (results) return;
-    const currentQ = questions[currentIndex];
-    const elapsed = Date.now() - startTime;
-    setSelectedAnswers((prev) => ({ ...prev, [currentQ.id]: optionIndex }));
-    setResponseTimes((prev) => ({ ...prev, [currentQ.id]: (prev[currentQ.id] || 0) + elapsed }));
+  const handleSelectOption = (optIdx: number) => {
+    if (!currentQ) return;
+    const elapsed = (Date.now() - questionStartTime) / 1000;
+    setSelectedAnswers((prev) => ({ ...prev, [currentQ.id]: optIdx }));
+    setResponseTimes((prev) => ({ ...prev, [currentQ.id]: elapsed }));
   };
 
   const handleNext = () => {
     if (currentIndex < questions.length - 1) {
       setCurrentIndex((prev) => prev + 1);
-      setStartTime(Date.now());
+      setQuestionStartTime(Date.now());
     }
   };
 
   const handlePrev = () => {
     if (currentIndex > 0) {
       setCurrentIndex((prev) => prev - 1);
-      setStartTime(Date.now());
+      setQuestionStartTime(Date.now());
     }
   };
 
@@ -102,159 +91,126 @@ export const CustomAssessmentView: React.FC<CustomAssessmentViewProps> = ({
   const totalQ = questions.length;
 
   return (
-    <div className="flex-1 h-full flex flex-col bg-[#fbfcfd] dark:bg-[#0d0f12] text-zinc-900 dark:text-zinc-100 overflow-y-auto font-sans transition-colors select-none">
-      <div className="max-w-3xl w-full mx-auto px-4 py-8 md:py-12 space-y-8">
+    <div className="flex-1 overflow-y-auto bg-white dark:bg-[#09090b] text-zinc-900 dark:text-zinc-100 p-6 font-sans select-none">
+      <div className="max-w-3xl mx-auto space-y-6">
         {/* Header */}
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between border-b border-zinc-200 dark:border-zinc-800 pb-4">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-2xl bg-blue-50 dark:bg-blue-950/50 border border-blue-200 dark:border-blue-800/60 flex items-center justify-center text-blue-600 dark:text-blue-400 shrink-0 shadow-2xs">
-              <Award className="w-5 h-5" />
+            <div className="p-2 rounded-xl bg-blue-600/10 text-blue-600 dark:text-blue-400">
+              <Award className="w-6 h-6" />
             </div>
             <div>
-              <h1 className="text-xl md:text-2xl font-bold text-zinc-950 dark:text-white tracking-tight">
+              <h2 className="text-lg font-bold text-zinc-950 dark:text-white flex items-center gap-2">
                 Custom Topic Assessment
-              </h1>
-              <p className="text-xs text-zinc-500 dark:text-zinc-400 font-mono mt-0.5">
-                Evaluate knowledge mastery across any custom subject with Bayesian Knowledge Tracing
+              </h2>
+              <p className="text-xs text-zinc-500 font-sans mt-0.5">
+                Generate real-time adaptive assessments on any custom computer science or technical topic
               </p>
             </div>
           </div>
         </div>
 
+        {/* Configuration State */}
         {!isQuizActive ? (
-          /* Topic Configuration Card */
           <div className="space-y-6">
-            <div className="p-6 rounded-3xl bg-white dark:bg-[#151922] border border-zinc-200 dark:border-zinc-800/80 shadow-sm space-y-5">
-              <div className="space-y-2">
-                <label className="text-xs font-bold text-zinc-700 dark:text-zinc-300 flex items-center gap-1.5 uppercase font-mono tracking-wider">
-                  <Target className="w-3.5 h-3.5 text-blue-500" /> Enter Custom Assessment Topic
+            <div className="p-6 rounded-2xl bg-zinc-50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 space-y-5">
+              {/* Topic Input */}
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-zinc-700 dark:text-zinc-300 flex items-center gap-1.5 font-mono uppercase tracking-wider">
+                  <Target className="w-3.5 h-3.5 text-zinc-500" /> Enter Custom Assessment Topic
                 </label>
                 <input
                   type="text"
-                  placeholder="e.g. Transformer Attention Mechanics, Linux Kernel Scheduling, Raft Consensus..."
-                  value={customInput}
-                  onChange={(e) => {
-                    setCustomInput(e.target.value);
-                    if (topic) setTopic('');
-                  }}
-                  className="w-full bg-zinc-50 dark:bg-zinc-900/80 border border-zinc-300 dark:border-zinc-700 rounded-2xl px-4 py-3 text-sm text-zinc-900 dark:text-white placeholder-zinc-400 outline-none focus:border-blue-500 transition font-sans"
+                  placeholder="e.g. CUDA Kernel Optimization, Raft Consensus, Graph Neural Networks..."
+                  value={topic}
+                  onChange={(e) => setTopic(e.target.value)}
+                  className="w-full bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 rounded-xl px-4 py-2.5 text-xs text-zinc-900 dark:text-white placeholder-zinc-400 font-sans focus:outline-none focus:border-blue-500 transition shadow-2xs"
                 />
               </div>
 
-              {/* Preset Topic Pills */}
-              <div className="space-y-2">
-                <span className="text-[11px] font-mono text-zinc-500">Or pick from popular learning topics:</span>
-                <div className="flex flex-wrap gap-2">
-                  {PRESET_TOPICS.map((t) => (
-                    <button
-                      key={t}
-                      type="button"
-                      onClick={() => {
-                        setTopic(t);
-                        setCustomInput('');
-                      }}
-                      className={`px-3 py-1.5 rounded-xl text-xs font-medium transition cursor-pointer ${
-                        topic === t
-                          ? 'bg-blue-600 text-white font-bold shadow-xs'
-                          : 'bg-zinc-100 dark:bg-zinc-800/80 text-zinc-700 dark:text-zinc-300 hover:bg-zinc-200 dark:hover:bg-zinc-700 border border-zinc-200 dark:border-zinc-700/60'
-                      }`}
-                    >
-                      {t}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
               {/* Assessment Options Grid */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2 border-t border-zinc-100 dark:border-zinc-800/60">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-1.5">
-                  <label className="text-xs font-bold text-zinc-700 dark:text-zinc-300 font-mono flex items-center gap-1.5">
-                    <Sliders className="w-3.5 h-3.5 text-blue-500" /> Target Difficulty
+                  <label className="text-xs font-bold text-zinc-700 dark:text-zinc-300 flex items-center gap-1.5 font-mono uppercase tracking-wider">
+                    <Brain className="w-3.5 h-3.5 text-zinc-500" /> Target Difficulty
                   </label>
-                  <div className="flex gap-1.5">
-                    {(['beginner', 'intermediate', 'advanced'] as const).map((d) => (
+                  <div className="grid grid-cols-3 gap-1.5">
+                    {(['beginner', 'intermediate', 'advanced'] as const).map((lvl) => (
                       <button
-                        key={d}
+                        key={lvl}
                         type="button"
-                        onClick={() => setDifficulty(d)}
-                        className={`flex-1 py-1.5 rounded-xl text-xs font-semibold capitalize transition cursor-pointer ${
-                          difficulty === d
-                            ? 'bg-zinc-900 dark:bg-white text-white dark:text-zinc-950 shadow-xs'
-                            : 'bg-zinc-100 dark:bg-zinc-850 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-200 dark:hover:bg-zinc-800'
+                        onClick={() => setDifficulty(lvl)}
+                        className={`py-2 text-xs font-semibold rounded-xl capitalize transition cursor-pointer border ${
+                          difficulty === lvl
+                            ? 'bg-blue-600 text-white border-blue-500 font-bold shadow-xs'
+                            : 'bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 text-zinc-600 dark:text-zinc-400 hover:border-zinc-300'
                         }`}
                       >
-                        {d}
+                        {lvl}
                       </button>
                     ))}
                   </div>
                 </div>
 
                 <div className="space-y-1.5">
-                  <label className="text-xs font-bold text-zinc-700 dark:text-zinc-300 font-mono flex items-center gap-1.5">
-                    <Zap className="w-3.5 h-3.5 text-blue-500" /> Question Count
+                  <label className="text-xs font-bold text-zinc-700 dark:text-zinc-300 flex items-center gap-1.5 font-mono uppercase tracking-wider">
+                    <Sliders className="w-3.5 h-3.5 text-zinc-500" /> Questions Count (Min 8)
                   </label>
-                  <div className="flex gap-1.5">
-                    {[3, 5, 10].map((count) => (
+                  <div className="grid grid-cols-4 gap-1.5">
+                    {[8, 10, 12, 15].map((cnt) => (
                       <button
-                        key={count}
+                        key={cnt}
                         type="button"
-                        onClick={() => setQuestionCount(count)}
-                        className={`flex-1 py-1.5 rounded-xl text-xs font-semibold transition cursor-pointer ${
-                          questionCount === count
-                            ? 'bg-blue-600 text-white shadow-xs'
-                            : 'bg-zinc-100 dark:bg-zinc-850 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-200 dark:hover:bg-zinc-800'
+                        onClick={() => setQuestionCount(cnt)}
+                        className={`py-2 text-xs font-semibold rounded-xl transition cursor-pointer border ${
+                          questionCount === cnt
+                            ? 'bg-blue-600 text-white border-blue-500 font-bold shadow-xs'
+                            : 'bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 text-zinc-600 dark:text-zinc-400 hover:border-zinc-300'
                         }`}
                       >
-                        {count} Questions
+                        {cnt} Qs
                       </button>
                     ))}
                   </div>
                 </div>
               </div>
 
-              {/* Start Button */}
-              <div className="pt-2">
+              {/* Action Banner */}
+              <div className="pt-3 border-t border-zinc-200 dark:border-zinc-800 flex justify-end">
                 <button
                   type="button"
                   onClick={handleStartQuiz}
-                  className="w-full py-3.5 bg-blue-600 dark:bg-white hover:bg-blue-500 dark:hover:bg-zinc-200 text-white dark:text-zinc-950 font-bold rounded-2xl transition flex items-center justify-center gap-2 shadow-sm text-sm cursor-pointer"
+                  className="px-6 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs flex items-center gap-2 shadow-xs transition cursor-pointer active:scale-98"
                 >
-                  <Brain className="w-4 h-4" />
-                  <span>Start Adaptive Assessment for "{customInput.trim() || topic || 'Deep Learning & Neural Networks'}"</span>
-                  <ArrowRight className="w-4 h-4" />
+                  <Zap className="w-4 h-4" />
+                  <span>Start Adaptive Assessment</span>
                 </button>
               </div>
             </div>
           </div>
         ) : (
           /* Active Assessment Stage */
-          <div className="p-6 rounded-3xl bg-white dark:bg-[#151922] border border-zinc-200 dark:border-zinc-800/80 shadow-sm space-y-6">
+          <div className="p-6 rounded-2xl bg-white dark:bg-zinc-900/60 border border-zinc-200 dark:border-zinc-800 shadow-2xs space-y-6">
             {!results ? (
-              /* Question Phase */
               currentQ && (
-                <div className="space-y-6">
+                <div className="space-y-5">
                   {/* Progress Header */}
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-bold font-mono text-blue-600 dark:text-blue-400">
-                      Topic: {activeTopic}
-                    </span>
-                    <span className="text-xs font-mono text-zinc-400">
+                  <div className="flex items-center justify-between font-mono text-xs text-zinc-500 pb-2 border-b border-zinc-100 dark:border-zinc-800">
+                    <span className="font-bold text-blue-600 dark:text-blue-400 uppercase tracking-wider">
                       Question {currentIndex + 1} of {totalQ}
                     </span>
+                    <span>Topic: {activeTopic}</span>
                   </div>
 
-                  <div className="w-full bg-zinc-100 dark:bg-zinc-800 h-2 rounded-full overflow-hidden">
-                    <div
-                      className="bg-blue-600 h-full transition-all duration-300 rounded-full"
-                      style={{ width: `${((currentIndex + 1) / totalQ) * 100}%` }}
-                    />
+                  {/* Question Stem */}
+                  <div className="space-y-2">
+                    <h3 className="text-sm font-bold text-zinc-950 dark:text-white leading-relaxed">
+                      {currentQ.question}
+                    </h3>
                   </div>
 
-                  <h3 className="text-base font-bold text-zinc-950 dark:text-white leading-snug">
-                    {currentQ.question}
-                  </h3>
-
-                  <div className="space-y-3">
+                  {/* Options */}
+                  <div className="space-y-2.5">
                     {currentQ.options.map((opt, optIdx) => {
                       const isSelected = selectedAnswers[currentQ.id] === optIdx;
                       return (
@@ -262,10 +218,10 @@ export const CustomAssessmentView: React.FC<CustomAssessmentViewProps> = ({
                           key={optIdx}
                           type="button"
                           onClick={() => handleSelectOption(optIdx)}
-                          className={`w-full text-left p-4 rounded-2xl border transition-all flex items-start gap-3 text-xs leading-relaxed cursor-pointer font-sans ${
+                          className={`w-full p-3.5 rounded-xl border text-left text-xs transition flex items-start gap-3 cursor-pointer ${
                             isSelected
-                              ? 'bg-blue-500/10 border-blue-500 text-blue-950 dark:text-blue-100 font-semibold shadow-2xs'
-                              : 'bg-zinc-50 dark:bg-zinc-900/50 border-zinc-200 dark:border-zinc-800 text-zinc-800 dark:text-zinc-200 hover:border-zinc-300 dark:hover:border-zinc-700'
+                              ? 'bg-blue-50 dark:bg-blue-950/30 border-blue-600 text-blue-950 dark:text-blue-100 font-semibold shadow-2xs'
+                              : 'bg-zinc-50/50 dark:bg-zinc-850/40 border-zinc-200 dark:border-zinc-800 hover:border-zinc-300 text-zinc-800 dark:text-zinc-200'
                           }`}
                         >
                           <span
@@ -277,7 +233,7 @@ export const CustomAssessmentView: React.FC<CustomAssessmentViewProps> = ({
                           >
                             {String.fromCharCode(65 + optIdx)}
                           </span>
-                          <span className="flex-1">{opt}</span>
+                          <span className="flex-1 leading-relaxed">{opt}</span>
                         </button>
                       );
                     })}
@@ -306,7 +262,7 @@ export const CustomAssessmentView: React.FC<CustomAssessmentViewProps> = ({
                       <button
                         type="button"
                         onClick={handleNext}
-                        className="px-5 py-2 rounded-xl text-xs font-bold bg-zinc-900 dark:bg-white text-white dark:text-zinc-950 hover:bg-zinc-800 dark:hover:bg-zinc-200 transition cursor-pointer shadow-xs"
+                        className="px-5 py-2 rounded-xl text-xs font-bold bg-blue-600 text-white hover:bg-blue-500 transition cursor-pointer shadow-xs"
                       >
                         Next Question
                       </button>
@@ -315,8 +271,9 @@ export const CustomAssessmentView: React.FC<CustomAssessmentViewProps> = ({
                 </div>
               )
             ) : (
-              /* Results Phase */
+              /* Results & Detailed Question Review Phase */
               <div className="space-y-6">
+                {/* Score Header */}
                 <div className="p-6 rounded-2xl bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-blue-950/30 dark:to-indigo-950/20 border border-blue-100 dark:border-blue-900/40 text-center space-y-2">
                   <div className="inline-flex items-center justify-center w-12 h-12 rounded-2xl bg-blue-600 text-white font-bold text-xl shadow-xs mx-auto">
                     {results.scorePercent}%
@@ -325,11 +282,119 @@ export const CustomAssessmentView: React.FC<CustomAssessmentViewProps> = ({
                     {results.scorePercent >= 75 ? 'Strong Mastery Demonstrated!' : 'Learning Opportunities Identified'}
                   </h4>
                   <p className="text-xs text-zinc-600 dark:text-zinc-300">
-                    You answered {results.correctCount} of {results.totalQuestions} questions correctly.
+                    You answered {results.correctCount} of {results.totalQuestions} questions correctly for <strong>{activeTopic}</strong>.
                   </p>
                 </div>
 
-                <div className="flex items-center justify-between pt-2">
+                {/* Question-by-Question Review with Doubt Clearing */}
+                <div className="space-y-3">
+                  <span className="text-xs font-mono font-bold text-zinc-500 uppercase tracking-wider block">
+                    Question Breakdown & Doubt Clearing
+                  </span>
+                  <div className="space-y-3">
+                    {questions.map((q, qIdx) => {
+                      const chosenIdx = selectedAnswers[q.id];
+                      const isCorrect = chosenIdx === q.correct_index;
+                      const chosenOptText = chosenIdx !== undefined ? q.options[chosenIdx] : 'Unanswered';
+                      const correctOptText = q.options[q.correct_index];
+
+                      return (
+                        <div
+                          key={q.id}
+                          className="p-4 rounded-xl bg-zinc-50 dark:bg-zinc-850/60 border border-zinc-200 dark:border-zinc-800 space-y-3 text-xs font-sans"
+                        >
+                          <div className="flex items-start justify-between gap-3">
+                            <div className="flex items-start gap-2.5">
+                              {isCorrect ? (
+                                <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0 mt-0.5" />
+                              ) : (
+                                <XCircle className="w-4 h-4 text-rose-500 shrink-0 mt-0.5" />
+                              )}
+                              <div>
+                                <p className="font-semibold text-zinc-900 dark:text-zinc-100 leading-relaxed">
+                                  Q{qIdx + 1}. {q.question}
+                                </p>
+                                <p className="text-[11px] text-zinc-500 font-mono mt-0.5">
+                                  Concept: {q.concept_name}
+                                </p>
+                              </div>
+                            </div>
+
+                            {onStartRemediationChat && (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  const prompt = `I have a doubt on Question ${qIdx + 1} from my assessment on "${activeTopic}":\n\n**Question**: ${q.question}\n- **My Selection**: ${chosenOptText}\n- **Correct Answer**: ${correctOptText}\n- **Explanation**: ${q.explanation}\n\nPlease clear my doubt step-by-step with an intuitive real-world example and explain why the correct option is true.`;
+                                  onStartRemediationChat(prompt);
+                                }}
+                                className="px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-[11px] font-bold font-sans flex items-center gap-1.5 transition cursor-pointer shrink-0 shadow-2xs"
+                                title="Open a new chat in General Chats to explain this question in detail"
+                              >
+                                <HelpCircle className="w-3.5 h-3.5" />
+                                <span>Ask Doubt in Chat</span>
+                              </button>
+                            )}
+                          </div>
+
+                          {/* Answer Comparison */}
+                          <div className="pl-6 space-y-1 text-[11px] font-mono">
+                            {!isCorrect && (
+                              <p className="text-rose-600 dark:text-rose-400">
+                                Your answer: <span className="line-through">{chosenOptText}</span>
+                              </p>
+                            )}
+                            <p className="text-emerald-600 dark:text-emerald-400 font-semibold">
+                              Correct answer: {correctOptText}
+                            </p>
+                          </div>
+
+                          {/* Explanation */}
+                          {q.explanation && (
+                            <div className="ml-6 p-3 rounded-lg bg-blue-50/60 dark:bg-blue-950/20 border border-blue-200/80 dark:border-blue-900/40 text-zinc-800 dark:text-zinc-200 text-xs leading-relaxed font-sans">
+                              <div className="flex items-center gap-1.5 text-blue-900 dark:text-blue-300 font-bold font-mono text-[11px] mb-1">
+                                <Lightbulb className="w-3.5 h-3.5 text-amber-500" />
+                                <span>Explanation</span>
+                              </div>
+                              <p>{q.explanation}</p>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* Detected Misconceptions */}
+                {results.detectedMisconceptions.length > 0 && (
+                  <div className="p-4 rounded-xl bg-amber-500/10 border border-amber-500/30 space-y-2">
+                    <div className="flex items-center gap-2 text-amber-600 dark:text-amber-400 font-bold text-xs font-mono">
+                      <AlertTriangle className="w-4 h-4" />
+                      <span>Identified Misconception Flags</span>
+                    </div>
+                    {results.detectedMisconceptions.map((m, idx) => (
+                      <div key={idx} className="flex items-center justify-between gap-3 pl-6">
+                        <p className="text-xs text-amber-900 dark:text-amber-200 leading-relaxed font-mono">
+                          • {m}
+                        </p>
+                        {onStartRemediationChat && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const prompt = `During my assessment on "${activeTopic}", I encountered this misconception: "${m}". Can you provide a clear conceptual breakdown and an intuitive counter-example to resolve this misconception?`;
+                              onStartRemediationChat(prompt);
+                            }}
+                            className="px-2.5 py-1 rounded-md text-[10px] font-mono font-bold bg-amber-500/20 text-amber-900 dark:text-amber-200 hover:bg-amber-500/30 transition cursor-pointer shrink-0"
+                          >
+                            Explain Misconception
+                          </button>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* Action Footer */}
+                <div className="flex items-center justify-between pt-3 border-t border-zinc-200 dark:border-zinc-800">
                   <button
                     type="button"
                     onClick={handleReset}
@@ -343,13 +408,13 @@ export const CustomAssessmentView: React.FC<CustomAssessmentViewProps> = ({
                       type="button"
                       onClick={() =>
                         onStartRemediationChat(
-                          `Let's review the weak areas from my assessment on ${activeTopic}: ${results.weakConcepts.join(', ') || activeTopic}.`
+                          `Let's review the weak areas and clarify doubts from my assessment on "${activeTopic}": ${results.weakConcepts.join(', ') || activeTopic}.`
                         )
                       }
                       className="px-5 py-2.5 rounded-xl text-xs font-bold bg-blue-600 text-white hover:bg-blue-500 transition cursor-pointer shadow-xs flex items-center gap-1.5"
                     >
-                      <Sparkles className="w-3.5 h-3.5" />
-                      <span>Start Adaptive Remediation</span>
+                      <MessageSquare className="w-3.5 h-3.5" />
+                      <span>Clear All Doubts in General Chat</span>
                     </button>
                   )}
                 </div>

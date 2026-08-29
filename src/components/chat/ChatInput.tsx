@@ -4,18 +4,19 @@ import {
   Globe,
   Paperclip,
   X,
-  FileText,
   FileCode,
-  CheckCircle2,
+  Square,
 } from 'lucide-react';
 import { parseUploadedFile, formatFilePrompt, ParsedFileInfo } from '../../lib/fileParser';
+import { useAppStore } from '../../stores/appStore';
 
 interface ChatInputProps {
   onSend: (message: string) => void;
   onStop: () => void;
 }
 
-export const ChatInput: React.FC<ChatInputProps> = ({ onSend }) => {
+export const ChatInput: React.FC<ChatInputProps> = ({ onSend, onStop }) => {
+  const { isStreaming } = useAppStore();
   const [input, setInput] = useState('');
   const [isExpanded, setIsExpanded] = useState(false);
   const [webSearchEnabled, setWebSearchEnabled] = useState(true);
@@ -81,8 +82,8 @@ export const ChatInput: React.FC<ChatInputProps> = ({ onSend }) => {
     <div className="p-4 md:p-6 select-none bg-transparent transition-colors">
       <div className="mx-auto max-w-3xl">
         <div
-          className={`relative w-full bg-white dark:bg-[#151922] border border-zinc-200 dark:border-zinc-800/90 shadow-md hover:shadow-lg transition-all rounded-2xl p-3 ${
-            isExpanded || hasValue ? 'shadow-xl border-blue-500/40' : ''
+          className={`relative w-full bg-white dark:bg-[#121215] border border-zinc-200 dark:border-zinc-800 shadow-xs hover:border-zinc-300 dark:hover:border-zinc-700 transition-all rounded-xl p-3 ${
+            isExpanded || hasValue ? 'border-zinc-400 dark:border-zinc-600' : ''
           }`}
           onClick={() => textareaRef.current?.focus()}
         >
@@ -96,10 +97,10 @@ export const ChatInput: React.FC<ChatInputProps> = ({ onSend }) => {
 
           {attachedFile && (
             <div className="px-3 pt-2 flex items-center gap-2">
-              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-blue-50 dark:bg-blue-950/40 text-blue-900 dark:text-blue-200 text-xs font-mono border border-blue-200 dark:border-blue-800/60 shadow-2xs">
-                <FileCode className="w-3.5 h-3.5 text-blue-500" />
+              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-zinc-100 dark:bg-zinc-850 text-zinc-900 dark:text-zinc-100 text-xs font-mono border border-zinc-200 dark:border-zinc-800 shadow-2xs">
+                <FileCode className="w-3.5 h-3.5 text-zinc-600 dark:text-zinc-400" />
                 <span className="truncate max-w-[220px] font-semibold">{attachedFile.name}</span>
-                <span className="text-[10px] text-blue-500/80">
+                <span className="text-[10px] text-zinc-500">
                   ({attachedFile.size} · {attachedFile.lineCount} lines)
                 </span>
                 <button
@@ -108,7 +109,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({ onSend }) => {
                     e.stopPropagation();
                     setAttachedFile(null);
                   }}
-                  className="p-0.5 hover:bg-blue-200/50 dark:hover:bg-blue-900/60 rounded text-blue-400 hover:text-blue-700 dark:hover:text-blue-100 transition cursor-pointer"
+                  className="p-0.5 hover:bg-zinc-200 dark:hover:bg-zinc-800 rounded text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 transition cursor-pointer"
                   title="Remove file"
                 >
                   <X className="w-3 h-3" />
@@ -147,8 +148,8 @@ export const ChatInput: React.FC<ChatInputProps> = ({ onSend }) => {
                 }}
                 className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-mono transition cursor-pointer ${
                   webSearchEnabled
-                    ? 'bg-zinc-100 dark:bg-zinc-800 text-zinc-900 dark:text-white border border-zinc-300 dark:border-zinc-700 font-semibold'
-                    : 'bg-zinc-50 dark:bg-zinc-950 text-zinc-400 dark:text-zinc-500 border border-zinc-200 dark:border-zinc-850 hover:text-zinc-800 dark:hover:text-zinc-300'
+                    ? 'bg-zinc-100 dark:bg-zinc-850 text-zinc-950 dark:text-white border border-zinc-300 dark:border-zinc-700 font-semibold'
+                    : 'bg-transparent text-zinc-400 dark:text-zinc-500 border border-zinc-200 dark:border-zinc-850 hover:text-zinc-800 dark:hover:text-zinc-300'
                 }`}
               >
                 <Globe className="w-3.5 h-3.5 text-zinc-500" />
@@ -161,7 +162,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({ onSend }) => {
                   e.stopPropagation();
                   fileInputRef.current?.click();
                 }}
-                className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-mono bg-zinc-50 dark:bg-zinc-950 text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white border border-zinc-200 dark:border-zinc-850 transition cursor-pointer"
+                className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-mono bg-transparent text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white border border-zinc-200 dark:border-zinc-800 hover:bg-zinc-100 dark:hover:bg-zinc-850 transition cursor-pointer"
               >
                 <Paperclip className="w-3.5 h-3.5 text-zinc-500" />
                 <span>Attach</span>
@@ -169,21 +170,37 @@ export const ChatInput: React.FC<ChatInputProps> = ({ onSend }) => {
             </div>
           </div>
 
-          <button
-            type="button"
-            onClick={(e) => {
-              e.stopPropagation();
-              handleSubmit();
-            }}
-            disabled={!hasValue}
-            className={`absolute bottom-3 right-3 flex h-8 w-8 items-center justify-center rounded-xl transition cursor-pointer ${
-              hasValue
-                ? 'bg-blue-600 text-white hover:bg-blue-500 active:scale-95 shadow-sm'
-                : 'bg-zinc-100 dark:bg-zinc-850 text-zinc-400 dark:text-zinc-600 cursor-not-allowed'
-            }`}
-          >
-            <Send className="h-3.5 w-3.5" />
-          </button>
+          {isStreaming ? (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                onStop();
+              }}
+              className="absolute bottom-3 right-3 flex h-7 items-center gap-1.5 px-3 rounded-lg bg-rose-600 hover:bg-rose-500 text-white text-xs font-mono font-bold shadow-xs transition active:scale-95 cursor-pointer"
+              title="Stop generating response"
+            >
+              <Square className="h-3 w-3 fill-current" />
+              <span>Stop</span>
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                handleSubmit();
+              }}
+              disabled={!hasValue}
+              className={`absolute bottom-3 right-3 flex h-7 w-7 items-center justify-center rounded-lg transition cursor-pointer ${
+                hasValue
+                  ? 'bg-blue-600 text-white hover:bg-blue-500 active:scale-95 shadow-2xs'
+                  : 'bg-zinc-100 dark:bg-zinc-850 text-zinc-400 dark:text-zinc-600 cursor-not-allowed'
+              }`}
+              title="Send message"
+            >
+              <Send className="h-3.5 w-3.5" />
+            </button>
+          )}
         </div>
       </div>
     </div>

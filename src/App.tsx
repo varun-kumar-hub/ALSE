@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { Sidebar } from './components/sidebar/Sidebar';
 import { ChatArea } from './components/chat/ChatArea';
 import { ChatHeader } from './components/chat/ChatHeader';
@@ -10,6 +10,7 @@ import { CommandPaletteModal } from './components/palette/CommandPaletteModal';
 import { ModelSwitchModal } from './components/modals/ModelSwitchModal';
 import { NewProjectModal } from './components/modals/NewProjectModal';
 import { AssessmentModal } from './components/modals/AssessmentModal';
+import { UserProfileModal } from './components/modals/UserProfileModal';
 
 import { LearnView } from './components/views/LearnView';
 import { KnowledgeView } from './components/views/KnowledgeView';
@@ -21,7 +22,9 @@ import { JudgeControlView } from './components/views/JudgeControlView';
 import { ProjectsView } from './components/views/ProjectsView';
 import { ProjectDashboardView } from './components/views/ProjectDashboardView';
 import { CustomAssessmentView } from './components/views/CustomAssessmentView';
+import { CommunityView } from './components/views/CommunityView';
 import { AdaptiveLearningDashboard } from './components/dashboard/AdaptiveLearningDashboard';
+import { OSDashboard } from './components/dashboard/OSDashboard';
 
 import { useAppStore } from './stores/appStore';
 import {
@@ -32,6 +35,7 @@ import {
   deleteChat as dbDeleteChat,
   getMessages,
   addMessage,
+  deleteMessage,
   getProjects,
   addProject,
   deleteProject as dbDeleteProject,
@@ -80,10 +84,14 @@ export function App() {
   const [projects, setProjects] = useState<ProjectItem[]>([]);
   const [messages, setMessages] = useState<ChatMessageType[]>([]);
   const [showSettings, setShowSettings] = useState(false);
+  const [showUserProfileModal, setShowUserProfileModal] = useState(false);
   const [showNewProjectModal, setShowNewProjectModal] = useState(false);
   const [isAssessmentOpen, setIsAssessmentOpen] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
-  const [isSidebarPinned, setIsSidebarPinned] = useState(true);
+  const [isSidebarPinned, setIsSidebarPinned] = useState<boolean>(() => {
+    return localStorage.getItem('sidebar_pinned') === 'true';
+  });
+  const abortControllerRef = useRef<AbortController | null>(null);
 
   // Initialize app settings, projects, and local persistence.
   useEffect(() => {
@@ -142,16 +150,18 @@ export function App() {
     await loadChats(undefined, projectId);
   };
 
-  const handleNewChat = async (initialPrompt?: string) => {
-    const title = initialPrompt ? initialPrompt.slice(0, 30) : 'New Chat';
-    const chat = await createChat(title, selectedModel, activeProjectId || undefined);
+  const handleNewChat = async (initialPrompt?: string, targetProjectId?: string | null) => {
+    const projId = targetProjectId !== undefined ? targetProjectId : activeProjectId;
+    const title = initialPrompt ? initialPrompt.slice(0, 40) : 'New Chat';
+    const chat = await createChat(title, selectedModel, projId || undefined);
+    setActiveProjectId(projId);
     setCurrentChatId(chat.id);
     setMessages([]);
     setActiveWorkspaceView('chat');
-    await loadChats(chat.id, activeProjectId);
+    await loadChats(chat.id, projId);
 
     if (initialPrompt) {
-      handleSendMessage(initialPrompt);
+      handleSendMessage(initialPrompt, chat.id);
     }
   };
 
@@ -238,12 +248,12 @@ export function App() {
 
     const conceptsText = extractedConcepts.length > 0 ? `\n\nTarget Concepts to Master:\n${extractedConcepts.map((c) => `- ${c}`).join('\n')}` : '';
     const kickoffPrompt = `Let's begin an adaptive learning session on ${subjectName}.${conceptsText}\n\nResearch Summary:\n${summary}`;
-    handleSendMessage(kickoffPrompt);
+    handleSendMessage(kickoffPrompt, chat.id);
   };
 
   // Main streaming chat completion logic connected to PS6 engine
-  const handleSendMessage = async (userPrompt: string) => {
-    let targetChatId = currentChatId;
+  const handleSendMessage = async (userPrompt: string, overrideChatId?: string) => {
+    let targetChatId = overrideChatId || currentChatId;
 
     if (!targetChatId) {
       const newChat = await createChat('New Chat', selectedModel, activeProjectId || undefined);
@@ -405,16 +415,61 @@ export function App() {
   };
 
   const handleStopStreaming = () => {
+    if (abortControllerRef.current) {
+      try {
+        abortControllerRef.current.abort();
+      } catch (e) {
+        console.warn('Error aborting stream:', e);
+      }
+      abortControllerRef.current = null;
+    }
     setIsStreaming(false);
+    setStreamingContent('');
     setGenerationStage('idle');
     resetThinkingTimeline();
   };
 
-  const handleRegenerate = () => {
+  const handleRegenerate = async () => {
+    if (!currentChatId || messages.length === 0) return;
     const lastUserMsg = [...messages].reverse().find((m) => m.role === 'user');
-    if (lastUserMsg) {
-      handleSendMessage(lastUserMsg.content);
+    if (!lastUserMsg) return;
+
+    handleStopStreaming();
+
+    // If last message was assistant response, remove it before generating new one
+    const lastMsg = messages[messages.length - 1];
+    if (lastMsg.role === 'assistant' && lastMsg.id) {
+      await deleteMessage(lastMsg.id);
+      setMessages((prev) => prev.slice(0, -1));
     }
+
+    handleSendMessage(lastUserMsg.content);
+  };
+
+  const handleEditMessage = async (messageId: string, newPrompt: string) => {
+    if (!currentChatId) return;
+
+    const msgIndex = messages.findIndex((m) => m.id === messageId);
+    if (msgIndex === -1) {
+      handleSendMessage(newPrompt);
+      return;
+    }
+
+    handleStopStreaming();
+
+    // Delete the target message and all subsequent messages to maintain conversation continuity
+    const messagesToDelete = messages.slice(msgIndex);
+    for (const m of messagesToDelete) {
+      if (m.id) {
+        await deleteMessage(m.id);
+      }
+    }
+
+    const preserved = messages.slice(0, msgIndex);
+    setMessages(preserved);
+
+    // Re-submit updated prompt
+    await handleSendMessage(newPrompt);
   };
 
   const handleExportChat = async () => {
@@ -444,7 +499,7 @@ export function App() {
   const projectChats = chats.filter((c) => c.project_id === activeProjectId);
 
   return (
-    <div className="flex h-screen w-screen overflow-hidden bg-[#f6f8fb] dark:bg-[#0b0d10] text-zinc-900 dark:text-zinc-100 font-sans transition-colors">
+    <div className="flex h-screen w-screen overflow-hidden bg-[#fafafa] dark:bg-[#09090b] text-zinc-900 dark:text-zinc-100 font-sans transition-colors">
       <Sidebar
         chats={chats}
         projects={projects}
@@ -454,7 +509,17 @@ export function App() {
         isOpen={isSidebarOpen}
         onClose={() => setIsSidebarOpen(false)}
         isPinned={isSidebarPinned}
-        onTogglePinSidebar={() => setIsSidebarPinned(!isSidebarPinned)}
+        onTogglePinSidebar={() => {
+          setIsSidebarPinned((prev) => {
+            const next = !prev;
+            localStorage.setItem('sidebar_pinned', String(next));
+            return next;
+          });
+        }}
+        onRefreshData={() => {
+          loadChats();
+          loadProjects();
+        }}
         onSelectView={(v) => {
           setActiveWorkspaceView(v);
           if (!isSidebarPinned) setIsSidebarOpen(false);
@@ -478,10 +543,11 @@ export function App() {
         onDeleteChat={handleDeleteChat}
         onDeleteProject={handleDeleteProject}
         onOpenSettings={() => setShowSettings(true)}
+        onOpenProfile={() => setShowUserProfileModal(true)}
       />
 
       {/* Main Workspace Area */}
-      <main className="flex-1 h-screen flex flex-col overflow-hidden bg-[#f6f8fb] dark:bg-[#0b0d10] text-zinc-900 dark:text-zinc-100 relative transition-colors">
+      <main className="flex-1 h-screen flex flex-col overflow-hidden bg-[#fafafa] dark:bg-[#09090b] text-zinc-900 dark:text-zinc-100 relative transition-colors">
         {activeWorkspaceView !== 'project_dashboard' && activeWorkspaceView !== 'projects' && (
           <ChatHeader
             chatTitle={
@@ -491,20 +557,28 @@ export function App() {
             }
             projectName={activeProject ? activeProject.name : null}
             onExport={handleExportChat}
-            onOpenAssessment={() => setIsAssessmentOpen(true)}
             onToggleSidebar={() => setIsSidebarOpen(!isSidebarOpen)}
           />
         )}
 
         <div className="flex-1 flex overflow-hidden">
+          {activeWorkspaceView === 'welcome' && (
+            <OSDashboard
+              onNewChat={() => handleNewChat()}
+              onOpenSettings={() => setShowSettings(true)}
+            />
+          )}
+
           {activeWorkspaceView === 'chat' && (
             <ChatArea
               chatTitle={activeChat?.title || 'LearnForge'}
+              projectName={activeProject ? activeProject.name : null}
               messages={messages}
               onSendMessage={handleSendMessage}
               onStopStreaming={handleStopStreaming}
               onRegenerate={handleRegenerate}
               onExport={handleExportChat}
+              onEditMessage={handleEditMessage}
             />
           )}
 
@@ -527,7 +601,7 @@ export function App() {
               activeChatId={currentChatId}
               onBackToProjects={() => setActiveWorkspaceView('projects')}
               onSelectChat={handleSelectChat}
-              onNewChat={(prompt) => handleNewChat(prompt)}
+              onNewChat={(prompt) => handleNewChat(prompt, activeProject.id)}
               onDeleteChat={handleDeleteChat}
               onOpenAssessment={() => setIsAssessmentOpen(true)}
               onSendMessage={handleSendMessage}
@@ -546,26 +620,30 @@ export function App() {
           {activeWorkspaceView === 'custom_assessment' && (
             <CustomAssessmentView
               onStartRemediationChat={(prompt) => {
-                setActiveWorkspaceView('chat');
-                handleSendMessage(prompt);
+                handleNewChat(prompt, null);
               }}
             />
           )}
 
           {activeWorkspaceView === 'learn' && (
-            <LearnView onStartTopicChat={(topic) => handleNewChat(topic)} />
+            <LearnView onStartTopicChat={(topic) => handleNewChat(topic, activeProjectId)} />
           )}
 
           {activeWorkspaceView === 'knowledge' && <KnowledgeView projectId={activeProjectId} />}
 
           {activeWorkspaceView === 'research' && (
             <ResearchView
-              onStartTopicChat={(topic) => handleNewChat(topic)}
+              onStartTopicChat={(topic) => handleNewChat(topic, activeProjectId)}
               onConvertToSubject={handleConvertResearchToSubject}
             />
           )}
 
-          {activeWorkspaceView === 'story_challenge' && <StoryChallengeView projectId={activeProjectId} />}
+          {activeWorkspaceView === 'story_challenge' && (
+            <StoryChallengeView
+              projectId={activeProjectId}
+              onExplainInChat={(prompt) => handleNewChat(prompt, activeProjectId)}
+            />
+          )}
 
           {activeWorkspaceView === 'analytics' && (
             <AnalyticsView
@@ -581,6 +659,16 @@ export function App() {
           {activeWorkspaceView === 'evaluation_lab' && <EvaluationLabView />}
 
           {activeWorkspaceView === 'judge_control' && <JudgeControlView />}
+
+          {activeWorkspaceView === 'community' && (
+            <CommunityView
+              onSelectProject={(projId) => {
+                handleSelectProject(projId);
+                setActiveWorkspaceView('project_dashboard');
+              }}
+              onRefreshProjects={loadProjects}
+            />
+          )}
         </div>
       </main>
 
@@ -594,6 +682,14 @@ export function App() {
       <DebugPanel isOpen={false} onClose={() => {}} />
 
       {showSettings && <SettingsPanel onClose={() => setShowSettings(false)} />}
+      <UserProfileModal
+        isOpen={showUserProfileModal}
+        onClose={() => setShowUserProfileModal(false)}
+        onSelectProject={(projId) => {
+          handleSelectProject(projId);
+          setActiveWorkspaceView('project_dashboard');
+        }}
+      />
       <ModelSwitchModal />
       <NewProjectModal
         isOpen={showNewProjectModal}
@@ -603,10 +699,12 @@ export function App() {
       <AssessmentModal
         isOpen={isAssessmentOpen}
         topicTitle={activeProject ? activeProject.name : activeChat?.title || 'Core Concepts'}
+        extractedConcepts={messages.map((m) => m.content.slice(0, 120)).filter(Boolean)}
         onClose={() => setIsAssessmentOpen(false)}
         onStartRemediationChat={(prompt) => {
-          setActiveWorkspaceView('chat');
-          handleSendMessage(prompt);
+          setIsAssessmentOpen(false);
+          const targetProjectId = activeProjectId || (activeProject ? activeProject.id : null);
+          handleNewChat(prompt, targetProjectId);
         }}
       />
     </div>

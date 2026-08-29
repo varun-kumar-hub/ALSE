@@ -38,10 +38,24 @@ export const PROVIDER_REGISTRY: Record<string, ProviderRegistryItem> = {
     modelsEndpoint: 'https://api.openai.com/v1/models',
     chatEndpoint: 'https://api.openai.com/v1/chat/completions',
     defaultModel: 'gpt-4o-mini',
-    supportedModels: ['gpt-4o-mini', 'gpt-4o', 'o1-mini', 'o3-mini'],
+    supportedModels: ['gpt-4o-mini', 'gpt-4o', 'o1-mini', 'o3-mini', '01-ai/yi-large', 'ox-alpha'],
     capabilities: ['chat', 'streaming', 'title-generation', 'json', 'tools', 'reasoning', 'coding', 'research', 'vision'],
     authHeader: (key) => ({ Authorization: `Bearer ${key}` }),
-    apiKeyPattern: /^sk-proj-/,
+    apiKeyPattern: /^sk-/,
+  },
+  ox: {
+    id: 'ox',
+    name: 'OX Alpha (01-ai)',
+    aliases: ['ox', 'ox-alpha', '01-ai', 'yi', 'yi-large', 'yi-lightning'],
+    kind: 'cloud',
+    baseUrl: 'https://api.openai.com/v1',
+    modelsEndpoint: 'https://api.openai.com/v1/models',
+    chatEndpoint: 'https://api.openai.com/v1/chat/completions',
+    defaultModel: '01-ai/yi-large',
+    supportedModels: ['01-ai/yi-large', '01-ai/yi-medium', '01-ai/yi-lightning', 'ox-alpha'],
+    capabilities: ['chat', 'streaming', 'title-generation', 'json', 'tools', 'reasoning', 'coding', 'research'],
+    authHeader: (key) => ({ Authorization: `Bearer ${key}` }),
+    apiKeyPattern: /^(sk-|ox-)/,
   },
   anthropic: {
     id: 'anthropic',
@@ -90,11 +104,23 @@ export const PROVIDER_REGISTRY: Record<string, ProviderRegistryItem> = {
     baseUrl: 'https://openrouter.ai/api/v1',
     modelsEndpoint: 'https://openrouter.ai/api/v1/models',
     chatEndpoint: 'https://openrouter.ai/api/v1/chat/completions',
-    defaultModel: 'meta-llama/llama-3.1-70b-instruct',
-    supportedModels: ['meta-llama/llama-3.1-70b-instruct'],
+    defaultModel: '01-ai/yi-large',
+    supportedModels: [
+      '01-ai/yi-large',
+      '01-ai/yi-medium',
+      '01-ai/yi-lightning',
+      'meta-llama/llama-3.3-70b-instruct',
+      'meta-llama/llama-3.1-70b-instruct',
+      'openai/gpt-4o-mini',
+      'openai/gpt-4o',
+      'anthropic/claude-3.5-sonnet',
+      'deepseek/deepseek-chat',
+      'qwen/qwen-2.5-72b-instruct',
+      'ox-alpha',
+    ],
     capabilities: ['chat', 'streaming', 'title-generation', 'json', 'tools', 'reasoning', 'coding', 'research', 'vision'],
     authHeader: (key) => ({ Authorization: `Bearer ${key}` }),
-    apiKeyPattern: /^sk-or-v1-/,
+    apiKeyPattern: /^sk-or-/,
   },
   groq: {
     id: 'groq',
@@ -121,13 +147,15 @@ export const PROVIDER_REGISTRY: Record<string, ProviderRegistryItem> = {
     defaultModel: 'nvidia/nemotron-3-super-120b-a12b',
     supportedModels: [
       'nvidia/nemotron-3-super-120b-a12b',
+      'nvidia/llama-3.1-nemotron-70b-instruct',
+      'nvidia/nemotron-4-340b-instruct',
+      'nvidia/nemotron-mini-4b-instruct',
       'nvidia/nemotron-3-ultra-550b-a55b',
       'nvidia/nemotron-3-nano-30b-a3b',
-      'openai/gpt-oss-120b',
-      'openai/gpt-oss-20b',
-      'google/gemma-4-31b-it',
-      'meta/llama-3.2-11b-vision-instruct',
-      'meta/llama-3.2-90b-vision-instruct',
+      'meta/llama-3.1-70b-instruct',
+      'deepseek-ai/deepseek-r1',
+      'google/gemma-2-27b-it',
+      'mistralai/mixtral-8x22b-instruct-v0.1',
     ],
     capabilities: ['chat', 'streaming', 'title-generation', 'json', 'tools', 'reasoning', 'coding', 'research', 'vision'],
     authHeader: (key) => ({ Authorization: `Bearer ${key}` }),
@@ -187,34 +215,20 @@ export function validateProviderModelCompatibility(
   const pId = providerId.toLowerCase();
   const mId = modelId.toLowerCase();
 
+  // Multi-model routing providers support any cloud model
+  if (['openrouter', 'nvidia', 'ox', 'custom', 'groq'].includes(pId)) {
+    return { valid: true };
+  }
+
   // 1. Local Ollama provider check
   if (pId === 'ollama' || pId === 'local') {
-    if (mId.includes('opencode') || mId.includes('gpt-5') || mId.includes('claude') || mId.includes('gemini')) {
+    if (mId.includes('opencode') || mId.includes('gpt-5') || mId.includes('claude') || mId.includes('gemini') || mId.includes('nemotron')) {
       return {
         valid: false,
         reason: `The cloud model "${modelId}" cannot be executed via local Ollama. Please select a local model (e.g. qwen3:8b or llama3.2).`,
       };
     }
     return { valid: true };
-  }
-
-  // 2. OpenCode Zen provider check
-  if (pId === 'opencode') {
-    if (mId.includes('llama') || mId.includes('qwen') || mId.includes('mistral') || mId.includes('phi')) {
-      return {
-        valid: false,
-        reason: `The local model "${modelId}" does not belong to OpenCode Zen. Please select an OpenCode Zen model (e.g. opencode-zen-coder or gpt-5.6-sol).`,
-      };
-    }
-    return { valid: true };
-  }
-
-  // 3. OpenAI provider check
-  if (pId === 'openai' && (mId.includes('llama') || mId.includes('claude') || mId.includes('gemini'))) {
-    return {
-      valid: false,
-      reason: `The model "${modelId}" does not belong to OpenAI.`,
-    };
   }
 
   return { valid: true };
@@ -278,8 +292,15 @@ export async function validateAndDiscoverProvider(
 
   const registry = PROVIDER_REGISTRY[providerId] || PROVIDER_REGISTRY.custom;
   const startTime = Date.now();
+  const cleanKey = apiKey.trim();
+  let effectiveProviderId = providerId;
   let modelsEndpoint = registry.modelsEndpoint;
-  if (registry.isCustom && customBaseUrl) {
+
+  // Auto-detect OpenRouter API key format
+  if (cleanKey.startsWith('sk-or-')) {
+    effectiveProviderId = 'openrouter';
+    modelsEndpoint = 'https://openrouter.ai/api/v1/models';
+  } else if (registry.isCustom && customBaseUrl) {
     const cleanBase = customBaseUrl.replace(/\/+$/, '');
     modelsEndpoint = `${cleanBase}/models`;
   }
@@ -295,17 +316,36 @@ export async function validateAndDiscoverProvider(
         message: string;
         latency_ms: number;
       }>('verify_cloud_provider', {
-        providerId,
+        providerId: effectiveProviderId,
         endpoint: modelsEndpoint,
-        apiKey: apiKey.trim(),
+        apiKey: cleanKey,
         authHeaderName: null,
         customHeaders: null,
       });
 
       if (rustRes.connected) {
+        let models = rustRes.models.length > 0 ? rustRes.models : registry.supportedModels;
+        if (effectiveProviderId === 'nvidia') {
+          const nemotronGuaranteed = [
+            'nvidia/nemotron-3-super-120b-a12b',
+            'nvidia/llama-3.1-nemotron-70b-instruct',
+            'nvidia/nemotron-4-340b-instruct',
+            'nvidia/nemotron-mini-4b-instruct',
+            'nvidia/nemotron-3-ultra-550b-a55b',
+            'nvidia/nemotron-3-nano-30b-a3b',
+          ];
+          models = Array.from(new Set([...nemotronGuaranteed, ...models]));
+          models.sort((a, b) => {
+            const aNem = a.toLowerCase().includes('nemotron') || a.toLowerCase().startsWith('nvidia/');
+            const bNem = b.toLowerCase().includes('nemotron') || b.toLowerCase().startsWith('nvidia/');
+            if (aNem && !bNem) return -1;
+            if (!aNem && bNem) return 1;
+            return a.localeCompare(b);
+          });
+        }
         return {
           connected: true,
-          models: rustRes.models.length > 0 ? rustRes.models : registry.supportedModels,
+          models,
           capabilities: registry.capabilities,
           latencyMs: rustRes.latency_ms,
         };
@@ -406,7 +446,26 @@ export async function validateAndDiscoverProvider(
       models = json.models.map((m: { id?: string; name?: string }) => m.id || m.name || '').filter(Boolean);
     }
 
-    const finalModels = models.length > 0 ? models.slice(0, 40) : registry.supportedModels;
+    let finalModels = models.length > 0 ? models : registry.supportedModels;
+
+    if (effectiveProviderId === 'nvidia') {
+      const nemotronGuaranteed = [
+        'nvidia/nemotron-3-super-120b-a12b',
+        'nvidia/llama-3.1-nemotron-70b-instruct',
+        'nvidia/nemotron-4-340b-instruct',
+        'nvidia/nemotron-mini-4b-instruct',
+        'nvidia/nemotron-3-ultra-550b-a55b',
+        'nvidia/nemotron-3-nano-30b-a3b',
+      ];
+      finalModels = Array.from(new Set([...nemotronGuaranteed, ...finalModels]));
+      finalModels.sort((a, b) => {
+        const aNem = a.toLowerCase().includes('nemotron') || a.toLowerCase().startsWith('nvidia/');
+        const bNem = b.toLowerCase().includes('nemotron') || b.toLowerCase().startsWith('nvidia/');
+        if (aNem && !bNem) return -1;
+        if (!aNem && bNem) return 1;
+        return a.localeCompare(b);
+      });
+    }
 
     return {
       connected: true,

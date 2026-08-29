@@ -429,6 +429,25 @@ export async function addMessage(
   return msg;
 }
 
+export async function deleteMessage(messageId: string): Promise<void> {
+  const db = await initDatabase();
+  if (isFallbackMode || !db) {
+    // Check all chat message stores in localStorageFallback
+    const chats = localStorageFallback.getChats();
+    for (const chat of chats) {
+      const msgs = localStorageFallback.getMessages(chat.id);
+      const filtered = msgs.filter((m) => m.id !== messageId);
+      if (filtered.length !== msgs.length) {
+        localStorageFallback.saveMessages(chat.id, filtered);
+        break;
+      }
+    }
+    return;
+  }
+
+  await db.execute(`DELETE FROM messages WHERE id = $1`, [messageId]);
+}
+
 /* ================= Settings CRUD ================= */
 
 export async function getSetting(key: string, defaultValue: string): Promise<string> {
@@ -518,6 +537,11 @@ export interface ProjectItem {
   created_at: string;
   updated_at?: string;
   is_archived?: boolean;
+  is_public?: boolean;
+  author?: string;
+  likes_count?: number;
+  clones_count?: number;
+  tags?: string[];
 }
 
 export interface NoteItem {
@@ -527,6 +551,69 @@ export interface NoteItem {
   content: string;
   updatedAt: string;
 }
+
+const DEFAULT_COMMUNITY_PROJECTS: ProjectItem[] = [
+  {
+    id: 'comm-dl-backprop',
+    name: 'Deep Learning & Backpropagation',
+    topic: 'Neural Networks & Optimization',
+    goal: 'Master chain rule derivations, matrix gradients, and optimizer algorithms',
+    description: 'Complete mathematical foundations of backpropagation, tensor jacobians, loss landscapes, and Adam/SGD optimizers.',
+    learning_budget: 45,
+    icon: '🧠',
+    is_public: true,
+    author: 'LearnForge Science Lab',
+    likes_count: 142,
+    clones_count: 89,
+    tags: ['Machine Learning', 'Mathematics', 'Neural Networks'],
+    created_at: '2026-08-01T00:00:00.000Z',
+  },
+  {
+    id: 'comm-os-concurrency',
+    name: 'Operating Systems & Concurrency',
+    topic: 'Systems Architecture',
+    goal: 'Master kernel scheduling, virtual memory paging, and deadlock synchronization',
+    description: 'Comprehensive study of POSIX threads, race condition prevention, semaphores, memory management units, and scheduling.',
+    learning_budget: 35,
+    icon: '⚡',
+    is_public: true,
+    author: 'Systems Engineering Collective',
+    likes_count: 118,
+    clones_count: 74,
+    tags: ['Operating Systems', 'Concurrency', 'Linux Kernel'],
+    created_at: '2026-08-05T00:00:00.000Z',
+  },
+  {
+    id: 'comm-system-design-raft',
+    name: 'Distributed Systems & Raft Consensus',
+    topic: 'Distributed Architecture',
+    goal: 'Understand leader election, log replication, safety guarantees, and split-brain recovery',
+    description: 'In-depth coverage of fault-tolerant distributed state machines, RPC protocols, quorum intersection, and vector clocks.',
+    learning_budget: 40,
+    icon: '🌐',
+    is_public: true,
+    author: 'Distributed Systems Group',
+    likes_count: 96,
+    clones_count: 61,
+    tags: ['System Design', 'Distributed Systems', 'Raft'],
+    created_at: '2026-08-10T00:00:00.000Z',
+  },
+  {
+    id: 'comm-quantum-mechanics',
+    name: 'Quantum Computing Fundamentals',
+    topic: 'Quantum Information',
+    goal: 'Master qubits, superposition, entanglement, Bloch sphere rotations, and quantum gates',
+    description: 'Linear algebra basis vectors, unitary transformations, Hadamard gates, Bell states, and quantum teleportation.',
+    learning_budget: 50,
+    icon: '⚛️',
+    is_public: true,
+    author: 'Quantum Physics Initiative',
+    likes_count: 85,
+    clones_count: 48,
+    tags: ['Quantum Computing', 'Physics', 'Linear Algebra'],
+    created_at: '2026-08-15T00:00:00.000Z',
+  },
+];
 
 const DEFAULT_PROJECTS: ProjectItem[] = [];
 
@@ -556,6 +643,69 @@ export async function getProjects(): Promise<ProjectItem[]> {
     return DEFAULT_PROJECTS;
   }
   return rows;
+}
+
+export async function getCommunityProjects(): Promise<ProjectItem[]> {
+  const userProjects = await getProjects();
+  const publicUserProjects = userProjects.filter((p) => p.is_public);
+  const rawCommunity = localStorage.getItem('learnforge_community_projects');
+  let customCommunity: ProjectItem[] = [];
+  if (rawCommunity) {
+    try {
+      customCommunity = JSON.parse(rawCommunity);
+    } catch {
+      customCommunity = [];
+    }
+  }
+
+  // Combine default community projects + any published user projects
+  const map = new Map<string, ProjectItem>();
+  DEFAULT_COMMUNITY_PROJECTS.forEach((p) => map.set(p.id, p));
+  customCommunity.forEach((p) => map.set(p.id, p));
+  publicUserProjects.forEach((p) => map.set(p.id, p));
+
+  return Array.from(map.values());
+}
+
+export async function toggleProjectPublicStatus(projectId: string, isPublic: boolean): Promise<void> {
+  const existing = await getProjects();
+  const target = existing.find((p) => p.id === projectId);
+  if (!target) return;
+
+  const updatedTarget = {
+    ...target,
+    is_public: isPublic,
+    author: target.author || 'LearnForge Learner',
+    updated_at: new Date().toISOString(),
+  };
+
+  await updateProject(projectId, { is_public: isPublic });
+
+  // Update in community storage
+  const rawCommunity = localStorage.getItem('learnforge_community_projects');
+  let customCommunity: ProjectItem[] = rawCommunity ? JSON.parse(rawCommunity) : [];
+  if (isPublic) {
+    customCommunity = [updatedTarget, ...customCommunity.filter((p) => p.id !== projectId)];
+  } else {
+    customCommunity = customCommunity.filter((p) => p.id !== projectId);
+  }
+  localStorage.setItem('learnforge_community_projects', JSON.stringify(customCommunity));
+}
+
+export async function cloneCommunityProject(communityProj: ProjectItem): Promise<ProjectItem> {
+  const newId = String(Date.now());
+  const cloned: ProjectItem = {
+    ...communityProj,
+    id: newId,
+    name: `${communityProj.name} (Copy)`,
+    is_public: false,
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+  };
+
+  const existing = await getProjects();
+  localStorage.setItem('ai_os_projects', JSON.stringify([cloned, ...existing]));
+  return cloned;
 }
 
 export async function createProject(
