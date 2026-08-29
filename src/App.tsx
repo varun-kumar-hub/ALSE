@@ -648,19 +648,26 @@ export function App() {
             />
           )}
 
-          {activeWorkspaceView === 'project_dashboard' && activeProject && (
-            <ProjectDashboardView
-              project={activeProject}
-              projectChats={projectChats}
-              activeChatId={currentChatId}
-              onBackToProjects={() => switchWorkspaceView('projects')}
-              onSelectChat={handleSelectChat}
-              onNewChat={(prompt) => handleNewChat(prompt, activeProject.id)}
-              onDeleteChat={handleDeleteChat}
-              onOpenAssessment={() => setIsAssessmentOpen(true)}
-              onSendMessage={handleSendMessage}
-              onExport={handleExportChat}
-            />
+          {activeWorkspaceView === 'project_dashboard' && (
+            activeProject ? (
+              <ProjectDashboardView
+                project={activeProject}
+                projectChats={projectChats}
+                activeChatId={currentChatId}
+                onBackToProjects={() => switchWorkspaceView('projects')}
+                onSelectChat={handleSelectChat}
+                onNewChat={(prompt) => handleNewChat(prompt, activeProject.id)}
+                onDeleteChat={handleDeleteChat}
+                onOpenAssessment={() => setIsAssessmentOpen(true)}
+                onSendMessage={handleSendMessage}
+                onExport={handleExportChat}
+              />
+            ) : (
+              <div className="flex-1 h-full flex flex-col items-center justify-center p-8 text-center space-y-3">
+                <div className="w-7 h-7 rounded-full border-2 border-blue-500 border-t-transparent animate-spin" />
+                <p className="text-xs font-mono text-zinc-500 dark:text-zinc-400">Loading subject workspace...</p>
+              </div>
+            )
           )}
 
           {activeWorkspaceView === 'dashboard' && (
