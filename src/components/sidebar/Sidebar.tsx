@@ -899,6 +899,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
                       <div
                         onClick={() => {
                           onSelectProject(proj.id);
+                          const nextExpanded = !isSubjectExpanded(proj.id);
+                          // Toggle accordion: if closed -> open and reveal chats, if open -> close
+                          setExpandedSubjectIds((prev) => ({
+                            ...prev,
+                            [proj.id]: nextExpanded,
+                          }));
                           onSelectView('project_dashboard');
                         }}
                         className={`group flex items-center justify-between px-3 py-2 rounded-xl text-xs font-medium transition cursor-pointer ${

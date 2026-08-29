@@ -609,6 +609,9 @@ export function App() {
             projectName={activeProject ? activeProject.name : null}
             onExport={handleExportChat}
             onToggleSidebar={() => setIsSidebarOpen(!isSidebarOpen)}
+            onBackToSubjectChats={
+              activeProject ? () => switchWorkspaceView('project_dashboard', activeProject.id) : undefined
+            }
           />
         )}
 

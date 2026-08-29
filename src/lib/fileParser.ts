@@ -15,6 +15,13 @@ export interface ParsedFileInfo {
   isTruncated: boolean;
 }
 
+export interface ParsedUserMessage {
+  hasAttachedFile: boolean;
+  fileName?: string;
+  fileMeta?: string;
+  userPrompt: string;
+}
+
 const MAX_CHAR_LIMIT = 45000; // ~10k tokens safe payload
 
 export async function parseUploadedFile(file: File): Promise<ParsedFileInfo> {
@@ -44,7 +51,9 @@ export async function parseUploadedFile(file: File): Promise<ParsedFileInfo> {
 
   let isTruncated = false;
   if (textContent.length > MAX_CHAR_LIMIT) {
-    textContent = textContent.slice(0, MAX_CHAR_LIMIT) + `\n\n[...File truncated at ${MAX_CHAR_LIMIT} characters for optimal processing...]`;
+    textContent =
+      textContent.slice(0, MAX_CHAR_LIMIT) +
+      `\n\n[...File truncated at ${MAX_CHAR_LIMIT} characters for optimal processing...]`;
     isTruncated = true;
   }
 
@@ -67,7 +76,7 @@ function isCodeOrTextExtension(ext: string): boolean {
     'txt', 'md', 'json', 'csv', 'tsv', 'yaml', 'yml', 'xml', 'html', 'css', 'scss',
     'js', 'jsx', 'ts', 'tsx', 'py', 'java', 'c', 'cpp', 'h', 'hpp', 'cs', 'rs',
     'go', 'php', 'rb', 'swift', 'kt', 'sql', 'sh', 'bat', 'ps1', 'env', 'log',
-    'dockerfile', 'ini', 'toml', 'cfg'
+    'dockerfile', 'ini', 'toml', 'cfg',
   ];
   return codeExts.includes(ext);
 }
@@ -82,19 +91,17 @@ function readFileAsText(file: File): Promise<string> {
 }
 
 async function readPdfFallback(file: File): Promise<string> {
-  // Simple PDF text stream extraction fallback
   const buffer = await file.arrayBuffer();
   const bytes = new Uint8Array(buffer);
   let rawStr = '';
-  // Extract printable ascii/utf-8 characters
   for (let i = 0; i < bytes.length; i++) {
     const b = bytes[i];
     if ((b >= 32 && b <= 126) || b === 10 || b === 13) {
       rawStr += String.fromCharCode(b);
     }
   }
-  // Strip binary metadata tags
-  const clean = rawStr.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F-\x9F]/g, ' ')
+  const clean = rawStr
+    .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F-\x9F]/g, ' ')
     .replace(/\s{3,}/g, '\n')
     .trim();
 
@@ -112,5 +119,34 @@ export function formatFilePrompt(fileInfo: ParsedFileInfo, userQuestion: string)
     return `${header}\n${fileInfo.content}\n${footer}\n\nPlease provide a comprehensive summary and analysis of this file.`;
   }
 
-  return `${header}\n${fileInfo.content}\n${footer}\n\nUser Question regarding this file:\n${userQuestion.trim()}`;
+  return `${header}\n${fileInfo.content}\n${footer}\n\n${userQuestion.trim()}`;
+}
+
+/**
+ * Parses user message content to separate attached file metadata from user question text for UI rendering.
+ */
+export function parseUserMessageContent(rawContent: string): ParsedUserMessage {
+  if (!rawContent) return { hasAttachedFile: false, userPrompt: '' };
+
+  const fileBlockRegex = /---\s*\[ATTACHED FILE:\s*([^\n(]+?)\s*\(([^)\n]+?)\)\]\s*---([\s\S]*?)---\s*\[END OF ATTACHED FILE:[^\]\n]*\]\s*---/i;
+  const match = rawContent.match(fileBlockRegex);
+
+  if (match) {
+    const fileName = match[1].trim();
+    const fileMeta = match[2].trim();
+    let promptAfter = rawContent.replace(match[0], '').trim();
+    promptAfter = promptAfter.replace(/^User Question regarding this file:\s*/i, '').trim();
+
+    return {
+      hasAttachedFile: true,
+      fileName,
+      fileMeta,
+      userPrompt: promptAfter,
+    };
+  }
+
+  return {
+    hasAttachedFile: false,
+    userPrompt: rawContent,
+  };
 }

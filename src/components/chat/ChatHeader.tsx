@@ -1,4 +1,5 @@
-import { Cpu, Download, Folder, MessageSquare, Sun, Moon, Menu } from 'lucide-react';
+import React from 'react';
+import { Cpu, Download, Folder, MessageSquare, Sun, Moon, Menu, ArrowLeft } from 'lucide-react';
 import { useAppStore } from '../../stores/appStore';
 
 interface ChatHeaderProps {
@@ -6,6 +7,7 @@ interface ChatHeaderProps {
   projectName?: string | null;
   onExport: () => void;
   onToggleSidebar?: () => void;
+  onBackToSubjectChats?: () => void;
 }
 
 export const ChatHeader: React.FC<ChatHeaderProps> = ({
@@ -13,6 +15,7 @@ export const ChatHeader: React.FC<ChatHeaderProps> = ({
   projectName,
   onExport,
   onToggleSidebar,
+  onBackToSubjectChats,
 }) => {
   const { executionConfig, aiMode, selectedModel, theme, setTheme } = useAppStore();
 
@@ -21,7 +24,7 @@ export const ChatHeader: React.FC<ChatHeaderProps> = ({
 
   return (
     <header className="h-14 w-full flex items-center justify-between px-4 sm:px-6 border-b border-zinc-200 dark:border-zinc-800 bg-white dark:bg-[#0f0f12] text-zinc-900 dark:text-white shrink-0 z-10 select-none transition-colors">
-      {/* Title & Context Badge */}
+      {/* Title & Context Badge with Back Navigation */}
       <div className="flex items-center gap-2.5 min-w-0">
         {onToggleSidebar && (
           <button
@@ -32,19 +35,27 @@ export const ChatHeader: React.FC<ChatHeaderProps> = ({
             <Menu className="w-4 h-4" />
           </button>
         )}
-        <div className="flex items-center gap-2 px-2.5 py-1 rounded-lg bg-zinc-100 dark:bg-zinc-850 border border-zinc-200 dark:border-zinc-800 text-xs text-zinc-700 dark:text-zinc-300 font-mono">
-          {projectName ? (
-            <>
-              <Folder className="w-3.5 h-3.5 text-zinc-600 dark:text-zinc-400 shrink-0" />
-              <span className="font-semibold text-zinc-950 dark:text-white truncate">{projectName}</span>
-            </>
-          ) : (
-            <>
-              <MessageSquare className="w-3.5 h-3.5 text-zinc-500 dark:text-zinc-400 shrink-0" />
-              <span className="font-semibold text-zinc-700 dark:text-zinc-300">General Workspace</span>
-            </>
-          )}
-        </div>
+
+        {projectName ? (
+          <button
+            type="button"
+            onClick={onBackToSubjectChats}
+            className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-zinc-100 dark:bg-zinc-850 hover:bg-zinc-200 dark:hover:bg-zinc-800 border border-zinc-200 dark:border-zinc-800 text-xs text-zinc-800 dark:text-zinc-200 font-mono transition cursor-pointer group shadow-2xs"
+            title={`Go back to all chats in ${projectName}`}
+          >
+            <ArrowLeft className="w-3.5 h-3.5 text-zinc-500 group-hover:text-blue-500 transition shrink-0" />
+            <Folder className="w-3.5 h-3.5 text-blue-500 shrink-0" />
+            <span className="font-bold text-zinc-950 dark:text-white truncate max-w-[160px]">{projectName}</span>
+            <span className="text-[10px] text-zinc-500 dark:text-zinc-400 group-hover:text-zinc-900 dark:group-hover:text-zinc-200 font-sans">
+              Chats
+            </span>
+          </button>
+        ) : (
+          <div className="flex items-center gap-2 px-2.5 py-1 rounded-lg bg-zinc-100 dark:bg-zinc-850 border border-zinc-200 dark:border-zinc-800 text-xs text-zinc-700 dark:text-zinc-300 font-mono">
+            <MessageSquare className="w-3.5 h-3.5 text-zinc-500 dark:text-zinc-400 shrink-0" />
+            <span className="font-semibold text-zinc-700 dark:text-zinc-300">General Workspace</span>
+          </div>
+        )}
 
         <span className="text-zinc-400 dark:text-zinc-600 font-mono text-xs">/</span>
 

@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import mermaid from 'mermaid';
-import { Network, AlertCircle, Copy, Check, Code2 } from 'lucide-react';
+import { Network, Copy, Check, Code2 } from 'lucide-react';
 import { useAppStore } from '../../stores/appStore';
 
 interface MermaidDiagramProps {

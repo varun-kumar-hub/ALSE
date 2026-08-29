@@ -16,6 +16,7 @@ import {
   AlertTriangle,
   Award,
   Zap,
+  FileCode,
 } from 'lucide-react';
 import { ChatMessage as ChatMessageType } from '../../services/types';
 import { ResponseActions } from './ResponseActions';
@@ -23,6 +24,7 @@ import { ThinkingCard } from './ThinkingCard';
 import { parseThinkingAndContent } from '../../lib/thoughtExtractor';
 import { cleanEducationalContent } from '../../lib/responseFilter';
 import { MermaidDiagram } from './MermaidDiagram';
+import { parseUserMessageContent } from '../../lib/fileParser';
 
 interface ChatMessageProps {
   message: ChatMessageType;
@@ -250,17 +252,23 @@ export const ChatMessageComponent: React.FC<ChatMessageProps> = ({
   const [editText, setEditText] = React.useState(message.content);
   const isUser = message.role === 'user';
 
+  const userMsgInfo = React.useMemo(() => {
+    if (!isUser) return null;
+    return parseUserMessageContent(message.content);
+  }, [message.content, isUser]);
+
   const parsed = React.useMemo(() => {
     if (isUser) return { thinking: '', content: message.content, isThinkingActive: false, activities: [] };
     return parseThinkingAndContent(message.content);
   }, [message.content, isUser]);
 
   React.useEffect(() => {
-    setEditText(message.content);
-  }, [message.content]);
+    setEditText(userMsgInfo?.userPrompt || message.content);
+  }, [message.content, userMsgInfo]);
 
   const handleCopyQuery = async () => {
-    await navigator.clipboard.writeText(message.content);
+    const textToCopy = userMsgInfo?.userPrompt || message.content;
+    await navigator.clipboard.writeText(textToCopy);
     setCopiedQuery(true);
     setTimeout(() => setCopiedQuery(false), 1600);
   };
@@ -364,7 +372,7 @@ export const ChatMessageComponent: React.FC<ChatMessageProps> = ({
                     <button
                       type="button"
                       onClick={() => {
-                        setEditText(message.content);
+                        setEditText(userMsgInfo?.userPrompt || message.content);
                         setIsEditing(false);
                       }}
                       className="px-2.5 py-1 rounded bg-blue-700/60 hover:bg-blue-700 text-white text-xs font-medium cursor-pointer transition"
@@ -382,9 +390,34 @@ export const ChatMessageComponent: React.FC<ChatMessageProps> = ({
                 </div>
               </div>
             ) : (
-              <p className="text-[14px] text-white whitespace-pre-wrap leading-relaxed select-text font-sans font-normal">
-                {message.content}
-              </p>
+              <div className="space-y-2 select-text font-sans font-normal">
+                {userMsgInfo?.hasAttachedFile && (
+                  <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-blue-700/90 border border-blue-400/80 text-white shadow-2xs">
+                    <FileCode className="w-4 h-4 text-blue-200 shrink-0" />
+                    <span className="font-semibold text-xs tracking-tight truncate max-w-[280px]">
+                      {userMsgInfo.fileName}
+                    </span>
+                    {userMsgInfo.fileMeta && (
+                      <span className="text-[11px] text-blue-200/90 font-mono">
+                        ({userMsgInfo.fileMeta})
+                      </span>
+                    )}
+                  </div>
+                )}
+                {userMsgInfo?.userPrompt ? (
+                  <p className="text-[14px] text-white whitespace-pre-wrap leading-relaxed">
+                    {userMsgInfo.userPrompt}
+                  </p>
+                ) : userMsgInfo?.hasAttachedFile ? (
+                  <p className="text-[13px] text-blue-100 italic leading-relaxed">
+                    Analyze attached document
+                  </p>
+                ) : (
+                  <p className="text-[14px] text-white whitespace-pre-wrap leading-relaxed">
+                    {message.content}
+                  </p>
+                )}
+              </div>
             )
           ) : (
             /* Assistant Message */
