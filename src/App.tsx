@@ -193,11 +193,11 @@ export function App() {
     }
   };
 
-  const handleSelectProject = async (projectId: string | null) => {
+  const handleSelectProject = async (projectId: string | null, explicitView?: string) => {
     setActiveProjectId(projectId);
     await loadChats(undefined, projectId);
-    const targetView = activeWorkspaceView === 'projects' ? 'project_dashboard' : activeWorkspaceView;
-    switchWorkspaceView(targetView, projectId, currentChatId);
+    const targetView = explicitView || (projectId ? 'project_dashboard' : 'chat');
+    switchWorkspaceView(targetView, projectId, null);
   };
 
   const handleNewChat = async (initialPrompt?: string, targetProjectId?: string | null) => {
